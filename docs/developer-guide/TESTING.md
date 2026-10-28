@@ -11,6 +11,7 @@ Backend:
 ```bash
 uv run ruff format --check .
 uv run ruff check .
+uv run python scripts/ci/prepare_typecheck.py   # removes broken RDKit stubs
 uv run mypy
 uv run pytest -q
 uv run pytest --cov=hcs_discovery --cov-report=term-missing
