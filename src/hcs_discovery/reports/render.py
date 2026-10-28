@@ -133,15 +133,24 @@ def render_markdown(data: dict[str, Any]) -> str:
             f"{'yes' if node['cached'] else 'no'} | {_fmt(node['duration_ms'])} |"
         )
 
+    total_results = len(data["results"])
     lines.extend(
         [
             "",
             "## Results",
             "",
-            f"{len(data['results'])} record(s). Rejected rows are retained with reasons.",
+            f"{total_results} record(s). Rejected rows are retained with reasons.",
             "",
         ]
     )
+    if total_results > 200:
+        lines.extend(
+            [
+                f"> **Table Truncation Notice:** Displaying first 200 of {total_results} records "
+                "for document rendering performance. Complete data is preserved in CSV, JSON and artifact exports.",
+                "",
+            ]
+        )
     header = [
         "Rank",
         "Name",
@@ -240,6 +249,15 @@ def render_html(data: dict[str, Any]) -> str:
             *data["metric_names"],
         ]
     )
+    total_html_results = len(data["results"])
+    truncation_html = ""
+    if total_html_results > 500:
+        truncation_html = (
+            "<div class='caveat' style='margin-bottom:12px; border-left-color:var(--accent-2); "
+            "background:#0c1522; color:#c0d4f5;'>"
+            f"<strong>Table Truncation Notice:</strong> Displaying first 500 of {total_html_results} "
+            "records for browser performance. Complete results are preserved in CSV, JSON and artifact exports.</div>"
+        )
     result_rows = []
     for row in data["results"][:500]:
         cells = [
@@ -335,7 +353,7 @@ def render_html(data: dict[str, Any]) -> str:
   <tbody>{node_rows}</tbody></table>
 
   <h2>Results</h2>
-  <table><thead><tr>{header_cells}</tr></thead><tbody>{"".join(result_rows)}</tbody></table>
+  {truncation_html}<table><thead><tr>{header_cells}</tr></thead><tbody>{"".join(result_rows)}</tbody></table>
 
   <h2>Artifacts</h2>
   <table><thead><tr><th>Path</th><th>Media type</th><th>Bytes</th><th>SHA-256</th></tr></thead>
@@ -384,6 +402,34 @@ def export_report(
         if not source.exists():
             raise NotFoundError("This run has no results.csv artifact.")
         output.write_bytes(source.read_bytes())
+    elif fmt == "sdf":
+        source = safe_join(settings.runs_dir, run_id, "results.sdf")
+        if source.exists():
+            output.write_bytes(source.read_bytes())
+        else:
+            from rdkit import Chem
+
+            writer = Chem.SDWriter(str(output))
+            try:
+                for row in data["results"]:
+                    smiles = row.get("smiles")
+                    mol = Chem.MolFromSmiles(smiles) if smiles else None
+                    if mol is None:
+                        mol = Chem.MolFromSmiles("")
+                    if mol is not None:
+                        mol.SetProp("_Name", str(row.get("compound_id") or row.get("name") or ""))
+                        if row.get("rank") is not None:
+                            mol.SetProp("RANK", str(row["rank"]))
+                        if row.get("composite_score") is not None:
+                            mol.SetProp("COMPOSITE_SCORE", str(row["composite_score"]))
+                        if row.get("pareto_front") is not None:
+                            mol.SetProp("PARETO_FRONT", str(row["pareto_front"]))
+                        for k, v in row.get("metrics", {}).items():
+                            if v is not None:
+                                mol.SetProp(str(k).upper(), str(v))
+                        writer.write(mol)
+            finally:
+                writer.close()
     else:
         raise ValueError(f"Unsupported report format '{fmt}'")
     return output

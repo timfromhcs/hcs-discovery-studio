@@ -65,6 +65,7 @@ cache_app = typer.Typer(help="Node cache.", no_args_is_help=True)
 compounds_app = typer.Typer(help="Molecule utilities.", no_args_is_help=True)
 db_app = typer.Typer(help="Database maintenance.", no_args_is_help=True)
 fetch_app = typer.Typer(help="External public database search (PubChem & ChEMBL).", no_args_is_help=True)
+agent_app = typer.Typer(help="Safe research assistant (Ask, Plan, Run).", no_args_is_help=True)
 
 for name, sub in (
     ("project", project_app),
@@ -78,6 +79,7 @@ for name, sub in (
     ("compounds", compounds_app),
     ("db", db_app),
     ("fetch", fetch_app),
+    ("agent", agent_app),
 ):
     app.add_typer(sub, name=name)
 
@@ -952,6 +954,127 @@ def fetch_chembl(
             d = it["data"]
             lines.append(f"  [{it['external_id']}] {d.get('pref_name') or query} - max phase {d.get('max_phase')}")
     _print(ctx, {"query": query, "count": len(items), "items": items}, "\n".join(lines))
+
+
+# ---------------------------------------------------------------------------
+# Agent commands
+# ---------------------------------------------------------------------------
+
+
+@agent_app.command("status")
+def agent_status_cmd(ctx: typer.Context) -> None:
+    """Inspect research agent status and local LLM provider connectivity."""
+    settings = get_settings()
+    from ..plugins.llm.openai_compat import build_provider
+    from ..plugins.llm.tools import get_tool_catalog
+
+    provider = build_provider(settings)
+    health = provider.probe()
+    tools = get_tool_catalog()
+    data = {
+        "modes": ["ask", "plan", "run"],
+        "provider": provider.metadata(),
+        "health": health.as_dict(),
+        "tools_count": len(tools),
+        "network_policy": settings.network_policy,
+    }
+    lines = [
+        f"Research Agent: {len(tools)} tools registered, modes: ask, plan, run.",
+        f"Provider: {provider.metadata().get('display_name')} ({health.status} - {health.detail})",
+        f"Network Policy: {settings.network_policy}",
+    ]
+    _print(ctx, data, "\n".join(lines))
+
+
+@agent_app.command("tools")
+def agent_tools_cmd(ctx: typer.Context) -> None:
+    """List allowlisted tools available to the research agent."""
+    from ..plugins.llm.tools import get_tool_catalog
+
+    tools = get_tool_catalog()
+    lines = [f"Available Agent Tools ({len(tools)}):"]
+    for t in tools:
+        mut = " [mutating/approval required]" if t.get("requires_approval") else ""
+        lines.append(f"  - {t['name']}{mut}: {t['description']}")
+    _print(ctx, {"count": len(tools), "tools": tools}, "\n".join(lines))
+
+
+@agent_app.command("ask")
+def agent_ask_cmd(
+    ctx: typer.Context,
+    prompt: str = typer.Argument(..., help="Question about chemistry, models, or datasets."),
+    project_id: str | None = typer.Option(None, "--project-id", "-p", help="Optional project context."),
+) -> None:
+    """Ask mode: read-only informational question over datasets and engines."""
+    settings = get_settings()
+    from ..plugins.llm.agent import AgentRequest, ResearchAgent
+
+    agent = ResearchAgent(settings=settings)
+    req = AgentRequest(mode="ask", prompt=prompt, project_id=project_id)
+    with get_session_factory(settings)() as session:
+        try:
+            resp = agent.handle(req, session=session)
+        except AppError as exc:
+            _fail(exc)
+    _print(ctx, resp.model_dump(), resp.text)
+
+
+@agent_app.command("plan")
+def agent_plan_cmd(
+    ctx: typer.Context,
+    prompt: str = typer.Argument(..., help="Goal or screening objective."),
+    project_id: str | None = typer.Option(None, "--project-id", "-p", help="Project context."),
+    dataset_id: str | None = typer.Option(None, "--dataset-id", "-d", help="Dataset context."),
+) -> None:
+    """Plan mode: construct validated DAG workflow and execution steps without mutating state."""
+    settings = get_settings()
+    from ..plugins.llm.agent import AgentRequest, ResearchAgent
+
+    agent = ResearchAgent(settings=settings)
+    req = AgentRequest(mode="plan", prompt=prompt, project_id=project_id, dataset_id=dataset_id)
+    with get_session_factory(settings)() as session:
+        try:
+            resp = agent.handle(req, session=session)
+        except AppError as exc:
+            _fail(exc)
+    _print(ctx, resp.model_dump(), resp.text)
+
+
+@agent_app.command("run")
+def agent_run_cmd(
+    ctx: typer.Context,
+    prompt: str = typer.Argument(..., help="Execution instructions."),
+    tool: str = typer.Option(..., "--tool", "-t", help="Allowlisted tool name to execute."),
+    args: str = typer.Option("{}", "--args", "-a", help="JSON dictionary of tool arguments."),
+    approve: bool = typer.Option(False, "--approve", help="Explicit human approval confirmation for tool execution."),
+    project_id: str | None = typer.Option(None, "--project-id", "-p", help="Optional project context."),
+) -> None:
+    """Run mode: execute approved typed allowlisted tools."""
+    settings = get_settings()
+    from ..plugins.llm.agent import AgentRequest, ResearchAgent
+
+    if not approve:
+        _fail(ValidationError("Execution refused: pass '--approve' to explicitly confirm tool execution."))
+
+    try:
+        parsed_args = json.loads(args)
+    except json.JSONDecodeError as exc:
+        _fail(ValidationError(f"Invalid JSON in --args: {exc}"))
+
+    tool_call = {"tool": tool, "arguments": parsed_args}
+    agent = ResearchAgent(settings=settings)
+    req = AgentRequest(
+        mode="run",
+        prompt=prompt,
+        project_id=project_id,
+        approved_tool_calls=[tool_call],
+    )
+    with get_session_factory(settings)() as session:
+        try:
+            resp = agent.handle(req, session=session)
+        except AppError as exc:
+            _fail(exc)
+    _print(ctx, resp.model_dump(), resp.text)
 
 
 @app.command("version")
