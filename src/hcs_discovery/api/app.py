@@ -25,7 +25,7 @@ from ..database.base import dispose_engines, get_session_factory, init_db
 from ..workflow.registry import default_registry
 from ..workflow.templates import templates
 from .ratelimit import RateLimiter
-from .routes import compounds, datasets, models, projects, runs, system, workflows
+from .routes import compounds, connectors, datasets, models, projects, runs, system, workflows
 
 
 def _resolve_web_dist() -> Path | None:
@@ -173,6 +173,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         workflows.router,
         runs.router,
         models.router,
+        connectors.router,
     ):
         app.include_router(router)
 

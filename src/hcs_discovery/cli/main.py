@@ -64,6 +64,7 @@ config_app = typer.Typer(help="Configuration.", no_args_is_help=True)
 cache_app = typer.Typer(help="Node cache.", no_args_is_help=True)
 compounds_app = typer.Typer(help="Molecule utilities.", no_args_is_help=True)
 db_app = typer.Typer(help="Database maintenance.", no_args_is_help=True)
+fetch_app = typer.Typer(help="External public database search (PubChem & ChEMBL).", no_args_is_help=True)
 
 for name, sub in (
     ("project", project_app),
@@ -76,6 +77,7 @@ for name, sub in (
     ("cache", cache_app),
     ("compounds", compounds_app),
     ("db", db_app),
+    ("fetch", fetch_app),
 ):
     app.add_typer(sub, name=name)
 
@@ -889,6 +891,67 @@ def db_current(ctx: typer.Context) -> None:
         {"database": str(settings.db_path), "revision": revision},
         f"Revision: {revision or 'not initialised'}",
     )
+
+
+@fetch_app.command("pubchem")
+def fetch_pubchem(
+    ctx: typer.Context,
+    query: str = typer.Argument(..., help="Compound name or SMILES to search in PubChem."),
+) -> None:
+    """Search compounds in NCBI PubChem by name or SMILES."""
+    settings = get_settings()
+    from ..plugins.connectors.pubchem import PubChemConnector
+
+    try:
+        connector = PubChemConnector(settings=settings)
+        records = connector.search_compound_by_name(query)
+    except AppError as exc:
+        _fail(exc)
+
+    items = [r.as_dict() for r in records]
+    lines = [f"Found {len(items)} compound(s) in PubChem for '{query}':"]
+    for it in items:
+        d = it["data"]
+        lines.append(f"  [{it['external_id']}] {d.get('iupac_name') or query} - SMILES: {d.get('canonical_smiles')}")
+    _print(ctx, {"query": query, "count": len(items), "items": items}, "\n".join(lines))
+
+
+@fetch_app.command("chembl")
+def fetch_chembl(
+    ctx: typer.Context,
+    query: str = typer.Argument(..., help="Query term for target or compound search."),
+    target: bool = typer.Option(
+        True,
+        "--target/--compound",
+        help="Search biological targets (default) or small molecule compounds.",
+    ),
+    limit: int = typer.Option(10, "--limit", "-n", min=1, max=100, help="Maximum results to return."),
+) -> None:
+    """Search targets or compounds in EMBL-EBI ChEMBL."""
+    settings = get_settings()
+    from ..plugins.connectors.chembl import ChEMBLConnector
+
+    try:
+        connector = ChEMBLConnector(settings=settings)
+        if target:
+            records = connector.search_targets(query, limit=limit)
+        else:
+            records = connector.search_compounds(query, limit=limit)
+    except AppError as exc:
+        _fail(exc)
+
+    items = [r.as_dict() for r in records]
+    if target:
+        lines = [f"Found {len(items)} target(s) in ChEMBL for '{query}':"]
+        for it in items:
+            d = it["data"]
+            lines.append(f"  [{it['external_id']}] {d.get('pref_name')} ({d.get('target_type')}, {d.get('organism')})")
+    else:
+        lines = [f"Found {len(items)} compound(s) in ChEMBL for '{query}':"]
+        for it in items:
+            d = it["data"]
+            lines.append(f"  [{it['external_id']}] {d.get('pref_name') or query} - max phase {d.get('max_phase')}")
+    _print(ctx, {"query": query, "count": len(items), "items": items}, "\n".join(lines))
 
 
 @app.command("version")
