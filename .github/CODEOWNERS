@@ -1,0 +1,3 @@
+# Default owner for the repository. Reviewers are requested automatically for
+# changes that touch security-sensitive paths or release automation.
+* @timfromhcs

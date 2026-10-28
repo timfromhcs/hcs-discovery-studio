@@ -1,0 +1,45 @@
+# Example: deterministic, offline triage workflow.
+# Thresholds are editable project criteria, not universal medicinal-chemistry laws.
+schema_version: 1
+id: triage-basic
+name: Basic triage
+description: >-
+  Compute RDKit descriptors, flag rows against configurable thresholds, rank the
+  survivors with a transparent composite score and write a summary report.
+nodes:
+  - id: descriptors
+    type: chem.descriptors
+    title: RDKit descriptors
+    config:
+      descriptors: [mw, logp, tpsa, hbd, hba, rotb, qed]
+  - id: filters
+    type: filter.rules
+    title: Triage thresholds
+    config:
+      mode: flag
+      rules:
+        - {column: mw, op: between, value: 150, value2: 600, label: "MW 150-600 g/mol"}
+        - {column: logp, op: between, value: -1.0, value2: 5.5, label: "cLogP -1..5.5"}
+        - {column: tpsa, op: le, value: 160, label: "TPSA <= 160 A^2"}
+        - {column: hbd, op: le, value: 5, label: "HBD <= 5"}
+        - {column: hba, op: le, value: 10, label: "HBA <= 10"}
+        - {column: rotb, op: le, value: 10, label: "Rotatable bonds <= 10"}
+  - id: ranking
+    type: rank.pareto
+    title: Pareto + composite ranking
+    config:
+      objectives:
+        - {column: qed, direction: higher, weight: 1.5}
+        - {column: tpsa, direction: lower, weight: 1.0}
+        - {column: logp, direction: lower, weight: 1.0}
+        - {column: mw, direction: lower, weight: 0.5}
+  - id: summary
+    type: report.summary
+    title: Summary report
+    config:
+      title: Basic triage summary
+      top_n: 10
+edges:
+  - {source: descriptors, target: filters}
+  - {source: filters, target: ranking}
+  - {source: ranking, target: summary}

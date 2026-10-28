@@ -1,0 +1,36 @@
+cff-version: 1.2.0
+message: "If you use HCS Discovery Studio in research, please cite this software."
+title: "HCS Discovery Studio"
+abstract: >-
+  A local-first, open-source workbench for AI-assisted drug-discovery research.
+  It imports compound libraries, runs reproducible CPU workflows with recorded
+  provenance, and exposes the same operations through a React UI, a headless
+  CLI and a versioned HTTP API.
+type: software
+authors:
+  - name: "hcsmedia"
+version: "0.1.0"
+date-released: "2026-10-28"
+license: Apache-2.0
+repository-code: "https://github.com/timfromhcs/hcs-discovery-studio"
+url: "https://github.com/timfromhcs/hcs-discovery-studio"
+keywords:
+  - cheminformatics
+  - drug discovery
+  - reproducibility
+  - workflow engine
+  - RDKit
+  - open science
+identifiers:
+  - type: url
+    value: "https://github.com/timfromhcs/hcs-discovery-studio"
+    description: "Source repository"
+preferred-citation:
+  type: software
+  title: "HCS Discovery Studio"
+  authors:
+    - name: "hcsmedia"
+  version: "0.1.0"
+  date-released: "2026-10-28"
+  license: Apache-2.0
+  repository-code: "https://github.com/timfromhcs/hcs-discovery-studio"

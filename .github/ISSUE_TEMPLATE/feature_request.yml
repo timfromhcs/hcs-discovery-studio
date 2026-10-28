@@ -1,0 +1,49 @@
+name: Feature request
+description: Propose a capability, adapter, workflow node, or documentation improvement.
+title: "[feature] "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or research need
+      description: What can you not do today, and why does it matter?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behaviour
+      description: Describe the UI, CLI and API surface you expect. Note any engine, model, data or license requirements.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Chemistry and datasets
+        - Workflow engine
+        - Scientific engine or model adapter
+        - UI and accessibility
+        - CLI and API
+        - Packaging and installation
+        - Documentation
+        - Security
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Existing tools, workarounds, or simpler designs.
+    validations:
+      required: false
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Scientific or licensing evidence
+      description: For a new model or dataset, cite the source, version, license, weights license, hardware needs and validation status. Do not claim accuracy without a benchmark protocol.
+    validations:
+      required: false

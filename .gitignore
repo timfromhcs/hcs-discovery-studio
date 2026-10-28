@@ -1,0 +1,65 @@
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+credentials/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+junit*.xml
+dist/
+build/
+
+# Node / frontend
+node_modules/
+apps/web/dist/
+apps/web/dist-ssr/
+*.local
+.vite/
+playwright-report/
+test-results/
+blob-report/
+.playwright/
+
+# Local application data: databases, caches, artifacts, logs, exports
+data/
+.e2e-data/
+*.sqlite
+*.sqlite3
+*.db
+runs/
+artifacts/
+cache/
+logs/
+exports/
+models/weights/
+*.ckpt
+*.safetensors
+*.gguf
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Temp
+tmp/
+*.tmp
+*.log

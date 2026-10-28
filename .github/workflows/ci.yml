@@ -1,0 +1,394 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "22"
+  UV_VERSION: "0.12.3"
+
+jobs:
+  backend:
+    name: Backend gates (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install uv
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+      - name: Verify lockfile is current
+        run: uv lock --check
+      - name: Install dependencies
+        run: uv sync --frozen
+      - name: Check formatting
+        run: uv run ruff format --check .
+      - name: Lint
+        run: uv run ruff check .
+      - name: Type check
+        run: uv run mypy
+      - name: Test with coverage
+        run: >-
+          uv run pytest -q
+          --cov=hcs_discovery
+          --cov-report=term-missing
+          --cov-report=xml
+          --cov-fail-under=70
+          --junitxml=junit.xml
+      - name: Upload test and coverage reports
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: backend-reports
+          path: |
+            coverage.xml
+            junit.xml
+          if-no-files-found: error
+          retention-days: 7
+
+  frontend:
+    name: Frontend typecheck and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Type check
+        run: npm run typecheck
+      - name: Production build
+        run: npm run build
+      - name: Upload built SPA
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: web-dist
+          path: apps/web/dist
+          if-no-files-found: error
+          retention-days: 1
+
+  e2e:
+    name: Playwright end-to-end (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install uv
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+      - name: Install Python dependencies
+        run: uv sync --frozen
+      - name: Install Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Install frontend dependencies
+        working-directory: apps/web
+        run: npm ci
+      - name: Build the SPA
+        working-directory: apps/web
+        run: npm run build
+      - name: Install Chromium
+        working-directory: apps/web
+        run: npx playwright install --with-deps chromium
+      - name: Run end-to-end tests
+        working-directory: apps/web
+        run: npm run test:e2e
+      - name: Upload Playwright diagnostics
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-diagnostics
+          path: |
+            apps/web/playwright-report
+            apps/web/test-results
+          if-no-files-found: ignore
+          retention-days: 7
+
+  migrations:
+    name: Clean SQLite migration
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install uv
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+      - name: Install dependencies
+        run: uv sync --frozen
+      - name: Apply migrations to an empty data directory
+        env:
+          HCS_DATA_DIR: ${{ runner.temp }}/hcs-migration-data
+        run: |
+          uv run hcs-discovery db upgrade
+          uv run hcs-discovery db current
+      - name: Verify the database exists and is non-empty
+        env:
+          HCS_DATA_DIR: ${{ runner.temp }}/hcs-migration-data
+        run: |
+          test -s "$HCS_DATA_DIR/hcs.sqlite3"
+          uv run hcs-discovery doctor
+
+  wheel:
+    name: Wheel build and install smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install uv
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+      - name: Install Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Build the SPA
+        working-directory: apps/web
+        run: |
+          npm ci
+          npm run build
+      - name: Build the wheel
+        run: uv build --wheel
+      - name: Install the wheel in a clean virtual environment
+        run: |
+          uv venv "$RUNNER_TEMP/wheel-venv"
+          uv pip install --python "$RUNNER_TEMP/wheel-venv/bin/python" dist/*.whl
+      - name: Smoke test the installed application
+        env:
+          HCS_DATA_DIR: ${{ runner.temp }}/hcs-wheel-data
+        run: |
+          set -euo pipefail
+          BIN="$RUNNER_TEMP/wheel-venv/bin/hcs-discovery"
+          "$BIN" version
+          "$BIN" doctor
+          "$BIN" serve --port 8793 > "$RUNNER_TEMP/wheel-server.log" 2>&1 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+          ready=0
+          for _ in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8793/api/v1/health >/dev/null 2>&1; then
+              ready=1
+              break
+            fi
+            sleep 1
+          done
+          if [ "$ready" -ne 1 ]; then
+            echo "server did not become healthy" >&2
+            cat "$RUNNER_TEMP/wheel-server.log" >&2
+            exit 1
+          fi
+          curl -fsS http://127.0.0.1:8793/api/v1/health
+          curl -fsS http://127.0.0.1:8793/ | grep -q 'id="root"'
+      - name: Show server log on failure
+        if: failure()
+        run: cat "$RUNNER_TEMP/wheel-server.log" || true
+
+  licenses:
+    name: License policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install uv
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+      - name: Install Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Install Python dependencies
+        run: uv sync --frozen
+      - name: Check Python dependency licenses
+        run: uv run python scripts/ci/check_licenses.py
+      - name: Check production npm licenses
+        run: node scripts/ci/check_licenses.mjs
+
+  dependency-audit:
+    name: Dependency vulnerability audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install uv
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+      - name: Install dependencies
+        run: uv sync --frozen
+      - name: Export locked runtime requirements
+        run: >-
+          uv export --frozen --no-dev --no-emit-project
+          --format requirements-txt
+          --output-file "$RUNNER_TEMP/requirements-audit.txt"
+      - name: Audit Python dependencies
+        run: >-
+          uvx --from pip-audit==2.10.1 pip-audit
+          --requirement "$RUNNER_TEMP/requirements-audit.txt"
+          --progress-spinner off
+          --strict
+      - name: Audit production npm dependencies
+        working-directory: apps/web
+        run: npm audit --omit=dev --audit-level=high
+
+  docs:
+    name: Documentation links
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install uv
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Check relative Markdown links
+        run: uv run --no-project python scripts/ci/check_links.py
+
+  secret-scan:
+    name: Secret scanning
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Check out full history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Scan for secrets with gitleaks
+        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # A license key is only required for organization-owned repositories.
+
+  dependency-review:
+    name: Dependency review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Review dependency changes
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: high
+          comment-summary-in-pr: on-failure
+
+  ci:
+    name: CI summary
+    if: always()
+    needs:
+      - backend
+      - frontend
+      - e2e
+      - migrations
+      - wheel
+      - licenses
+      - dependency-audit
+      - docs
+      - secret-scan
+      - dependency-review
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail if any required job did not succeed
+        env:
+          RESULTS: >-
+            backend=${{ needs.backend.result }}
+            frontend=${{ needs.frontend.result }}
+            e2e=${{ needs.e2e.result }}
+            migrations=${{ needs.migrations.result }}
+            wheel=${{ needs.wheel.result }}
+            licenses=${{ needs.licenses.result }}
+            dependency-audit=${{ needs.dependency-audit.result }}
+            docs=${{ needs.docs.result }}
+            secret-scan=${{ needs.secret-scan.result }}
+            dependency-review=${{ needs.dependency-review.result }}
+        run: |
+          echo "$RESULTS"
+          for result in $RESULTS; do
+            name="${result%%=*}"
+            status="${result#*=}"
+            if [ "$name" = "dependency-review" ] && [ "$status" = "skipped" ]; then
+              continue
+            fi
+            if [ "$status" != "success" ]; then
+              echo "required job $name finished with status $status" >&2
+              exit 1
+            fi
+          done

@@ -1,0 +1,118 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing annotated tag to publish (for example v0.1.0)
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "22"
+  UV_VERSION: "0.12.3"
+  RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+
+jobs:
+  publish:
+    name: Build, attest and publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Check out the tagged commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install uv
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+      - name: Install Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Verify tag, package version and changelog agree
+        run: uv run --no-project python scripts/release/verify_version.py "$RELEASE_TAG"
+      - name: Install test dependencies
+        run: uv sync --frozen
+      - name: Run the release test gate
+        run: uv run pytest -q
+      - name: Build the frontend
+        working-directory: apps/web
+        run: |
+          npm ci
+          npm run build
+      - name: Install production dependencies for packaging
+        run: uv sync --frozen --no-dev
+      - name: Build the wheel
+        run: uv build --wheel
+      - name: Generate a CycloneDX SBOM
+        run: |
+          export SOURCE_DATE_EPOCH="$(git log -1 --format=%ct)"
+          uvx --from cyclonedx-bom==7.5.0 cyclonedx-py environment .venv/bin/python \
+            --pyproject pyproject.toml \
+            --output-reproducible \
+            --of JSON \
+            --output-file dist/sbom.cdx.json
+      - name: Write checksums
+        run: |
+          cd dist
+          sha256sum ./*.whl sbom.cdx.json > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+      - name: Attest build provenance for the wheel
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/*.whl
+      - name: Publish the GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "release $RELEASE_TAG already exists; replacing assets"
+            gh release upload "$RELEASE_TAG" dist/*.whl dist/sbom.cdx.json dist/SHA256SUMS.txt --clobber
+            if [ -f "docs/releases/${RELEASE_TAG}.md" ]; then
+              gh release edit "$RELEASE_TAG" --notes-file "docs/releases/${RELEASE_TAG}.md" --prerelease
+            fi
+          else
+            if [ -f "docs/releases/${RELEASE_TAG}.md" ]; then
+              NOTES=(--notes-file "docs/releases/${RELEASE_TAG}.md")
+            else
+              NOTES=(--generate-notes)
+            fi
+            gh release create "$RELEASE_TAG" \
+              dist/*.whl dist/sbom.cdx.json dist/SHA256SUMS.txt \
+              --title "HCS Discovery Studio ${RELEASE_TAG#v} (preview)" \
+              --prerelease \
+              --verify-tag \
+              "${NOTES[@]}"
+          fi
+      - name: Summarize published assets
+        run: |
+          {
+            echo "## Release ${RELEASE_TAG}"
+            echo
+            echo "Assets: wheel, CycloneDX SBOM and SHA-256 checksums."
+            echo
+            echo '```'
+            cat dist/SHA256SUMS.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

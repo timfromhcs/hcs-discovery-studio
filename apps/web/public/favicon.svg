@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="HCS Discovery Studio">
+  <rect width="64" height="64" rx="14" fill="#0b131c"/>
+  <g stroke="#3dd6c3" stroke-width="2.4" fill="none" stroke-linecap="round">
+    <path d="M32 13 48 22.5v19L32 51 16 41.5v-19z"/>
+    <path d="M32 13v10m16 -0.5-9 5m9 14.5-9-5M32 51v-9m-16 -0.5 9-5m-9-14.5 9 5"/>
+  </g>
+  <g fill="#3dd6c3">
+    <circle cx="32" cy="13" r="3.4"/>
+    <circle cx="48" cy="22.5" r="3.4"/>
+    <circle cx="48" cy="41.5" r="3.4"/>
+    <circle cx="32" cy="51" r="3.4"/>
+    <circle cx="16" cy="41.5" r="3.4"/>
+    <circle cx="16" cy="22.5" r="3.4"/>
+  </g>
+  <circle cx="32" cy="32" r="6.4" fill="#0b131c" stroke="#6aa9ff" stroke-width="2.6"/>
+</svg>

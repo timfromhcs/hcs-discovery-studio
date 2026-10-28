@@ -1,0 +1,172 @@
+"""Typed tabular data that flows between workflow nodes.
+
+Every column carries its unit, score direction and producing method, so downstream
+ranking and the UI cannot silently interpret an unqualified number.
+"""
+
+from __future__ import annotations
+
+import math
+from collections.abc import Iterable
+from dataclasses import dataclass, field
+from typing import Any, Literal
+
+from ..core.errors import ValidationError
+from ..core.hashing import stable_json_hash
+
+ColumnType = Literal["string", "number", "boolean"]
+
+
+@dataclass(frozen=True)
+class Column:
+    name: str
+    label: str
+    type: ColumnType = "number"
+    unit: str | None = None
+    direction: Literal["higher", "lower", "neutral"] | None = None
+    method: str | None = None
+    description: str | None = None
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "name": self.name,
+            "label": self.label,
+            "type": self.type,
+            "unit": self.unit,
+            "direction": self.direction,
+            "method": self.method,
+            "description": self.description,
+        }
+
+
+IDENTITY_COLUMNS: tuple[Column, ...] = (
+    Column("compound_id", "Compound ID", "string", description="Internal identifier."),
+    Column(
+        "smiles",
+        "SMILES",
+        "string",
+        method="RDKit canonical isomeric SMILES",
+        description="Canonical isomeric SMILES after the dataset standardisation policy.",
+    ),
+    Column("name", "Name", "string"),
+    Column("source_id", "Source ID", "string", description="Identifier from the source record."),
+)
+
+FILTER_COLUMNS: tuple[Column, ...] = (
+    Column(
+        "filter_pass",
+        "Passes filters",
+        "boolean",
+        description="Result of the configured rule checks. Rejected rows are retained.",
+    ),
+    Column(
+        "filter_reasons",
+        "Filter reasons",
+        "string",
+        description="Semicolon-separated reasons for a failed rule.",
+    ),
+)
+
+
+def _is_missing(value: Any) -> bool:
+    return value is None or (isinstance(value, float) and (math.isnan(value) or math.isinf(value)))
+
+
+@dataclass
+class Table:
+    rows: list[dict[str, Any]]
+    columns: list[Column] = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        seen: dict[str, Column] = {}
+        for column in self.columns:
+            seen[column.name] = column
+        self.columns = list(seen.values())
+
+    @property
+    def column_names(self) -> list[str]:
+        return [column.name for column in self.columns]
+
+    def column(self, name: str) -> Column:
+        for column in self.columns:
+            if column.name == name:
+                return column
+        raise ValidationError(f"Column '{name}' is not present.", details={"columns": self.column_names})
+
+    def has_column(self, name: str) -> bool:
+        return any(column.name == name for column in self.columns)
+
+    def require(self, names: Iterable[str]) -> None:
+        missing = [name for name in names if not self.has_column(name)]
+        if missing:
+            raise ValidationError(
+                f"Required column(s) missing: {', '.join(missing)}.",
+                details={"missing": missing, "columns": self.column_names},
+            )
+
+    def with_columns(self, new_columns: Iterable[Column]) -> Table:
+        merged = list(self.columns)
+        existing = {column.name for column in merged}
+        for column in new_columns:
+            if column.name not in existing:
+                merged.append(column)
+                existing.add(column.name)
+        return Table(rows=self.rows, columns=merged)
+
+    def add_values(self, column: Column, values: list[Any]) -> Table:
+        if len(values) != len(self.rows):
+            raise ValueError("Column length does not match row count")
+        for row, value in zip(self.rows, values, strict=True):
+            row[column.name] = value
+        if not self.has_column(column.name):
+            self.columns.append(column)
+        return self
+
+    def numeric(self, name: str) -> list[float | None]:
+        out: list[float | None] = []
+        for row in self.rows:
+            value = row.get(name)
+            if value is None or isinstance(value, bool):
+                out.append(None)
+                continue
+            if isinstance(value, float) and (math.isnan(value) or math.isinf(value)):
+                out.append(None)
+                continue
+            try:
+                out.append(float(value))
+            except (TypeError, ValueError):
+                out.append(None)
+        return out
+
+    def copy(self, *, rows: list[dict[str, Any]] | None = None) -> Table:
+        return Table(
+            rows=[dict(row) for row in rows] if rows is not None else [dict(row) for row in self.rows],
+            columns=list(self.columns),
+        )
+
+    def subset_columns(self, names: Iterable[str]) -> Table:
+        keep = list(names)
+        for name in keep:
+            self.column(name)
+        return Table(
+            rows=[{key: row.get(key) for key in keep} for row in self.rows],
+            columns=[column for column in self.columns if column.name in keep],
+        )
+
+    def content_hash(self) -> str:
+        return stable_json_hash(
+            {
+                "columns": [column.as_dict() for column in self.columns],
+                "rows": self.rows,
+            }
+        )
+
+    def summary(self) -> dict[str, Any]:
+        return {
+            "rows": len(self.rows),
+            "columns": self.column_names,
+        }
+
+    def to_records(self, *, limit: int | None = None) -> list[dict[str, Any]]:
+        rows = self.rows if limit is None else self.rows[:limit]
+        return [dict(row) for row in rows]

@@ -1,0 +1,65 @@
+name: Bug report
+description: Report a reproducible defect in the application, CLI, API, or documentation.
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting a problem. Do **not** paste API keys, bearer tokens,
+        private datasets, or proprietary structures. Redact paths and identifiers
+        that you cannot share publicly.
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened?
+      description: A clear description of the observed behaviour.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Include exact commands or UI actions and the sample data used.
+      placeholder: |
+        1. uv run hcs-discovery ...
+        2. Open ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: Output of `hcs-discovery version`, or the commit SHA.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Python, Node, RDKit and browser versions. Paste redacted `hcs-discovery doctor` output if relevant.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Redacted logs or screenshots
+      description: Remove tokens, secrets, private paths and sensitive scientific data.
+    validations:
+      required: false
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Confirmations
+      options:
+        - label: I have removed secrets and private data from this report.
+          required: true
+        - label: I searched existing issues before opening this one.
+          required: true

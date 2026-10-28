@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/timfromhcs/hcs-discovery-studio/security/policy
+    about: Please report security issues privately according to SECURITY.md, not in a public issue.
+  - name: Scientific limitations
+    url: https://github.com/timfromhcs/hcs-discovery-studio/blob/main/docs/user-guide/SCIENTIFIC_LIMITATIONS.md
+    about: Read what this preview does and does not claim before filing a scientific issue.
