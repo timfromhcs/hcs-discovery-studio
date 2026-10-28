@@ -151,13 +151,35 @@ class RunExecutor:
             table = self._input_table(run)
             self.events.emit("run.validated", "Workflow and dataset validated.", data={"rows": len(table.rows)})
 
+            node_tables: dict[str, Table] = {}
             for node in validated.order:
                 self._check_cancelled(run)
-                table = self._run_node(run, node.id, node.type, node.config, node.timeout_seconds, table)
+                p_ids = validated.parents_map.get(node.id, [])
+                if not p_ids:
+                    in_table = table
+                    incoming_tables: dict[str, Table] = {}
+                elif len(p_ids) == 1:
+                    in_table = node_tables[p_ids[0]]
+                    incoming_tables = {p_ids[0]: in_table}
+                else:
+                    in_table = node_tables[p_ids[0]]
+                    incoming_tables = {pid: node_tables[pid] for pid in p_ids}
+
+                node_out = self._run_node(
+                    run,
+                    node.id,
+                    node.type,
+                    node.config,
+                    node.timeout_seconds,
+                    in_table,
+                    incoming_tables=incoming_tables,
+                )
+                node_tables[node.id] = node_out
                 self._check_cancelled(run)
 
-            self._persist_results(run, table)
-            self._write_manifest(run, validated.spec, table, started)
+            final_table = node_tables[validated.order[-1].id]
+            self._persist_results(run, final_table)
+            self._write_manifest(run, validated.spec, final_table, started)
             run.status = "succeeded"
             run.finished_at = db_now()
             run.lease_owner = None
@@ -235,6 +257,7 @@ class RunExecutor:
         config: dict[str, Any],
         timeout_seconds: int,
         input_table: Table,
+        incoming_tables: dict[str, Table] | None = None,
     ) -> Table:
         definition = self.registry.get(node_type)
         parsed_config = definition.parse_config(config)
@@ -291,6 +314,7 @@ class RunExecutor:
             check_cancel=lambda: self._check_cancelled(run),
             write_artifact=self._write_artifact,
             engine_versions=self._engine_versions(),
+            incoming_tables=incoming_tables or {},
         )
         try:
             output = definition.handler(input_table.copy(), parsed_config, context)

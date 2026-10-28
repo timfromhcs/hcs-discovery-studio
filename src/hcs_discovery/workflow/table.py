@@ -41,6 +41,7 @@ class Column:
 
 IDENTITY_COLUMNS: tuple[Column, ...] = (
     Column("compound_id", "Compound ID", "string", description="Internal identifier."),
+    Column("id", "ID", "string", description="Compound identifier."),
     Column(
         "smiles",
         "SMILES",
@@ -159,6 +160,76 @@ class Table:
             rows=[{key: row.get(key) for key in keep} for row in self.rows],
             columns=[column for column in self.columns if column.name in keep],
         )
+
+    def join(
+        self,
+        other: Table,
+        *,
+        key_column: str = "id",
+        how: Literal["inner", "left", "outer"] = "left",
+        suffix: str = "_right",
+    ) -> Table:
+        """Merge this table with another table on a common key column."""
+        self.require([key_column])
+        other.require([key_column])
+
+        merged_columns: list[Column] = list(self.columns)
+        right_col_map: dict[str, str] = {}
+        existing_names = set(self.column_names)
+
+        for col in other.columns:
+            if col.name == key_column:
+                continue
+            final_name = col.name
+            if final_name in existing_names:
+                final_name = f"{col.name}{suffix}"
+            right_col_map[col.name] = final_name
+            merged_columns.append(
+                Column(
+                    name=final_name,
+                    label=col.label,
+                    type=col.type,
+                    unit=col.unit,
+                    direction=col.direction,
+                    method=col.method,
+                    description=col.description,
+                )
+            )
+
+        right_index: dict[Any, dict[str, Any]] = {}
+        for r in other.rows:
+            k = r.get(key_column)
+            if k is not None:
+                right_index[k] = r
+
+        new_rows: list[dict[str, Any]] = []
+        seen_right_keys: set[Any] = set()
+
+        for l_row in self.rows:
+            k = l_row.get(key_column)
+            r_row = right_index.get(k)
+            if r_row is None and how == "inner":
+                continue
+            row_dict = dict(l_row)
+            if r_row is not None:
+                seen_right_keys.add(k)
+                for orig_name, final_name in right_col_map.items():
+                    row_dict[final_name] = r_row.get(orig_name)
+            else:
+                for final_name in right_col_map.values():
+                    row_dict[final_name] = None
+            new_rows.append(row_dict)
+
+        if how == "outer":
+            for k, r_row in right_index.items():
+                if k not in seen_right_keys:
+                    row_dict = {c.name: None for c in self.columns}
+                    row_dict[key_column] = k
+                    for orig_name, final_name in right_col_map.items():
+                        row_dict[final_name] = r_row.get(orig_name)
+                    new_rows.append(row_dict)
+
+        return Table(rows=new_rows, columns=merged_columns)
 
     def content_hash(self) -> str:
         return stable_json_hash(

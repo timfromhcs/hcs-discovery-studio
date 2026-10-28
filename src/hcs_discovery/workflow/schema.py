@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -49,6 +49,8 @@ class ValidatedWorkflow:
     order: list[NodeSpec]
     columns_at: dict[str, list[Column]]
     registry: NodeRegistry
+    parents_map: dict[str, list[str]] = field(default_factory=dict)
+    children_map: dict[str, list[str]] = field(default_factory=dict)
 
     @property
     def root(self) -> NodeSpec:
@@ -81,6 +83,10 @@ def validate_workflow(
     input_columns: list[Column] | None = None,
 ) -> ValidatedWorkflow:
     registry = registry or default_registry()
+    if input_columns is None:
+        from .table import IDENTITY_COLUMNS
+
+        input_columns = list(IDENTITY_COLUMNS)
     spec = payload if isinstance(payload, WorkflowSpec) else parse_workflow(payload)
     issues: list[dict[str, Any]] = []
 
@@ -117,7 +123,7 @@ def validate_workflow(
     if not spec.nodes:
         issues.append({"code": "empty_workflow", "message": "A workflow needs at least one node."})
 
-    parents: dict[str, str | None] = {node_id: None for node_id in nodes}
+    parents: dict[str, list[str]] = {node_id: [] for node_id in nodes}
     children: dict[str, list[str]] = {node_id: [] for node_id in nodes}
     seen_edges: set[tuple[str, str]] = set()
 
@@ -156,21 +162,23 @@ def validate_workflow(
             )
             continue
         seen_edges.add((edge.source, edge.target))
-        if parents[edge.target] is not None:
+
+        # Check multi-input rules: only table.join supports multiple parent edges
+        if parents[edge.target] and nodes[edge.target].type != "table.join":
             issues.append(
                 {
                     "code": "multiple_inputs_unsupported",
                     "node": edge.target,
                     "message": (
-                        "This version supports one input per node. Multi-input merge nodes are not implemented; "
-                        "use one linear branch per result set."
+                        f"Node '{edge.target}' ({nodes[edge.target].type}) only accepts one input. "
+                        "Use 'table.join' to merge multiple incoming branches."
                     ),
                 }
             )
-        parents[edge.target] = edge.source
+        parents[edge.target].append(edge.source)
         children[edge.source].append(edge.target)
 
-    roots = [node_id for node_id, parent in parents.items() if parent is None]
+    roots = [node_id for node_id, p_list in parents.items() if not p_list]
     if len(roots) > 1:
         issues.append(
             {
@@ -182,42 +190,44 @@ def validate_workflow(
     elif not roots and nodes:
         issues.append({"code": "no_root", "message": "Every node has a parent, so the graph is cyclic."})
 
+    # Kahn's algorithm for topological sorting of DAG
     order: list[NodeSpec] = []
-    if (
-        not issues or all(issue["code"] in {"multiple_roots", "multiple_inputs_unsupported"} for issue in issues)
-    ) and roots:
-        stack = [roots[0]]
-        visited: set[str] = set()
-        while stack:
-            current = stack.pop()
-            if current in visited:
-                continue
-            visited.add(current)
-            order.append(nodes[current])
-            stack.extend(reversed(children[current]))
-        if len(visited) != len(nodes):
+    if roots and not any(i["code"] == "no_root" for i in issues):
+        in_degree = {nid: len(parents[nid]) for nid in nodes}
+        queue = [nid for nid in nodes if in_degree[nid] == 0]
+        while queue:
+            curr = queue.pop(0)
+            order.append(nodes[curr])
+            for ch in children[curr]:
+                in_degree[ch] -= 1
+                if in_degree[ch] == 0:
+                    queue.append(ch)
+        if len(order) != len(nodes):
             issues.append(
                 {
                     "code": "cycle_or_disconnected",
-                    "message": "Workflow graph is cyclic or has disconnected nodes.",
+                    "message": "Workflow graph contains a directed cycle or unreachable nodes.",
                 }
             )
 
     columns_at: dict[str, list[Column]] = {}
-    if not issues:
-        current_columns = list(input_columns or [])
-        if current_columns:
-            available = {column.name for column in current_columns}
-            for required in registry.get(order[0].type).requires:
-                if required not in available:
-                    issues.append(
-                        {
-                            "code": "missing_input_column",
-                            "node": order[0].id,
-                            "message": f"Entry node requires column '{required}', which the dataset does not provide.",
-                        }
-                    )
+    if not issues and order:
         for node in order:
+            # Determine incoming columns for this node
+            p_ids = parents[node.id]
+            if not p_ids:
+                node_in_cols = list(input_columns or [])
+            elif len(p_ids) == 1:
+                node_in_cols = list(columns_at.get(p_ids[0], []))
+            else:
+                # Merge columns from all parents
+                seen_c: dict[str, Column] = {}
+                for pid in p_ids:
+                    for c in columns_at.get(pid, []):
+                        if c.name not in seen_c:
+                            seen_c[c.name] = c
+                node_in_cols = list(seen_c.values())
+
             definition = registry.get(node.type)
             try:
                 config = definition.parse_config(node.config)
@@ -231,12 +241,10 @@ def validate_workflow(
                     }
                 )
                 continue
-            missing = [
-                name
-                for name in definition.required_columns(config)
-                if name not in {column.name for column in current_columns}
-            ]
-            if missing and not (node is order[0] and not current_columns):
+
+            available_col_names = {c.name for c in node_in_cols}
+            missing = [name for name in definition.required_columns(config) if name not in available_col_names]
+            if missing and not (not p_ids and not node_in_cols):
                 issues.append(
                     {
                         "code": "missing_column",
@@ -249,8 +257,15 @@ def validate_workflow(
             except Exception as exc:
                 issues.append({"code": "invalid_config", "node": node.id, "message": str(exc)})
                 continue
-            current_columns = [*current_columns, *produced]
-            columns_at[node.id] = list(current_columns)
+
+            # Output columns = incoming + produced
+            out_cols = list(node_in_cols)
+            out_names = {c.name for c in out_cols}
+            for prod in produced:
+                if prod.name not in out_names:
+                    out_cols.append(prod)
+                    out_names.add(prod.name)
+            columns_at[node.id] = out_cols
 
     if issues:
         raise ValidationError(
@@ -258,7 +273,14 @@ def validate_workflow(
             details={"issues": issues},
         )
 
-    return ValidatedWorkflow(spec=spec, order=order, columns_at=columns_at, registry=registry)
+    return ValidatedWorkflow(
+        spec=spec,
+        order=order,
+        columns_at=columns_at,
+        registry=registry,
+        parents_map=parents,
+        children_map=children,
+    )
 
 
 def dataset_table(compounds: list[dict[str, Any]]) -> Table:
@@ -266,6 +288,7 @@ def dataset_table(compounds: list[dict[str, Any]]) -> Table:
 
     rows = [
         {
+            "id": item["id"],
             "compound_id": item["id"],
             "smiles": item["isomeric_smiles"],
             "name": item.get("name"),

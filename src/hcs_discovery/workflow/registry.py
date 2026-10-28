@@ -37,6 +37,7 @@ class NodeContext:
     check_cancel: Callable[[], None]
     write_artifact: ArtifactWriter
     engine_versions: dict[str, str] = field(default_factory=dict)
+    incoming_tables: dict[str, Any] = field(default_factory=dict)
 
     def log(self, message: str, *, level: str = "info", data: dict[str, Any] | None = None) -> None:
         self.emit(level, message, data, "log")

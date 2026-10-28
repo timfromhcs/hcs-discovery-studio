@@ -663,6 +663,38 @@ def _run_summary(table: Table, config: SummaryConfig, ctx: NodeContext) -> Table
     return table
 
 
+# --------------------------------------------------------------------------- table.join
+class JoinConfig(BaseModel):
+    key_column: str = Field(default="id", description="Common column to align rows on.")
+    how: Literal["inner", "left", "outer"] = Field(
+        default="left", description="Join type: 'left' (retain all left rows), 'inner', or 'outer'."
+    )
+    suffix: str = Field(
+        default="_branch",
+        pattern=r"^_[a-z0-9_]{1,16}$",
+        description="Suffix for resolving column name collisions between branches.",
+    )
+
+
+def _run_join(table: Table, config: JoinConfig, ctx: NodeContext) -> Table:
+    if not ctx.incoming_tables or len(ctx.incoming_tables) < 2:
+        return table
+
+    tables = list(ctx.incoming_tables.values())
+    result = tables[0]
+    for idx, other in enumerate(tables[1:], start=2):
+        sfx = f"{config.suffix}_{idx}" if len(tables) > 2 else config.suffix
+        result = result.join(other, key_column=config.key_column, how=config.how, suffix=sfx)
+
+    ctx.log(
+        f"Joined {len(tables)} tables on '{config.key_column}' ({config.how}) -> "
+        f"{len(result.rows)} rows, {len(result.columns)} columns.",
+        level="info",
+    )
+    ctx.report_progress(1.0)
+    return result
+
+
 def register_builtin_nodes(registry: NodeRegistry) -> None:
     registry.register(
         NodeDefinition(
@@ -801,5 +833,19 @@ def register_builtin_nodes(registry: NodeRegistry) -> None:
                 check_domain=config.check_applicability_domain,
             ),
             documentation="Predictions are statistical estimations within model applicability domains.",
+        )
+    )
+    registry.register(
+        NodeDefinition(
+            type="table.join",
+            title="Table merge / join",
+            category="data",
+            version=NODE_VERSION,
+            description="Merge branching pipeline tables on a common key column.",
+            config_model=JoinConfig,
+            handler=_run_join,
+            requires=(),
+            outputs=lambda _config: [],
+            documentation="Combines multiple pipeline branches using key-based alignment.",
         )
     )
