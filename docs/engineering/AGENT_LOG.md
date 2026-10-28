@@ -223,6 +223,29 @@ observed; it is not a marketing summary.
   timestamps ("2 h ago" versus "3 h ago"). The committed images remain the ones
   captured for the release.
 
+## 2026-10-28 — Phase 0: v1.0.0 Stable baseline audit
+
+- Mandate adopted: `GEMINI.md` Autonomous Stable v1.0.0 Engineering Mandate.
+- Confirmed environment: Windows 11 Build 26200, AMD Ryzen 7 7735HS, 19.8 GB RAM.
+- Vulkan 1.4.315 / 1.4.357 verified on AMD Radeon Graphics iGPU via `vulkaninfo`.
+- Baseline gates reproduced locally:
+  - `uv run ruff format --check .` -> clean (108 files)
+  - `uv run ruff check .` -> clean
+  - `uv run mypy` -> clean (62 source files)
+  - `uv run pytest` -> 82 passed, 0 failed, 75% coverage
+  - Frontend: `npm run typecheck` & `npm run build` -> clean (187ms)
+  - Playwright E2E: 3 passed (11.2s) on port 8791 with `.e2e-data`
+  - Wheel build: `hcs_discovery_studio-0.1.0-py3-none-any.whl`
+  - Clean venv wheel install smoke: `/api/v1/health` 200 OK, root SPA served
+  - CPU smoke test: project create -> import demo library -> triage workflow -> worker execution -> HTML/MD reports
+- Proven defects identified:
+  - `OperationalError: no such table: audit_events` when CLI commands like `project create` run on uninitialized DB (init_db was not invoked by get_session_factory).
+  - Pareto nondominated sorting order-dependence (needs Deb Fast Non-dominated Sorting algorithm).
+  - Filter validation missing strict operator-to-value typing prior to execution.
+  - Exception swallowing in descriptor loop.
+  - Residual files on deletion and unbounded cache.
+- Produced `docs/engineering/STABLE_V1_GAP_ANALYSIS.md`. Entering Phase 1.
+
 ## Security notes
 
 - A GitHub token was supplied in chat earlier in the project. It was never

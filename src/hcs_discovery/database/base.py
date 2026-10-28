@@ -18,6 +18,7 @@ from ..core.config import Settings, get_settings
 
 _engines: dict[str, Engine] = {}
 _factories: dict[str, sessionmaker[Session]] = {}
+_initialized: set[str] = set()
 
 
 def _apply_sqlite_pragmas(dbapi_connection, _connection_record) -> None:
@@ -47,10 +48,25 @@ def get_engine(settings: Settings | None = None) -> Engine:
     return _engines[key]
 
 
+def ensure_database_initialized(settings: Settings | None = None) -> None:
+    settings = settings or get_settings()
+    key = str(settings.db_path)
+    if key in _initialized:
+        return
+    engine = get_engine(settings)
+    from sqlalchemy import inspect
+
+    tables = inspect(engine).get_table_names()
+    if not tables:
+        init_db(settings)
+    _initialized.add(key)
+
+
 def get_session_factory(settings: Settings | None = None) -> sessionmaker[Session]:
     settings = settings or get_settings()
     key = str(settings.db_path)
     if key not in _factories:
+        ensure_database_initialized(settings)
         _factories[key] = sessionmaker(bind=get_engine(settings), expire_on_commit=False, future=True)
     return _factories[key]
 
@@ -85,6 +101,7 @@ def dispose_engines() -> None:
         engine.dispose()
     _engines.clear()
     _factories.clear()
+    _initialized.clear()
 
 
 def database_exists(path: Path) -> bool:

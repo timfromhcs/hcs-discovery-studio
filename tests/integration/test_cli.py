@@ -15,7 +15,7 @@ runner = CliRunner()
 
 def _json(result) -> dict:  # type: ignore[no-untyped-def]
     assert result.exit_code == 0, result.output
-    return json.loads(result.output)
+    return json.loads(result.stdout)
 
 
 def test_doctor_json(settings):
@@ -126,3 +126,20 @@ def test_invalid_workflow_exits_with_validation_code(settings, tmp_path: Path):
     result = runner.invoke(app, ["--json", "workflow", "validate", str(bad)])
     assert result.exit_code == 3
     assert json.loads(result.output)["error"]["code"] == "validation_error"
+
+
+def test_cli_on_uninitialized_database(tmp_path: Path):
+    from hcs_discovery.core.config import Settings, reset_settings
+    from hcs_discovery.database.base import dispose_engines
+
+    data_dir = tmp_path / "uninitialized_data"
+    current = Settings(data_dir=data_dir, network_policy="local")
+    reset_settings(current)
+    dispose_engines()
+    try:
+        created = _json(runner.invoke(app, ["--json", "project", "create", "--name", "Auto Project"]))
+        assert created["name"] == "Auto Project"
+        assert (data_dir / "hcs.sqlite3").exists()
+    finally:
+        dispose_engines()
+        reset_settings(None)
