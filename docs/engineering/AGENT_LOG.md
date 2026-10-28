@@ -282,6 +282,24 @@ observed; it is not a marketing summary.
   - Added 8 scientific contract and live docking smoke tests in `tests/scientific/test_vina_adapter.py`.
   - Full test suite: 100 passing tests, 0 warnings (excluding FastAPI testclient deprecation), clean mypy and ruff. Commit `930cfed`.
 
+## 2026-10-28 — Phase 2: Units 5 & 6 property prediction and connectors
+
+- Unit 5: Learned property prediction & scaffold splitting:
+  - Implemented Delaney ESOL aqueous solubility model (`esol_solubility`) with leverage-based uncertainty calibration and applicability domain checks.
+  - Implemented Wager et al. CNS MPO multi-parameter optimization model (`cns_mpo_bbb`) for blood-brain barrier permeability scoring.
+  - Implemented Bemis-Murcko generic/canonical scaffold extraction and leakage-free dataset splitting.
+  - Registered `predict.property` workflow step and `science:property-predict` in model catalog.
+  - Added 7 scientific validation, contract, and benchmark protocol tests in `tests/scientific/test_property_prediction.py`. Commit `2cd4fe3`.
+
+- Unit 6: Public data connectors (PubChem & ChEMBL):
+  - Added strict outbound network policy check (default local-only, explicit opt-in for remote).
+  - Implemented PubChem PUG REST client with CC0 license attribution and rate-limiting.
+  - Implemented EMBL-EBI ChEMBL client for targets, compounds, and bioactivities with CC-BY-SA 3.0 attribution.
+  - Added API routes under `/api/v1/connectors` for status, search, and activity inspection.
+  - Added CLI command group `hcs-discovery fetch pubchem` and `hcs-discovery fetch chembl`.
+  - Added 7 integration tests with mock transports and policy gating in `tests/integration/test_connectors.py`. Commit `4614d1c`.
+  - Full test suite: 114 passing tests, 0 warnings (excluding FastAPI testclient deprecation), clean mypy and ruff.
+
 ## Security notes
 
 - A GitHub token was supplied in chat earlier in the project. It was never
