@@ -23,7 +23,7 @@ test or a recorded manual check; it does not mean validated science.
 | Local LLM provider | Probe/config only | No chat feature or LLM node |
 | Docking/MD/ML engines | Planned | Registry metadata only |
 | GitHub CI | Pass | All required jobs green on Linux and Windows; CodeQL green |
-| Public release | Pending | Tag `v0.1.0` after this status commit |
+| Public release | Done | Prerelease [`v0.1.0`](https://github.com/timfromhcs/hcs-discovery-studio/releases/tag/v0.1.0); assets verified |
 | v1.0.0 | Not met | See release-gate table |
 
 ## Working now
@@ -82,13 +82,29 @@ test or a recorded manual check; it does not mean validated science.
 - Frontend typecheck and production build clean locally and in CI.
 - Genuine screenshots in `docs/screenshots/`.
 - GitHub Actions run
-  [40676916640](https://github.com/timfromhcs/hcs-discovery-studio/actions/runs/40676916640)
-  passed every required job: Ubuntu and Windows backend gates, frontend build,
-  Playwright, clean SQLite migration, wheel smoke test, license policy,
-  dependency audit, documentation links, secret scanning and the aggregate
-  summary. CodeQL run
-  [40676916587](https://github.com/timfromhcs/hcs-discovery-studio/actions/runs/40676916587)
+  [40677454655](https://github.com/timfromhcs/hcs-discovery-studio/actions/runs/40677454655)
+  passed every required job on commit `2420016`: Ubuntu and Windows backend
+  gates, frontend build, Playwright, clean SQLite migration, wheel smoke test,
+  license policy, dependency audit, documentation links, secret scanning and the
+  aggregate summary. CodeQL run
+  [40677454641](https://github.com/timfromhcs/hcs-discovery-studio/actions/runs/40677454641)
   also passed.
+
+### Published release
+
+- Tag `v0.1.0` points at commit `2420016`. Release workflow run
+  [40677691377](https://github.com/timfromhcs/hcs-discovery-studio/actions/runs/40677691377)
+  built, attested and published the prerelease
+  [`v0.1.0`](https://github.com/timfromhcs/hcs-discovery-studio/releases/tag/v0.1.0).
+- Assets: `hcs_discovery_studio-0.1.0-py3-none-any.whl`
+  (SHA-256 `c40674667d67a85409d70a36bba8fd28ae8933867f47f2885cd94ab09ec0e33e`),
+  `sbom.cdx.json`
+  (SHA-256 `17c668dec0808c1ccab6724aff6c69baaa34f5ebd3d40f6dd4a1d0a741087c96`)
+  and `SHA256SUMS.txt`. The published checksums match the downloaded files.
+- `gh attestation verify` succeeds for the wheel, so the SLSA build provenance
+  is present and tied to this repository's release workflow.
+- The downloaded wheel was installed into a fresh virtual environment and
+  `hcs-discovery version` printed `HCS Discovery Studio 0.1.0`.
 
 ## Partial
 
@@ -120,7 +136,9 @@ test or a recorded manual check; it does not mean validated science.
 - Predictive-accuracy benchmarks or experimental validation.
 - Coverage badge from CI (coverage is measured locally but not published as a
   badge).
-- Signed artifacts, SLSA provenance or container attestations.
+- Signed release artifacts (GPG or cosign) and container attestations. The wheel
+  does carry a GitHub build-provenance attestation.
+- Published coverage badge or coverage upload to a third-party service.
 
 ## Phase status
 
@@ -135,7 +153,7 @@ test or a recorded manual check; it does not mean validated science.
 | 6. Real engine integrations | Partial | RDKit only; planned engines are metadata |
 | 7. Performance/resilience/validation | Partial | Cache, leases, timeouts, tests; no benchmark campaign |
 | 8. Security/licenses/docs | Complete for preview | Threat model, audit, policies, docs set |
-| 9. GitHub/CI/release candidate | In progress | CI green on both OSes and CodeQL; tag/release pending |
+| 9. GitHub/CI/release candidate | Complete | CI green on both OSes and CodeQL; `v0.1.0` prerelease published and verified |
 | 10. Stable v1.0.0 | Not met | Requires real engine coverage and validation |
 
 ## Release-gate assessment
@@ -154,7 +172,7 @@ preview.
 | Tests and static checks | Pass locally and in CI | 82 + 3 E2E; Linux/Windows backend, CodeQL |
 | Real scientific engine breadth | Fail | Only RDKit; docking/MD/ML are planned |
 | Scientific validation | Fail | No predictive claim; protocol only |
-| Public release | Pending | CI green; tag and asset verification not yet done |
+| Public release | Pass | `v0.1.0` prerelease published; wheel, SBOM and checksums verified; provenance attestation verified |
 
 ## Known defects and risks
 

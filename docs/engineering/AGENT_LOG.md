@@ -189,6 +189,25 @@ observed; it is not a marketing summary.
   documentation links, secret scanning and the aggregate summary. CodeQL run
   [40676916587](https://github.com/timfromhcs/hcs-discovery-studio/actions/runs/40676916587)
   is also green.
+- Committed the release candidate as `2420016` and confirmed the follow-up CI
+  run
+  [40677454655](https://github.com/timfromhcs/hcs-discovery-studio/actions/runs/40677454655)
+  and CodeQL run
+  [40677454641](https://github.com/timfromhcs/hcs-discovery-studio/actions/runs/40677454641)
+  were green before tagging.
+- Pushed tag `v0.1.0`. Release workflow run
+  [40677691377](https://github.com/timfromhcs/hcs-discovery-studio/actions/runs/40677691377)
+  built the wheel, generated a CycloneDX SBOM and `SHA256SUMS.txt`, attested the
+  build provenance and published the prerelease at
+  <https://github.com/timfromhcs/hcs-discovery-studio/releases/tag/v0.1.0>.
+- Downloaded every release asset and verified it: the wheel SHA-256 is
+  `c40674667d67a85409d70a36bba8fd28ae8933867f47f2885cd94ab09ec0e33e`, the SBOM
+  SHA-256 is
+  `17c668dec0808c1ccab6724aff6c69baaa34f5ebd3d40f6dd4a1d0a741087c96`, and both
+  match `SHA256SUMS.txt`. `gh attestation verify` passes for the wheel.
+- Installed the downloaded wheel into a fresh virtual environment; the packaged
+  SPA is present and `hcs-discovery version` prints
+  `HCS Discovery Studio 0.1.0`.
 
 ## Security notes
 
@@ -201,10 +220,8 @@ observed; it is not a marketing summary.
 
 ## Blockers
 
-- None technical at the time of writing.
-- Release is gated on: committing this status update, waiting for its CI run,
-  pushing the `v0.1.0` tag and verifying the published wheel, SBOM, checksums and
-  build-provenance attestation.
+- None technical at the time of writing. The `v0.1.0` preview is published and
+  its assets are verified.
 
 ## Open follow-ups
 

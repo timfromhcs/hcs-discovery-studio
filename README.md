@@ -90,7 +90,9 @@ cd apps/web && npm run dev        # http://127.0.0.1:5173, proxies /api to 8787
 
 ### Option B — release wheel
 
-The published wheel bundles the built UI:
+Download the wheel from the
+[`v0.1.0` release](https://github.com/timfromhcs/hcs-discovery-studio/releases/tag/v0.1.0).
+It bundles the built UI:
 
 ```bash
 python -m venv .venv

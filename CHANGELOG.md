@@ -53,7 +53,9 @@ feature-by-feature status.
 - GitHub Actions CI for Linux and Windows backend gates, frontend build and
   Playwright end-to-end tests, CodeQL analysis, dependency review, a license
   policy check and secret scanning. The pipeline is green on both operating
-  systems for the release candidate.
+  systems, and the tag-triggered release workflow published `v0.1.0` as a
+  prerelease with a CycloneDX SBOM, `SHA256SUMS.txt` and a verified
+  build-provenance attestation.
 - Apache-2.0 license, NOTICE, citation metadata, security policy, code of
   conduct, contribution guide and the documentation set required by the
   project brief.
