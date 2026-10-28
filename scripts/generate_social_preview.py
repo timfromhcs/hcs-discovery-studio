@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 import os
 from pathlib import Path
+
 from PIL import Image, ImageDraw, ImageFont
 
 
@@ -60,7 +61,12 @@ def create_social_preview(output_path: Path) -> None:
 
     # Central coordination circle
     core_r = 20
-    draw.ellipse([mark_cx - core_r, mark_cy - core_r, mark_cx + core_r, mark_cy + core_r], fill=(11, 20, 32, 255), outline=(106, 169, 255, 255), width=4)
+    draw.ellipse(
+        [mark_cx - core_r, mark_cy - core_r, mark_cx + core_r, mark_cy + core_r],
+        fill=(11, 20, 32, 255),
+        outline=(106, 169, 255, 255),
+        width=4,
+    )
     dot_r = 8
     draw.ellipse([mark_cx - dot_r, mark_cy - dot_r, mark_cx + dot_r, mark_cy + dot_r], fill=(106, 169, 255, 255))
 
