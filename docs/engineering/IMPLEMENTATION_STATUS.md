@@ -22,8 +22,8 @@ test or a recorded manual check; it does not mean validated science.
 | CLI/API parity | Done for shipped actions | Shared services; CLI tests |
 | Local LLM provider | Probe/config only | No chat feature or LLM node |
 | Docking/MD/ML engines | Planned | Registry metadata only |
-| GitHub CI | Configured | Workflows added; verify the first cloud run |
-| Public release | Pending | Tag/release after CI verification |
+| GitHub CI | Pass | All required jobs green on Linux and Windows; CodeQL green |
+| Public release | Pending | Tag `v0.1.0` after this status commit |
 | v1.0.0 | Not met | See release-gate table |
 
 ## Working now
@@ -74,12 +74,21 @@ test or a recorded manual check; it does not mean validated science.
 
 ### Packaging and quality
 
-- Self-contained wheel bundling the built SPA; smoke-tested on port 8792.
-- 82 backend tests passing locally.
-- 3 Playwright end-to-end tests passing locally.
-- Ruff format/check and mypy clean locally.
-- Frontend typecheck and production build clean locally.
+- Self-contained wheel bundling the built SPA; smoke-tested locally on port 8793
+  and by the CI wheel job.
+- 82 backend tests passing locally and in CI.
+- 3 Playwright end-to-end tests passing locally and in CI.
+- Ruff format/check and mypy clean locally and in CI.
+- Frontend typecheck and production build clean locally and in CI.
 - Genuine screenshots in `docs/screenshots/`.
+- GitHub Actions run
+  [40676916640](https://github.com/timfromhcs/hcs-discovery-studio/actions/runs/40676916640)
+  passed every required job: Ubuntu and Windows backend gates, frontend build,
+  Playwright, clean SQLite migration, wheel smoke test, license policy,
+  dependency audit, documentation links, secret scanning and the aggregate
+  summary. CodeQL run
+  [40676916587](https://github.com/timfromhcs/hcs-discovery-studio/actions/runs/40676916587)
+  also passed.
 
 ## Partial
 
@@ -126,7 +135,7 @@ test or a recorded manual check; it does not mean validated science.
 | 6. Real engine integrations | Partial | RDKit only; planned engines are metadata |
 | 7. Performance/resilience/validation | Partial | Cache, leases, timeouts, tests; no benchmark campaign |
 | 8. Security/licenses/docs | Complete for preview | Threat model, audit, policies, docs set |
-| 9. GitHub/CI/release candidate | In progress | Workflows written; cloud run and release pending |
+| 9. GitHub/CI/release candidate | In progress | CI green on both OSes and CodeQL; tag/release pending |
 | 10. Stable v1.0.0 | Not met | Requires real engine coverage and validation |
 
 ## Release-gate assessment
@@ -142,10 +151,10 @@ preview.
 | CLI/API parity | Pass for shipped actions | Tests cover core flows |
 | Reproducible provenance | Pass | Manifest, hashes, cache keys, versions |
 | Secrets and network policy | Pass | Redaction, loopback default, token gate |
-| Tests and static checks | Pass locally | 82 + 3 E2E; cloud verification pending |
+| Tests and static checks | Pass locally and in CI | 82 + 3 E2E; Linux/Windows backend, CodeQL |
 | Real scientific engine breadth | Fail | Only RDKit; docking/MD/ML are planned |
 | Scientific validation | Fail | No predictive claim; protocol only |
-| Public release | Pending | CI and tag not yet verified |
+| Public release | Pending | CI green; tag and asset verification not yet done |
 
 ## Known defects and risks
 
@@ -157,6 +166,10 @@ preview.
   `apps/web/dist` has no UI.
 - No TLS or reverse-proxy configuration is shipped.
 - The LLM provider is untested against every compatible server.
+- RDKit 2026.9.1 ships `rdkit-stubs` with invalid Python syntax
+  (`rdkit.rdBase._vectunsigned int`), which aborts mypy. The backend CI job and
+  `scripts/ci/prepare_typecheck.py` remove that stub package; RDKit remains an
+  untyped dependency by design.
 - Report tables truncate at 200 rows in Markdown and 500 in HTML; the JSON/CSV
   exports are complete.
 - The `targets`, `structures` and `predictions` tables are reserved and may

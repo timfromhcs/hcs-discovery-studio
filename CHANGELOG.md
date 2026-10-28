@@ -52,10 +52,22 @@ feature-by-feature status.
   tests for redaction and network policy.
 - GitHub Actions CI for Linux and Windows backend gates, frontend build and
   Playwright end-to-end tests, CodeQL analysis, dependency review, a license
-  policy check and secret scanning.
+  policy check and secret scanning. The pipeline is green on both operating
+  systems for the release candidate.
 - Apache-2.0 license, NOTICE, citation metadata, security policy, code of
   conduct, contribution guide and the documentation set required by the
   project brief.
+
+### Fixed
+
+- `uv sync` now works on a fresh checkout before the SPA is built. A Hatch build
+  hook creates the missing `apps/web/dist` directory; release builds still
+  compile the frontend before packaging.
+- Narrow-screen tables no longer clip primary data. Secondary columns are hidden
+  deliberately, identifiers ellipsize, card headers wrap their actions, and the
+  settings environment table stacks label above value.
+- Mypy no longer aborts on RDKit 2026.9.1's invalid bundled type stubs; the CI
+  job removes only that stub package before type checking.
 
 ### Known limitations
 

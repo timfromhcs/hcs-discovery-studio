@@ -152,6 +152,44 @@ observed; it is not a marketing summary.
 - Decision: release as `0.1.0` preview, not `1.0.0`, because only RDKit is
   runnable and no predictive validation exists.
 
+## 2026-10-28 — Responsive audit, CI hardening and release candidate
+
+- Re-ran the frontend typecheck and production build after the responsive CSS
+  changes; both are clean.
+- Added a temporary Playwright overflow audit and ran it against every main
+  route at 390 px. It reported real overflow in the project datasets table, the
+  compound library, the workflow node table and the settings environment table.
+  The audit script was deleted after use; it is not part of the shipped tooling.
+- Fixed narrow layouts by hiding secondary columns deliberately, ellipsizing
+  identifiers, stacking card headers when their actions do not fit, and letting
+  the environment table stack label above value. The library now states that
+  narrow screens show name and structure and points to the compound page for
+  descriptors.
+- Re-captured all 28 documentation screenshots from the running application and
+  inspected the narrow captures. No page-level horizontal overflow remains.
+- Removed the stale `results-light.png`; the README references
+  `results-fixed-light.png`, which is the current capture.
+- Fixed `uv sync --frozen` on a fresh checkout: the Hatch wheel target
+  force-includes `apps/web/dist`, which does not exist before the SPA is built.
+  Added `hatch_build.py` to create the directory during editable installs.
+  Release builds still compile the frontend before building the wheel.
+- Fixed CI mypy failures caused by RDKit 2026.9.1's bundled `rdkit-stubs`
+  (invalid `rdkit.rdBase._vectunsigned int` syntax and incomplete descriptors).
+  Added `scripts/ci/prepare_typecheck.py` and a backend CI step that removes
+  only that stub package before mypy.
+- Shortened the secret-redaction test fixture so it no longer resembles a real
+  GitHub token and cannot trip the gitleaks scan.
+- Initialized Git, scanned the staged tree for credentials and large files,
+  committed, and published the public repository
+  `timfromhcs/hcs-discovery-studio`.
+- Cloud CI run
+  [40676916640](https://github.com/timfromhcs/hcs-discovery-studio/actions/runs/40676916640)
+  is green: Ubuntu and Windows backend gates, frontend build, Playwright E2E,
+  clean SQLite migration, wheel smoke test, license policy, dependency audit,
+  documentation links, secret scanning and the aggregate summary. CodeQL run
+  [40676916587](https://github.com/timfromhcs/hcs-discovery-studio/actions/runs/40676916587)
+  is also green.
+
 ## Security notes
 
 - A GitHub token was supplied in chat earlier in the project. It was never
@@ -164,8 +202,9 @@ observed; it is not a marketing summary.
 ## Blockers
 
 - None technical at the time of writing.
-- Release is gated on: final local gates, git initialization, public repository
-  creation, cloud CI verification, tag and release asset verification.
+- Release is gated on: committing this status update, waiting for its CI run,
+  pushing the `v0.1.0` tag and verifying the published wheel, SBOM, checksums and
+  build-provenance attestation.
 
 ## Open follow-ups
 
@@ -173,4 +212,5 @@ observed; it is not a marketing summary.
 - Add PostgreSQL and distributed-worker support only if the product needs it.
 - Implement a real docking or property adapter with a validation report before
   claiming scientific breadth.
-- Add a signed/attested release path if the repository plan supports it.
+- Consider replacing RDKit's bundled stubs with a maintained stub package, or
+  pin a release whose stubs mypy can parse.

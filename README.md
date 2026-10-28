@@ -41,7 +41,7 @@ or evidence of binding, safety or efficacy. Predictions and rankings are
 prioritisation signals. Read
 [Scientific limitations](docs/user-guide/SCIENTIFIC_LIMITATIONS.md).
 
-## Working now (verified locally)
+## Working now (verified locally and in CI)
 
 | Capability | Status | Evidence |
 |---|---|---|
@@ -190,20 +190,24 @@ never labels a model Vulkan-compatible unless that adapter has a real probe.
 
 | Gate | Command | Result |
 |---|---|---|
-| Backend tests | `uv run pytest -q` | 82 passed locally |
+| Backend tests | `uv run pytest -q` | 82 passed locally and in CI |
 | Coverage | `uv run pytest --cov=hcs_discovery` | 75% locally; CI floor 70% |
-| Python format/lint/type | `uv run ruff format --check .`, `uv run ruff check .`, `uv run mypy` | Clean locally |
-| Frontend typecheck/build | `npm run typecheck`, `npm run build` in `apps/web` | Clean locally |
-| End-to-end | `npm run test:e2e` in `apps/web` | 3 passed locally |
-| License policy | `uv run python scripts/ci/check_licenses.py`, `node scripts/ci/check_licenses.mjs` | Pass locally |
+| Python format/lint/type | `uv run ruff format --check .`, `uv run ruff check .`, `uv run mypy` | Clean locally and in CI |
+| Frontend typecheck/build | `npm run typecheck`, `npm run build` in `apps/web` | Clean locally and in CI |
+| End-to-end | `npm run test:e2e` in `apps/web` | 3 passed locally and in CI |
+| License policy | `uv run python scripts/ci/check_licenses.py`, `node scripts/ci/check_licenses.mjs` | Pass locally and in CI |
 | Dependency audit | `pip-audit`, `npm audit --omit=dev` | No known vulnerabilities at release time |
-| Secret scan | gitleaks | Runs in CI on full history |
-| Static analysis | CodeQL (Python, TypeScript) | Runs in CI |
+| Secret scan | gitleaks | Pass in CI on full history |
+| Static analysis | CodeQL (Python, TypeScript) | Pass in CI |
 
 CI runs backend gates on **Ubuntu and Windows**, frontend typecheck/build,
 Playwright E2E on Linux, a clean SQLite migration, a wheel install/health smoke
 test, license and dependency audits, secret scanning, dependency review and
-CodeQL. See [Testing](docs/developer-guide/TESTING.md) for the layer-by-layer
+CodeQL. The release-candidate runs are
+[CI 40676916640](https://github.com/timfromhcs/hcs-discovery-studio/actions/runs/40676916640)
+and
+[CodeQL 40676916587](https://github.com/timfromhcs/hcs-discovery-studio/actions/runs/40676916587).
+See [Testing](docs/developer-guide/TESTING.md) for the layer-by-layer
 methodology and how to reproduce each result.
 
 ## Security
