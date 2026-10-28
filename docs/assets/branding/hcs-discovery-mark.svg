@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120" role="img" aria-label="HCS Discovery Studio Mark">
+  <defs>
+    <linearGradient id="markGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3dd6c3"/>
+      <stop offset="100%" stop-color="#6aa9ff"/>
+    </linearGradient>
+    <radialGradient id="markBg" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#142132"/>
+      <stop offset="100%" stop-color="#080e16"/>
+    </radialGradient>
+  </defs>
+  <rect width="120" height="120" rx="26" fill="url(#markBg)" stroke="#1e314b" stroke-width="2"/>
+  
+  <!-- Outer Benzene / Discovery Hexagon ring -->
+  <g stroke="url(#markGlow)" stroke-width="4.5" fill="none" stroke-linejoin="round" stroke-linecap="round">
+    <polygon points="60,22 93,41 93,79 60,98 27,79 27,41"/>
+  </g>
+  
+  <!-- Radial inner coordination bonds -->
+  <g stroke="#3dd6c3" stroke-width="2.5" opacity="0.8" stroke-linecap="round">
+    <line x1="60" y1="22" x2="60" y2="44"/>
+    <line x1="93" y1="41" x2="74" y2="52"/>
+    <line x1="93" y1="79" x2="74" y2="68"/>
+    <line x1="60" y1="98" x2="60" y2="76"/>
+    <line x1="27" y1="79" x2="46" y2="68"/>
+    <line x1="27" y1="41" x2="46" y2="52"/>
+  </g>
+
+  <!-- Vertices / Atom centers -->
+  <g fill="#3dd6c3">
+    <circle cx="60" cy="22" r="6"/>
+    <circle cx="93" cy="41" r="6"/>
+    <circle cx="93" cy="79" r="6"/>
+    <circle cx="60" cy="98" r="6"/>
+    <circle cx="27" cy="79" r="6"/>
+    <circle cx="27" cy="41" r="6"/>
+  </g>
+
+  <!-- Central Target / Coordination Core -->
+  <circle cx="60" cy="60" r="13" fill="#0b1420" stroke="#6aa9ff" stroke-width="4"/>
+  <circle cx="60" cy="60" r="5" fill="#6aa9ff"/>
+</svg>

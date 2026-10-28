@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 120" width="640" height="120" role="img" aria-label="HCS Discovery Studio Wordmark">
+  <defs>
+    <linearGradient id="wmGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3dd6c3"/>
+      <stop offset="100%" stop-color="#6aa9ff"/>
+    </linearGradient>
+    <radialGradient id="wmBg" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#142132"/>
+      <stop offset="100%" stop-color="#080e16"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Left Icon Mark -->
+  <g transform="translate(10, 10)">
+    <rect width="100" height="100" rx="22" fill="url(#wmBg)" stroke="#1e314b" stroke-width="2"/>
+    <polygon points="50,18 78,34 78,66 50,82 22,66 22,34" stroke="url(#wmGlow)" stroke-width="3.8" fill="none" stroke-linejoin="round" stroke-linecap="round"/>
+    <g stroke="#3dd6c3" stroke-width="2" opacity="0.85" stroke-linecap="round">
+      <line x1="50" y1="18" x2="50" y2="37"/>
+      <line x1="78" y1="34" x2="62" y2="44"/>
+      <line x1="78" y1="66" x2="62" y2="56"/>
+      <line x1="50" y1="82" x2="50" y2="63"/>
+      <line x1="22" y1="66" x2="38" y2="56"/>
+      <line x1="22" y1="34" x2="38" y2="44"/>
+    </g>
+    <g fill="#3dd6c3">
+      <circle cx="50" cy="18" r="5"/>
+      <circle cx="78" cy="34" r="5"/>
+      <circle cx="78" cy="66" r="5"/>
+      <circle cx="50" cy="82" r="5"/>
+      <circle cx="22" cy="66" r="5"/>
+      <circle cx="22" cy="34" r="5"/>
+    </g>
+    <circle cx="50" cy="50" r="11" fill="#0b1420" stroke="#6aa9ff" stroke-width="3.2"/>
+    <circle cx="50" cy="50" r="4.2" fill="#6aa9ff"/>
+  </g>
+
+  <!-- Typography Right -->
+  <text x="135" y="55" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, sans-serif" font-size="34" font-weight="750" fill="#f0f5fc" letter-spacing="-0.02em">
+    HCS Discovery Studio
+  </text>
+  
+  <text x="136" y="85" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, sans-serif" font-size="14.5" font-weight="450" fill="#8da4be" letter-spacing="0.01em">
+    Open science. Reproducible discovery. Made with ❤️ by hcsmedia.
+  </text>
+</svg>
