@@ -261,6 +261,27 @@ observed; it is not a marketing summary.
   - Hardened descriptor exception boundaries against catching arbitrary unexpected system exceptions.
   - Test suite expanded to 87 passing tests with 100% clean formatting and mypy.
 
+## 2026-10-28 — Phase 1: Unit 3 Lifecycle, bounded cache & storage hygiene
+
+- Unit 3: Bounded cache management & cascade file deletion:
+  - Added configurable `cache_max_mb` (1024 MB) and `cache_max_age_days` (30 days) to `Settings`.
+  - Implemented `NodeCache.prune()` with LRU eviction and corrupt entry detection.
+  - Implemented `preview_project_deletion()` and updated `delete_project` / `delete_dataset` to safely cascade removal of run directories, artifacts, and uploads without leaving orphaned files.
+  - Added CLI `cache prune` and `project delete --dry-run` commands.
+  - Added 5 integration tests in `tests/integration/test_lifecycle.py` (92 passing tests). Commit `cf7fe9e`.
+
+## 2026-10-28 — Phase 2: Unit 4 AutoDock Vina CPU docking adapter & workflow node
+
+- Unit 4: AutoDock Vina CPU docking integration:
+  - Implemented PDBQT ligand preparation (`prepare_ligand_pdbqt`) with RDKit 3D conformer embedding, MMFF94 force field optimization, Gasteiger charges, and AutoDock atom typing.
+  - Implemented receptor PDBQT inspection and spatial bounding box computation (`validate_receptor_pdbqt`).
+  - Implemented `VinaAdapter` with CPU execution, subprocess timeouts, cancellation checks, and pose parsing.
+  - Implemented `pose_pdbqt_to_sdf` converting docked poses into standard multi-record SDF artifacts with `VINA_AFFINITY_KCAL_MOL` tags.
+  - Registered `dock.vina` workflow step in `src/hcs_discovery/workflow/nodes.py`.
+  - Updated model registry in `src/hcs_discovery/services/models.py` with honest probing (`available` or `not_configured`, `implemented=True`).
+  - Added 8 scientific contract and live docking smoke tests in `tests/scientific/test_vina_adapter.py`.
+  - Full test suite: 100 passing tests, 0 warnings (excluding FastAPI testclient deprecation), clean mypy and ruff. Commit `930cfed`.
+
 ## Security notes
 
 - A GitHub token was supplied in chat earlier in the project. It was never
