@@ -55,6 +55,8 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/hcs_discovery"]
 
+[tool.hatch.build.targets.wheel.hooks.custom]
+
 # Ship the built single-page application inside the wheel so `pip install` produces
 # a working local server without a Node toolchain.
 [tool.hatch.build.targets.wheel.force-include]
