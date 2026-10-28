@@ -22,6 +22,12 @@ from ..plugins.science.docking.vina import (
     run_vina_docking,
     vina_docking_columns,
 )
+from ..plugins.science.properties.adapter import (
+    PropertyPredictorConfig,
+    property_prediction_columns,
+    run_property_prediction,
+)
+from ..plugins.science.properties.models import get_property_model
 from .registry import NodeContext, NodeDefinition, NodeRegistry
 from .table import FILTER_COLUMNS, Column, Table
 
@@ -776,5 +782,24 @@ def register_builtin_nodes(registry: NodeRegistry) -> None:
             documentation=(
                 "Scores are computational prioritisation signals, not experimental affinity or efficacy proof."
             ),
+        )
+    )
+    registry.register(
+        NodeDefinition(
+            type="predict.property",
+            title="Learned property prediction",
+            category="properties",
+            version="1.0.0",
+            description="Predict molecular properties (ESOL aqueous solubility, CNS MPO BBB) with uncertainty.",
+            config_model=PropertyPredictorConfig,
+            handler=run_property_prediction,
+            requires=("smiles",),
+            outputs=lambda config: property_prediction_columns(
+                get_property_model(config.model_id),
+                config.output_prefix or config.model_id,
+                include_uncertainty=config.include_uncertainty,
+                check_domain=config.check_applicability_domain,
+            ),
+            documentation="Predictions are statistical estimations within model applicability domains.",
         )
     )

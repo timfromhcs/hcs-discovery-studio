@@ -24,6 +24,12 @@ from ..plugins.science.docking.vina import (
 from ..plugins.science.docking.vina import (
     probe_vina,
 )
+from ..plugins.science.properties.adapter import (
+    ADAPTER_ID as PROP_PRED_ID,
+)
+from ..plugins.science.properties.adapter import (
+    probe_property_predictor,
+)
 from ..schemas.models import AdapterCard, LicenseInfo, ResourceProfile
 
 RDKIT_BSL = LicenseInfo(code="BSD-3-Clause", weights="n/a", data="n/a")
@@ -132,6 +138,41 @@ def _vina_card(settings: Settings, *, probe: bool) -> AdapterCard:
     )
 
 
+def _property_predictor_card() -> AdapterCard:
+    probe_res = probe_property_predictor()
+    notes = [
+        "Learned and validated molecular property prediction models: ESOL aqueous solubility, CNS MPO BBB scoring.",
+        probe_res["detail"],
+        "Models provide calibrated uncertainty and applicability domain checks.",
+    ]
+    return AdapterCard(
+        id=PROP_PRED_ID,
+        display_name="Property Predictor",
+        category="property",
+        version="1.0.0",
+        license=LicenseInfo(
+            code="Apache-2.0",
+            weights="open-literature",
+            data="Delaney-2004/Wager-2010",
+        ),
+        capabilities=[
+            "property_prediction",
+            "solubility",
+            "cns_bbb",
+            "uncertainty_estimation",
+            "applicability_domain",
+        ],
+        device_providers=["cpu"],
+        network_required=False,
+        resource_profile=ResourceProfile(ram_mb_min=256),
+        status="available",
+        citation_url="https://doi.org/10.1021/ci034243x",
+        documentation_url="https://doi.org/10.1021/ci034243x",
+        notes=notes,
+        implemented=True,
+    )
+
+
 def _planned_cards() -> list[AdapterCard]:
     planned = [
         (
@@ -196,7 +237,13 @@ def _planned_cards() -> list[AdapterCard]:
 
 def list_models(session: Session, settings: Settings, *, probe: bool = False) -> list[dict]:
     del session  # kept for signature symmetry with other services
-    cards = [_rdkit_card(), _vina_card(settings, probe=probe), _llm_card(settings, probe=probe), *_planned_cards()]
+    cards = [
+        _rdkit_card(),
+        _vina_card(settings, probe=probe),
+        _property_predictor_card(),
+        _llm_card(settings, probe=probe),
+        *_planned_cards(),
+    ]
     return [card.as_dict() for card in cards]
 
 
