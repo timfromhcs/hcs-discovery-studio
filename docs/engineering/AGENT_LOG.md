@@ -310,6 +310,39 @@ observed; it is not a marketing summary.
   - Added 4 integration tests in `tests/integration/test_dag_workflow.py` testing DAG branching, Kahn sort, cycle detection, and live worker DAG execution.
   - Full test suite: 118 passing tests, clean mypy and ruff formatting. Commit `1556d89`.
 
+## 2026-10-28 — Phase 5: Safe Research Assistant & Report Truncation Disclosures
+
+- Safe Research Agent:
+  - Implemented `ResearchAgent` (`src/hcs_discovery/plugins/llm/agent.py`) supporting three strict operational modes:
+    - `Ask`: Read-only queries over available models, dataset summaries, and computational metrics.
+    - `Plan`: Formulates validated DAG workflows with schema validation, resource estimates, and limitation disclosures.
+    - `Run`: Executes approved typed allowlisted tools with human approval gating.
+  - Implemented 10 allowlisted server-side tools in `src/hcs_discovery/plugins/llm/tools.py`.
+  - Added prompt-injection defense by isolating untrusted data in `<untrusted_data>` blocks.
+  - Added API routes under `/api/v1/agent` and CLI commands `hcs-discovery agent status`, `tools`, `ask`, `plan`, `run`.
+  - Added 10 integration tests in `tests/integration/test_agent.py`.
+- Report Table Truncation Disclosure:
+  - Added prominent disclosure notices in Markdown (>200 rows) and HTML (>500 rows) reports informing users of rendering truncation.
+  - Added full complete exports in CSV, JSON, and SDF (`export_report(..., fmt='sdf')`) formats.
+  - Commit `abaa3b4`.
+
+## 2026-10-28 — Phase 6: Visual Identity Branding & v1.0.0 Stable Transition
+
+- Original Branding Assets:
+  - Designed vector mark `apps/web/public/brand/hcs-discovery-mark.svg` and `docs/assets/branding/hcs-discovery-mark.svg`.
+  - Designed wordmark `apps/web/public/brand/hcs-discovery-wordmark.svg` with official brand line:
+    `Open science. Reproducible discovery. Made with ❤️ by hcsmedia.`
+  - Generated crisp 1280x640 OpenGraph social preview card `docs/assets/branding/social-preview.png` (51.7 KB, well under 1MB GitHub limit).
+  - Commit `e4b5864`.
+- Version Bump to 1.0.0 Stable:
+  - Updated `pyproject.toml` version to `1.0.0` and classifier to `Development Status :: 5 - Production/Stable`.
+  - Updated `src/hcs_discovery/__init__.py`, `apps/web/package.json`, `apps/web/src/lib/constants.ts`, and `CITATION.cff`.
+  - Re-locked dependencies with `uv lock` (resolved clean).
+  - Updated `CHANGELOG.md` with comprehensive release notes for `[1.0.0] - 2026-10-28`.
+  - Created `docs/releases/v1.0.0.md` release notes.
+  - Verified tag compatibility with `scripts/release/verify_version.py v1.0.0` (PASS).
+  - Updated `README.md` and `docs/engineering/IMPLEMENTATION_STATUS.md`.
+
 ## Security notes
 
 - A GitHub token was supplied in chat earlier in the project. It was never

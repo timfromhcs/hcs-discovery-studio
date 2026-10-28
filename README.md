@@ -1,17 +1,21 @@
+<p align="center">
+  <img src="docs/assets/branding/hcs-discovery-wordmark.svg" alt="HCS Discovery Studio" width="580">
+</p>
+
 # HCS Discovery Studio
 
 **Open science. Reproducible discovery. Made with ❤️ by hcsmedia.**
 
 A local-first, open-source workbench for reproducible computational
-drug-discovery research. Import a compound library, run a transparent triage
-workflow, inspect every row, event and artifact, and automate the same pipeline
+drug-discovery research. Import a compound library, run transparent triage
+and docking workflows, inspect every row, event and artifact, and automate the same pipeline
 from the CLI or HTTP API — without Docker, CUDA, an account, or a cloud key.
 
 [![CI](https://github.com/timfromhcs/hcs-discovery-studio/actions/workflows/ci.yml/badge.svg)](https://github.com/timfromhcs/hcs-discovery-studio/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/timfromhcs/hcs-discovery-studio/actions/workflows/codeql.yml/badge.svg)](https://github.com/timfromhcs/hcs-discovery-studio/actions/workflows/codeql.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Python 3.12–3.13](https://img.shields.io/badge/python-3.12%E2%80%933.13-3776ab.svg)](pyproject.toml)
-[![Status: 0.1.0 preview](https://img.shields.io/badge/status-0.1.0%20preview-f0a34a.svg)](docs/engineering/IMPLEMENTATION_STATUS.md)
+[![Status: v1.0.0 Stable](https://img.shields.io/badge/status-v1.0.0%20stable-3dd6c3.svg)](docs/engineering/IMPLEMENTATION_STATUS.md)
 
 <img src="docs/screenshots/workspace-dark.png" alt="HCS Discovery Studio workspace showing projects, machine diagnostics, queue state and recent runs" width="1200">
 
@@ -47,17 +51,20 @@ prioritisation signals. Read
 |---|---|---|
 | CSV, SDF and SMILES import with row-level errors | **Available** | 16/17 demo rows imported; failures retained |
 | RDKit standardisation, descriptors and Morgan/Tanimoto similarity | **Available** | Deterministic fixture tests |
-| Rule filters, Pareto fronts, weighted composite score | **Available** | Engine and API tests |
-| Persistent lease-based queue, restart recovery, cancellation | **Available** | Queue/worker integration tests |
-| Content-addressed node cache and run manifests | **Available** | Cache-key and provenance tests |
-| SSE run events, logs, artifacts and report export | **Available** | Run lifecycle and report tests |
+| AutoDock Vina CPU docking | **Available** | Native structure-based virtual screening (`dock.vina`) with conformer prep |
+| Learned property prediction (ESOL & CNS MPO) | **Available** | Delaney solubility and Wager BBB permeability scoring |
+| Bemis-Murcko generic scaffold splitting | **Available** | Leakage-free split validation tests |
+| PubChem & ChEMBL public data connectors | **Available** | NCBI & EBI REST search with policy-gated access |
+| DAG branching & table joins | **Available** | Kahn topological sort, fan-out, and `table.join` |
+| Deb's Fast Non-dominated Sorting & Pareto ranking | **Available** | Multi-objective sorting invariant tests |
+| Safe local research assistant | **Available** | Ask, Plan, Run modes with strict allowlisted tools |
+| Persistent lease-based queue & restart recovery | **Available** | Queue/worker integration tests |
+| Bounded cache lifecycle & cascade deletion | **Available** | Size/age pruning and orphan cleanup tests |
+| Report export & table truncation disclosures | **Available** | Markdown/HTML truncation notices & full CSV/JSON/SDF export |
 | React UI for project → import → workflow → run → results | **Available** | 3 Playwright E2E tests |
-| CLI and versioned HTTP API | **Available** | CLI/API integration tests |
-| Self-contained wheel with bundled SPA | **Available** | Built and smoke-tested |
-| Local OpenAI-compatible LLM provider | **Probe/config only** | No chat UI, no LLM workflow node |
-| Docking, MD, ADMET, structure prediction | **Planned** | Registry metadata only |
-| Target explorer and remote data connectors | **Planned** | Not exposed as working controls |
-| PostgreSQL, distributed workers, multi-user auth | **Not implemented** | Single-machine SQLite preview |
+| CLI and versioned HTTP API | **Available** | Shared domain services; CLI integration tests |
+| Self-contained wheel with bundled SPA | **Available** | Built and smoke-tested without Node runtime |
+| OpenMM, Boltz-2, Chai-1 | **Planned** | Tracked honestly in model registry |
 
 The full ledger, including partial features and known defects, is in
 [Implementation status](docs/engineering/IMPLEMENTATION_STATUS.md).
@@ -92,7 +99,7 @@ cd apps/web && npm run dev        # http://127.0.0.1:5173, proxies /api to 8787
 ### Option B — release wheel
 
 Download the wheel from the
-[`v0.1.0` release](https://github.com/timfromhcs/hcs-discovery-studio/releases/tag/v0.1.0).
+[`v1.0.0` release](https://github.com/timfromhcs/hcs-discovery-studio/releases/tag/v1.0.0).
 It bundles the built UI:
 
 ```bash

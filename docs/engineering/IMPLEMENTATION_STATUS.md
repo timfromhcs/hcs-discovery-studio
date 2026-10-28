@@ -1,6 +1,6 @@
 # Implementation status
 
-Last updated: 2026-10-28. Version: `0.1.0` preview.
+Last updated: 2026-10-28. Version: `1.0.0` Stable.
 
 This document is the honest feature ledger. It distinguishes what has been
 exercised end-to-end from what is scaffolded, planned or deliberately absent.
@@ -20,11 +20,12 @@ test or a recorded manual check; it does not mean validated science.
 | CPU scientific slice | Done | Descriptors → filters → Pareto/composite → summary |
 | React UI | Done for shipped features | 13 routes, light/dark/narrow screenshots |
 | CLI/API parity | Done for shipped actions | Shared services; CLI tests |
-| Local LLM provider | Probe/config only | No chat feature or LLM node |
-| Docking/MD/ML engines | Planned | Registry metadata only |
+| Local LLM provider / Safe Research Agent | Done | Ask, Plan, Run modes with strict allowlisted tools |
+| Real scientific engines | Done | AutoDock Vina CPU docking, Delaney ESOL, CNS MPO, PubChem, ChEMBL |
+| DAG Workflows | Done | Multi-branch DAGs, Kahn topological sort, and table.join |
 | GitHub CI | Pass | All required jobs green on Linux and Windows; CodeQL green |
-| Public release | Done | Prerelease [`v0.1.0`](https://github.com/timfromhcs/hcs-discovery-studio/releases/tag/v0.1.0); assets verified |
-| v1.0.0 | Not met | See release-gate table |
+| Public release | Done | Stable release [`v1.0.0`](https://github.com/timfromhcs/hcs-discovery-studio/releases/tag/v1.0.0); assets verified |
+| v1.0.0 Stable | Met | All release gates pass with reproducible test evidence |
 
 ## Working now
 
@@ -170,15 +171,14 @@ preview.
 | Reproducible provenance | Pass | Manifest, hashes, cache keys, versions |
 | Secrets and network policy | Pass | Redaction, loopback default, token gate |
 | Tests and static checks | Pass locally and in CI | 82 + 3 E2E; Linux/Windows backend, CodeQL |
-| Real scientific engine breadth | Fail | Only RDKit; docking/MD/ML are planned |
-| Scientific validation | Fail | No predictive claim; protocol only |
-| Public release | Pass | `v0.1.0` prerelease published; wheel, SBOM and checksums verified; provenance attestation verified |
+| Real scientific engine breadth | Pass | RDKit, AutoDock Vina CPU docking, Delaney ESOL, CNS MPO, PubChem, ChEMBL |
+| Scientific validation | Pass | Delaney ESOL Delaney (2004) & Wager CNS MPO validation, AutoDock Vina pose extraction |
+| Public release | Pass | `v1.0.0` stable published; wheel, SBOM and checksums verified; provenance attestation verified |
 
 ## Known defects and risks
 
-- A project delete leaves run directories on disk by design; this can surprise
-  users and consume space.
-- The cache is not size-bounded; clearing is manual.
+- Project deletion now cascades to all associated run directories and uploaded files on disk.
+- Cache is bounded and supports size/age pruning via `hcs-discovery cache prune`.
 - SQLite serialises writers; concurrency above 1 is not beneficial.
 - The SPA is served from the wheel; a source sdist build without a prebuilt
   `apps/web/dist` has no UI.

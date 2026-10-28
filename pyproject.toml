@@ -1,6 +1,6 @@
 [project]
 name = "hcs-discovery-studio"
-version = "0.1.0"
+version = "1.0.0"
 description = "Local-first, open-source AI drug-discovery research workbench with reproducible workflows, provenance and a headless CLI."
 readme = "README.md"
 requires-python = ">=3.12,<3.14"
@@ -8,7 +8,7 @@ license = { text = "Apache-2.0" }
 authors = [{ name = "hcsmedia" }]
 keywords = ["cheminformatics", "drug-discovery", "rdkit", "reproducibility", "workflows"]
 classifiers = [
-  "Development Status :: 3 - Alpha",
+  "Development Status :: 5 - Production/Stable",
   "Environment :: Console",
   "Intended Audience :: Science/Research",
   "License :: OSI Approved :: Apache Software License",

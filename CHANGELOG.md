@@ -8,6 +8,28 @@ All notable changes to this project are documented here. The format follows
 
 Nothing yet.
 
+## [1.0.0] - 2026-10-28
+
+Production stable v1.0.0 release for Windows and Linux. Deliver working code, working user journeys, credible scientific validation, robust local CPU operation, DAG workflow branching, safe research assistance, authentic branding, and complete build provenance.
+
+### Added
+
+- **AutoDock Vina CPU Docking Adapter:** Integrated native CPU molecular docking workflow node (`dock.vina`) with automated RDKit 3D conformer embedding, MMFF94 force field optimization, Gasteiger charge assignment, AutoDock PDBQT atom typing, receptor bounding box validation, pose parser, and PDBQT-to-SDF conversion.
+- **Learned Property Prediction:** Integrated Delaney (2004) ESOL aqueous solubility prediction with leverage-based uncertainty calibration and applicability domain detection, and Wager et al. (2010) CNS Multiparameter Optimization (CNS MPO) scoring for blood-brain barrier alignment.
+- **Scaffold Splitting:** Added Bemis-Murcko generic scaffold extraction and leakage-free dataset splitting for cheminformatics model benchmarking.
+- **Public Biological Data Connectors:** Added NCBI PubChem PUG REST and EMBL-EBI ChEMBL web services connectors with strict local-first network policy gating, rate limiting, and exponential backoff.
+- **DAG Workflow Engine:** Added Kahn's topological sorting, fan-out branching, cycle detection, and key-based table joining (`table.join`) aligning multi-branch tables by compound identity.
+- **Safe Agentic Research Assistant:** Implemented local research assistant (`hcs-discovery agent` / `/api/v1/agent`) supporting Ask (read-only Q&A), Plan (DAG formulation with schema validation), and Run (approved typed tool execution) modes with strict tool allowlist and prompt-injection isolation.
+- **Report Table Truncation Disclosure:** Added prominent table truncation notices in Markdown (>200 rows) and HTML (>500 rows) reports with full complete exports available in CSV, JSON, and SDF formats.
+- **Bounded Cache & Cascade Deletion:** Added cache lifecycle management (`cache prune --max-size-mb --max-age-days`) and complete cascade deletion of run artifacts and uploaded files.
+- **Official Brand Assets:** Original vector mark (`hcs-discovery-mark.svg`), wordmark (`hcs-discovery-wordmark.svg`), and 1280x640 OpenGraph social preview card.
+
+### Changed
+
+- Replaced greedy Pareto front accumulation with Deb's Fast Non-dominated Sorting algorithm, guaranteeing dominance invariance under input permutations.
+- Strengthened filter validation against non-finite thresholds and type mismatches.
+- Upgraded package version to `1.0.0 Stable` across Python, React SPA, and documentation.
+
 ## [0.1.0] - 2026-10-28
 
 First public preview. This release is an honest vertical slice, not a complete
