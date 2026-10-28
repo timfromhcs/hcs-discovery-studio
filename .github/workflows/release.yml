@@ -86,11 +86,18 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
+          EXTRA_ARGS=()
+          TITLE="HCS Discovery Studio ${RELEASE_TAG#v} (Stable)"
+          if [[ "$RELEASE_TAG" == *"-rc"* || "$RELEASE_TAG" == *"-preview"* ]]; then
+            EXTRA_ARGS+=(--prerelease)
+            TITLE="HCS Discovery Studio ${RELEASE_TAG#v} (Release Candidate)"
+          fi
+
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
             echo "release $RELEASE_TAG already exists; replacing assets"
             gh release upload "$RELEASE_TAG" dist/*.whl dist/sbom.cdx.json dist/SHA256SUMS.txt --clobber
             if [ -f "docs/releases/${RELEASE_TAG}.md" ]; then
-              gh release edit "$RELEASE_TAG" --notes-file "docs/releases/${RELEASE_TAG}.md" --prerelease
+              gh release edit "$RELEASE_TAG" --notes-file "docs/releases/${RELEASE_TAG}.md" "${EXTRA_ARGS[@]}"
             fi
           else
             if [ -f "docs/releases/${RELEASE_TAG}.md" ]; then
@@ -100,9 +107,9 @@ jobs:
             fi
             gh release create "$RELEASE_TAG" \
               dist/*.whl dist/sbom.cdx.json dist/SHA256SUMS.txt \
-              --title "HCS Discovery Studio ${RELEASE_TAG#v} (preview)" \
-              --prerelease \
+              --title "$TITLE" \
               --verify-tag \
+              "${EXTRA_ARGS[@]}" \
               "${NOTES[@]}"
           fi
       - name: Summarize published assets
