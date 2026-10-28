@@ -300,6 +300,16 @@ observed; it is not a marketing summary.
   - Added 7 integration tests with mock transports and policy gating in `tests/integration/test_connectors.py`. Commit `4614d1c`.
   - Full test suite: 114 passing tests, 0 warnings (excluding FastAPI testclient deprecation), clean mypy and ruff.
 
+## 2026-10-28 — Phase 3: Unit 7 Workflow DAG branching, Kahn sorting & table.join
+
+- Unit 7: Workflow DAG branching and key-based join:
+  - Implemented Kahn's algorithm for topological sorting of workflow DAGs with cycle and disconnected node detection.
+  - Enabled branching / fan-out: multiple child nodes can consume the output table from a single parent or entry node.
+  - Implemented `Table.join()` with key-based row alignment (`id`, `smiles`, etc.) supporting `left`, `inner`, and `outer` join semantics.
+  - Implemented `table.join` workflow node and updated `RunExecutor` with dictionary-based table routing across DAG branches.
+  - Added 4 integration tests in `tests/integration/test_dag_workflow.py` testing DAG branching, Kahn sort, cycle detection, and live worker DAG execution.
+  - Full test suite: 118 passing tests, clean mypy and ruff formatting. Commit `1556d89`.
+
 ## Security notes
 
 - A GitHub token was supplied in chat earlier in the project. It was never
