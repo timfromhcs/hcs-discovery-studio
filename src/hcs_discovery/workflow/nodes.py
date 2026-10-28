@@ -17,6 +17,11 @@ from ..chemistry.descriptors import (
     tanimoto_to_query,
 )
 from ..core.errors import ValidationError
+from ..plugins.science.docking.vina import (
+    VinaConfig,
+    run_vina_docking,
+    vina_docking_columns,
+)
 from .registry import NodeContext, NodeDefinition, NodeRegistry
 from .table import FILTER_COLUMNS, Column, Table
 
@@ -755,5 +760,21 @@ def register_builtin_nodes(registry: NodeRegistry) -> None:
             handler=_run_summary,
             requires=(),
             outputs=lambda _config: [],
+        )
+    )
+    registry.register(
+        NodeDefinition(
+            type="dock.vina",
+            title="AutoDock Vina docking",
+            category="docking",
+            version="1.2.5",
+            description="CPU molecular docking and binding pose prediction with AutoDock Vina.",
+            config_model=VinaConfig,
+            handler=run_vina_docking,
+            requires=("smiles",),
+            outputs=lambda config: vina_docking_columns(config.output_prefix),
+            documentation=(
+                "Scores are computational prioritisation signals, not experimental affinity or efficacy proof."
+            ),
         )
     )

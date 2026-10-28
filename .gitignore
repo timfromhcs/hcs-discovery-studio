@@ -38,6 +38,8 @@ blob-report/
 .playwright/
 
 # Local application data: databases, caches, artifacts, logs, exports
+bin/
+*.exe
 data/
 .e2e-data/
 *.sqlite

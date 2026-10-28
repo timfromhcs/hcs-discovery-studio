@@ -12,6 +12,18 @@ from sqlalchemy.orm import Session
 from ..core.config import Settings
 from ..core.errors import NotFoundError
 from ..plugins.llm.openai_compat import build_provider
+from ..plugins.science.docking.vina import (
+    ADAPTER_ID as VINA_ID,
+)
+from ..plugins.science.docking.vina import (
+    ENGINE_VERSION as VINA_VERSION,
+)
+from ..plugins.science.docking.vina import (
+    SCIENTIFIC_CAVEAT as VINA_CAVEAT,
+)
+from ..plugins.science.docking.vina import (
+    probe_vina,
+)
 from ..schemas.models import AdapterCard, LicenseInfo, ResourceProfile
 
 RDKIT_BSL = LicenseInfo(code="BSD-3-Clause", weights="n/a", data="n/a")
@@ -91,17 +103,37 @@ def _llm_card(settings: Settings, *, probe: bool) -> AdapterCard:
     )
 
 
+def _vina_card(settings: Settings, *, probe: bool) -> AdapterCard:
+    probe_res = probe_vina(settings)
+    status = probe_res["status"]
+    notes = [
+        "CPU molecular docking baseline: search space definition, ligand preparation, empirical scoring.",
+        probe_res["detail"],
+        VINA_CAVEAT,
+    ]
+    if status == "not_configured":
+        notes.append(probe_res.get("remediation", ""))
+
+    return AdapterCard(
+        id=VINA_ID,
+        display_name="AutoDock Vina",
+        category="docking",
+        version=probe_res.get("version") or VINA_VERSION,
+        license=LicenseInfo(code="Apache-2.0", weights="n/a", data="n/a"),
+        capabilities=["docking", "pose_search", "binding_affinity"],
+        device_providers=["cpu"],
+        network_required=False,
+        resource_profile=ResourceProfile(ram_mb_min=512),
+        status=status,
+        citation_url="https://doi.org/10.1021/acs.jcim.1c00203",
+        documentation_url="https://autodock-vina.readthedocs.io/",
+        notes=notes,
+        implemented=True,
+    )
+
+
 def _planned_cards() -> list[AdapterCard]:
     planned = [
-        (
-            "science:autodock-vina",
-            "AutoDock Vina",
-            "docking",
-            "Apache-2.0",
-            "CPU docking baseline. Planned; not implemented or tested in this release.",
-            "https://github.com/ccsb-scripps/AutoDock-Vina",
-            ["docking", "pose_search"],
-        ),
         (
             "science:openmm",
             "OpenMM",
@@ -164,7 +196,7 @@ def _planned_cards() -> list[AdapterCard]:
 
 def list_models(session: Session, settings: Settings, *, probe: bool = False) -> list[dict]:
     del session  # kept for signature symmetry with other services
-    cards = [_rdkit_card(), _llm_card(settings, probe=probe), *_planned_cards()]
+    cards = [_rdkit_card(), _vina_card(settings, probe=probe), _llm_card(settings, probe=probe), *_planned_cards()]
     return [card.as_dict() for card in cards]
 
 

@@ -179,9 +179,12 @@ def test_models_registry_reports_planned_engines_honestly(client):
     items = client.get("/api/v1/models").json()["items"]
     statuses = {item["id"]: item["status"] for item in items}
     assert statuses["science:rdkit"] == "available"
-    assert statuses["science:autodock-vina"] == "planned"
     vina = next(item for item in items if item["id"] == "science:autodock-vina")
-    assert vina["implemented"] is False
+    assert vina["implemented"] is True
+    assert statuses["science:autodock-vina"] in ("available", "not_configured")
+    assert statuses["science:openmm"] == "planned"
+    openmm = next(item for item in items if item["id"] == "science:openmm")
+    assert openmm["implemented"] is False
 
 
 def test_invalid_dataset_import_is_rejected(client):
