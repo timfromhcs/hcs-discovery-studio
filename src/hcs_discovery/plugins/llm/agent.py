@@ -148,7 +148,13 @@ class ResearchAgent:
 
         # Deterministic local scientific assistant response
         p_lower = prompt.lower()
-        if "engine" in p_lower or "model" in p_lower:
+        if "vina" in p_lower or "dock" in p_lower:
+            reply = (
+                "AutoDock Vina CPU docking is integrated for structure-based virtual screening. "
+                "Affinity scores (kcal/mol) indicate estimated binding pose stability and should be used "
+                "as prioritisation filters, not definitive binding measurements."
+            )
+        elif "engine" in p_lower or "model" in p_lower:
             available = [
                 e["display_name"]
                 for e in engines_info.get("engines", [])
@@ -157,12 +163,6 @@ class ResearchAgent:
             reply = (
                 f"Currently available local engines: {', '.join(available)}.\n"
                 "All chemistry calculations and predictions execute locally on CPU."
-            )
-        elif "vina" in p_lower or "dock" in p_lower:
-            reply = (
-                "AutoDock Vina CPU docking is integrated for structure-based virtual screening. "
-                "Affinity scores (kcal/mol) indicate estimated binding pose stability and should be used "
-                "as prioritisation filters, not definitive binding measurements."
             )
         elif "solubility" in p_lower or "esol" in p_lower:
             reply = (
