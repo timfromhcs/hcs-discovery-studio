@@ -208,6 +208,20 @@ observed; it is not a marketing summary.
 - Installed the downloaded wheel into a fresh virtual environment; the packaged
   SPA is present and `hcs-discovery version` prints
   `HCS Discovery Studio 0.1.0`.
+- Found the `Dependency review` job failing on every pull request because the
+  repository had Dependabot alerts and the dependency graph disabled. Enabled
+  Dependabot alerts through the API; the dependency graph then reported 189
+  packages and dependency review passes.
+- Merged the three Dependabot major upgrades after their PR workflows went green:
+  Vite 8.3.5 (#2), `@vitejs/plugin-react` 6.1.2 (#3) and TypeScript 7.0.2 (#1).
+  Rebuilt the SPA locally with the new toolchain; the production build succeeds
+  and the Playwright suite passes in CI.
+- Untracked `apps/web/tsconfig.tsbuildinfo`, which had been committed by mistake,
+  and added `*.tsbuildinfo` to `.gitignore`.
+- Re-captured the documentation screenshots against the rebuilt SPA to confirm
+  visual parity, then discarded them because the only difference was relative
+  timestamps ("2 h ago" versus "3 h ago"). The committed images remain the ones
+  captured for the release.
 
 ## Security notes
 

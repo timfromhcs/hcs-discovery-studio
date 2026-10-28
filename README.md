@@ -67,7 +67,8 @@ The full ledger, including partial features and known defects, is in
 ### Option A — source checkout (recommended for development)
 
 Requirements: **Python 3.12 or 3.13**, [uv](https://docs.astral.sh/uv/), and
-**Node.js 22** for the frontend.
+**Node.js 22.12 or newer** (Vite 8 requires Node 20.19+ or 22.12+) for the
+frontend.
 
 ```bash
 git clone https://github.com/timfromhcs/hcs-discovery-studio.git

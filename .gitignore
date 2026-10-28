@@ -29,6 +29,7 @@ build/
 node_modules/
 apps/web/dist/
 apps/web/dist-ssr/
+*.tsbuildinfo
 *.local
 .vite/
 playwright-report/
