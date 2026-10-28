@@ -266,13 +266,31 @@ def project_delete(
     ctx: typer.Context,
     project_id: str,
     yes: bool = typer.Option(False, "--yes", help="Skip the confirmation prompt."),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Preview records and files that would be deleted."),
+    keep_files: bool = typer.Option(False, "--keep-files", help="Keep on-disk run and upload directories."),
 ) -> None:
-    """Delete a project and its database records. Run directories are kept."""
-    if not yes:
-        typer.confirm(f"Delete project {project_id} and all of its database records?", abort=True)
+    """Delete a project, its database records, and on-disk run files."""
+    from ..services.projects import preview_project_deletion
+
     with get_session_factory()() as session:
-        _run_cli(delete_project, session, project_id)
-    _print(ctx, {"id": project_id, "status": "deleted"}, f"Deleted project {project_id}. Run directories were kept.")
+        if dry_run:
+            preview = _run_cli(preview_project_deletion, session, project_id)
+            _print(
+                ctx,
+                {**preview, "dry_run": True},
+                f"Would delete project '{preview['name']}' with {preview['runs_count']} run(s), "
+                f"{preview['datasets_count']} dataset(s), and {len(preview['disk_paths'])} on-disk path(s) "
+                f"({preview['total_disk_bytes'] / 1024:.1f} KiB).",
+            )
+            return
+
+        if not yes:
+            typer.confirm(f"Delete project {project_id} and all of its records and on-disk files?", abort=True)
+        _run_cli(delete_project, session, project_id, purge_files=not keep_files)
+    status_msg = (
+        f"Deleted project {project_id}." if not keep_files else f"Deleted project {project_id}. Run files kept."
+    )
+    _print(ctx, {"id": project_id, "status": "deleted", "purged_files": not keep_files}, status_msg)
 
 
 # --------------------------------------------------------------------------- datasets
@@ -793,6 +811,28 @@ def cache_status(ctx: typer.Context) -> None:
 
     stats = NodeCache(get_settings().cache_dir).stats()
     _print(ctx, stats, f"Cache: {stats['entries']} entries, {stats['bytes'] / 1024:.1f} KiB")
+
+
+@cache_app.command("prune")
+def cache_prune(
+    ctx: typer.Context,
+    max_mb: int | None = typer.Option(None, "--max-mb", help="Target maximum cache size in MB."),
+    max_age_days: int | None = typer.Option(None, "--max-age-days", help="Maximum age of entries in days."),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Report what would be removed without deleting."),
+) -> None:
+    from ..workflow.cache import NodeCache
+
+    settings = get_settings()
+    cache = NodeCache(settings.cache_dir)
+    target_mb = max_mb if max_mb is not None else settings.cache_max_mb
+    target_age = max_age_days if max_age_days is not None else settings.cache_max_age_days
+    entries, size = cache.prune(max_mb=target_mb, max_age_days=target_age, dry_run=dry_run)
+    action = "Would remove" if dry_run else "Removed"
+    _print(
+        ctx,
+        {"removed_entries": entries, "removed_bytes": size, "dry_run": dry_run},
+        f"{action} {entries} cache entries ({size / 1024:.1f} KiB).",
+    )
 
 
 @cache_app.command("clear")

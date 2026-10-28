@@ -206,13 +206,29 @@ def get_dataset(session: Session, dataset_id: str) -> Dataset:
     return dataset
 
 
-def delete_dataset(session: Session, dataset_id: str) -> None:
+def delete_dataset(
+    session: Session,
+    dataset_id: str,
+    *,
+    purge_files: bool = True,
+    settings: Any = None,
+) -> None:
     from sqlalchemy import delete
 
+    from ..core.config import get_settings
+
+    settings = settings or get_settings()
     dataset = get_dataset(session, dataset_id)
+
+    if purge_files:
+        upload_dir = settings.uploads_dir / dataset.project_id
+        if upload_dir.exists():
+            for f in upload_dir.glob(f"{dataset.id}-*"):
+                f.unlink(missing_ok=True)
+
     session.execute(delete(Compound).where(Compound.dataset_id == dataset.id))
     session.delete(dataset)
-    audit(session, "dataset.delete", "dataset", dataset_id, {"name": dataset.name})
+    audit(session, "dataset.delete", "dataset", dataset_id, {"name": dataset.name, "purged_files": purge_files})
     session.commit()
 
 

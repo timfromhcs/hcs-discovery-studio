@@ -7,6 +7,7 @@ code paths instead of maintaining parallel pipelines.
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -72,11 +73,81 @@ def get_project(session: Session, project_id: str) -> Project:
     return project
 
 
-def delete_project(session: Session, project_id: str) -> None:
+def preview_project_deletion(session: Session, project_id: str, settings: Any = None) -> dict[str, Any]:
+    from ..core.config import get_settings
+
+    settings = settings or get_settings()
     project = get_project(session, project_id)
+
+    run_ids = session.execute(select(Run.id).where(Run.project_id == project.id)).scalars().all()
+    datasets = session.execute(select(Dataset).where(Dataset.project_id == project.id)).scalars().all()
+    workflow_count = (
+        session.execute(select(func.count(Workflow.id)).where(Workflow.project_id == project.id)).scalar() or 0
+    )
+    compound_count = (
+        session.execute(select(func.count(Compound.id)).where(Compound.project_id == project.id)).scalar() or 0
+    )
+
+    disk_paths: list[str] = []
+    total_disk_bytes = 0
+
+    for rid in run_ids:
+        rdir = settings.runs_dir / rid
+        if rdir.exists():
+            disk_paths.append(str(rdir))
+            for f in rdir.rglob("*"):
+                if f.is_file():
+                    total_disk_bytes += f.stat().st_size
+
+    prj_upload = settings.uploads_dir / project.id
+    if prj_upload.exists():
+        disk_paths.append(str(prj_upload))
+        for f in prj_upload.rglob("*"):
+            if f.is_file():
+                total_disk_bytes += f.stat().st_size
+
+    return {
+        "project_id": project.id,
+        "name": project.name,
+        "datasets_count": len(datasets),
+        "compounds_count": int(compound_count),
+        "workflows_count": int(workflow_count),
+        "runs_count": len(run_ids),
+        "disk_paths": disk_paths,
+        "total_disk_bytes": total_disk_bytes,
+    }
+
+
+def delete_project(
+    session: Session,
+    project_id: str,
+    *,
+    purge_files: bool = True,
+    settings: Any = None,
+) -> dict[str, Any]:
+    import shutil
+
+    from ..core.config import get_settings
+
+    settings = settings or get_settings()
+    preview = preview_project_deletion(session, project_id, settings)
+    project = get_project(session, project_id)
+
+    if purge_files:
+        run_ids = session.execute(select(Run.id).where(Run.project_id == project.id)).scalars().all()
+        for rid in run_ids:
+            rdir = settings.runs_dir / rid
+            if rdir.exists():
+                shutil.rmtree(rdir, ignore_errors=True)
+
+        prj_upload = settings.uploads_dir / project.id
+        if prj_upload.exists():
+            shutil.rmtree(prj_upload, ignore_errors=True)
+
     session.delete(project)
-    audit(session, "project.delete", "project", project_id, {"name": project.name})
+    audit(session, "project.delete", "project", project_id, {"name": project.name, "purged_files": purge_files})
     session.commit()
+    return preview
 
 
 def project_overview(session: Session, project_id: str) -> dict:

@@ -35,6 +35,8 @@ class Settings(BaseSettings):
     worker_poll_seconds: float = Field(default=0.5, ge=0.05)
     run_lease_seconds: int = Field(default=90, ge=10)
     max_run_attempts: int = Field(default=2, ge=1, le=5)
+    cache_max_mb: int = Field(default=1024, ge=10)
+    cache_max_age_days: int = Field(default=30, ge=1)
 
     # Local OpenAI-compatible provider. Secrets come from the environment only and
     # are never persisted by the application.
