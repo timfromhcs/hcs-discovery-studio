@@ -246,6 +246,21 @@ observed; it is not a marketing summary.
   - Residual files on deletion and unbounded cache.
 - Produced `docs/engineering/STABLE_V1_GAP_ANALYSIS.md`. Entering Phase 1.
 
+## 2026-10-28 — Phase 1: Unit 1 & 2 foundations and scientific correctness
+
+- Unit 1: Database auto-initialization & migration idempotence:
+  - Added `ensure_database_initialized` to `src/hcs_discovery/database/base.py`.
+  - Added `path_separator = os` to `alembic.ini` to resolve deprecation warnings.
+  - Added regression test `test_cli_on_uninitialized_database` in `tests/integration/test_cli.py`.
+- Unit 2: Pareto nondominated sorting correctness & objective semantics:
+  - Replaced the order-dependent greedy Pareto comparison in `src/hcs_discovery/workflow/nodes.py` with Deb's Fast Non-dominated Sorting algorithm (`fast_nondominated_sort`).
+  - Added mathematical property tests proving permutation invariance across 20 shuffles and dominance invariance.
+  - Added explicit objective directions and types: `maximize`, `minimize`, `target_range` (with continuous trapezoidal satisfaction formula), `constraint`, and `informational`.
+  - Excluded zero-weight objectives from participating in Pareto dominance by default to prevent unintentional distortion.
+  - Strengthened `RuleConfig` with Pydantic model validators enforcing finite numeric bounds, automatic bound ordering for `between`, and explicit missing-value handling.
+  - Hardened descriptor exception boundaries against catching arbitrary unexpected system exceptions.
+  - Test suite expanded to 87 passing tests with 100% clean formatting and mypy.
+
 ## Security notes
 
 - A GitHub token was supplied in chat earlier in the project. It was never

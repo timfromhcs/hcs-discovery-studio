@@ -129,11 +129,18 @@ class Table:
             if value is None or isinstance(value, bool):
                 out.append(None)
                 continue
-            if isinstance(value, float) and (math.isnan(value) or math.isinf(value)):
-                out.append(None)
+            if isinstance(value, (int, float)):
+                if math.isnan(value) or math.isinf(value):
+                    out.append(None)
+                else:
+                    out.append(float(value))
                 continue
             try:
-                out.append(float(value))
+                num = float(value)
+                if math.isnan(num) or math.isinf(num):
+                    out.append(None)
+                else:
+                    out.append(num)
             except (TypeError, ValueError):
                 out.append(None)
         return out

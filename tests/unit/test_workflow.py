@@ -250,3 +250,164 @@ def test_numeric_column_coerces_missing_and_booleans():
     table.rows[0]["mw"] = True
     table.rows[1]["mw"] = None
     assert table.numeric("mw") == [None, None, 226.0]
+
+
+def test_pareto_permutation_invariance_and_dominance():
+    import random
+
+    from hcs_discovery.workflow.nodes import ObjectiveConfig, RankConfig, _run_rank
+
+    # Create 8 compounds with known dominance relations
+    # c1 dominates c2, c3 is a trade-off, c4 is dominated by c3, etc.
+    raw_data = [
+        {"compound_id": "c1", "smiles": "C", "mw": 200.0, "logp": 1.0},  # Dominates c2
+        {"compound_id": "c2", "smiles": "CC", "mw": 250.0, "logp": 1.5},
+        {"compound_id": "c3", "smiles": "CCC", "mw": 150.0, "logp": 2.5},  # Trade-off with c1
+        {"compound_id": "c4", "smiles": "CCCC", "mw": 180.0, "logp": 3.0},  # Dominated by c3
+        {"compound_id": "c5", "smiles": "CCCCC", "mw": 300.0, "logp": 0.5},  # Trade-off
+        {"compound_id": "c6", "smiles": "CCCCCC", "mw": 350.0, "logp": 1.0},  # Dominated by c5
+        {"compound_id": "c7", "smiles": "c1ccccc1", "mw": 100.0, "logp": 5.0},  # Trade-off
+        {"compound_id": "c8", "smiles": "c1ccccc1C", "mw": 120.0, "logp": 5.5},  # Dominated by c7
+    ]
+
+    config = RankConfig(
+        objectives=[
+            ObjectiveConfig(column="mw", direction="lower", weight=1.0),
+            ObjectiveConfig(column="logp", direction="lower", weight=1.0),
+        ],
+        pareto_front_limit=5,
+    )
+
+    base_table = Table(
+        rows=[dict(r) for r in raw_data],
+        columns=[
+            Column("compound_id", "ID", "string"),
+            Column("smiles", "SMILES", "string"),
+            Column("mw", "MW", "number", direction="lower"),
+            Column("logp", "LogP", "number", direction="lower"),
+        ],
+    )
+    base_result = _run_rank(base_table, config, DummyContext())
+    baseline_pareto = {r["compound_id"]: r["pareto_rank"] for r in base_result.rows}
+
+    # Invariant 1: c1 must strictly dominate c2
+    assert baseline_pareto["c1"] < baseline_pareto["c2"]
+    assert baseline_pareto["c3"] < baseline_pareto["c4"]
+    assert baseline_pareto["c5"] < baseline_pareto["c6"]
+    assert baseline_pareto["c7"] < baseline_pareto["c8"]
+    # Front 1 should contain non-dominated trade-offs: c1, c3, c5, c7
+    assert baseline_pareto["c1"] == 1
+    assert baseline_pareto["c3"] == 1
+    assert baseline_pareto["c5"] == 1
+    assert baseline_pareto["c7"] == 1
+
+    # Invariant 2: 20 random permutations must yield IDENTICAL pareto_ranks for every compound
+    rng = random.Random(42)
+    for _ in range(20):
+        shuffled_rows = [dict(r) for r in raw_data]
+        rng.shuffle(shuffled_rows)
+        shuffled_table = Table(rows=shuffled_rows, columns=list(base_table.columns))
+        shuffled_result = _run_rank(shuffled_table, config, DummyContext())
+        permuted_pareto = {r["compound_id"]: r["pareto_rank"] for r in shuffled_result.rows}
+        assert permuted_pareto == baseline_pareto, "Pareto rank must be 100% permutation-invariant"
+
+
+def test_pareto_identical_ties():
+    from hcs_discovery.workflow.nodes import ObjectiveConfig, RankConfig, _run_rank
+
+    table = Table(
+        rows=[
+            {"compound_id": "c1", "smiles": "C", "mw": 200.0, "logp": 1.0},
+            {"compound_id": "c2", "smiles": "CC", "mw": 200.0, "logp": 1.0},  # Identical to c1
+            {"compound_id": "c3", "smiles": "CCC", "mw": 300.0, "logp": 2.0},
+        ],
+        columns=[
+            Column("compound_id", "ID", "string"),
+            Column("smiles", "SMILES", "string"),
+            Column("mw", "MW", "number"),
+            Column("logp", "LogP", "number"),
+        ],
+    )
+    config = RankConfig(
+        objectives=[
+            ObjectiveConfig(column="mw", direction="lower", weight=1.0),
+            ObjectiveConfig(column="logp", direction="lower", weight=1.0),
+        ]
+    )
+    res = _run_rank(table, config, DummyContext())
+    by_id = {r["compound_id"]: r for r in res.rows}
+    assert by_id["c1"]["pareto_rank"] == by_id["c2"]["pareto_rank"] == 1
+    assert by_id["c3"]["pareto_rank"] == 2
+
+
+def test_target_range_objective():
+    import math
+
+    from hcs_discovery.workflow.nodes import ObjectiveConfig, RankConfig, _run_rank
+
+    table = Table(
+        rows=[
+            {"compound_id": "c1", "smiles": "C", "mw": 300.0},  # inside [200, 400] -> score 1.0
+            {"compound_id": "c2", "smiles": "CC", "mw": 200.0},  # boundary -> score 1.0
+            {"compound_id": "c3", "smiles": "CCC", "mw": 150.0},  # distance 50 with tol 100 -> score 0.5
+            {"compound_id": "c4", "smiles": "CCCC", "mw": 500.0},  # distance 100 with tol 100 -> score 0.0
+        ],
+        columns=[
+            Column("compound_id", "ID", "string"),
+            Column("smiles", "SMILES", "string"),
+            Column("mw", "MW", "number"),
+        ],
+    )
+    config = RankConfig(
+        objectives=[
+            ObjectiveConfig(
+                column="mw",
+                direction="target_range",
+                target_min=200.0,
+                target_max=400.0,
+                tolerance=100.0,
+                weight=1.0,
+            )
+        ]
+    )
+    res = _run_rank(table, config, DummyContext())
+    by_id = {r["compound_id"]: r for r in res.rows}
+    assert math.isclose(by_id["c1"]["composite_score"], 1.0)
+    assert math.isclose(by_id["c2"]["composite_score"], 1.0)
+    assert math.isclose(by_id["c3"]["composite_score"], 0.5)
+    assert math.isclose(by_id["c4"]["composite_score"], 0.0)
+
+
+def test_rule_config_validation_and_missing_values():
+    from pydantic import ValidationError as PydanticValidationError
+
+    from hcs_discovery.workflow.nodes import RuleConfig, _run_filters
+
+    # 1. Invalid non-numeric string for numeric op fails validation
+    with pytest.raises(PydanticValidationError):
+        RuleConfig(column="mw", op="le", value="not_a_number")
+
+    with pytest.raises(PydanticValidationError):
+        RuleConfig(column="mw", op="between", value=100.0, value2="bad")
+
+    # 2. between with min > max normalizes automatically
+    norm_rule = RuleConfig(column="mw", op="between", value=500.0, value2=100.0)
+    assert norm_rule.value == 100.0
+    assert norm_rule.value2 == 500.0
+
+    # 3. Missing values do not pass numeric constraints
+    table = Table(
+        rows=[
+            {"compound_id": "c1", "smiles": "C", "mw": None},
+            {"compound_id": "c2", "smiles": "CC", "mw": 200.0},
+        ],
+        columns=[
+            Column("compound_id", "ID", "string"),
+            Column("smiles", "SMILES", "string"),
+            Column("mw", "MW", "number"),
+        ],
+    )
+    fconfig = FilterConfig(rules=[RuleConfig(column="mw", op="le", value=300.0)])
+    filtered = _run_filters(table, fconfig, DummyContext())
+    assert filtered.rows[0]["filter_pass"] is False
+    assert filtered.rows[1]["filter_pass"] is True

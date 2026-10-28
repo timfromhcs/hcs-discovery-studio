@@ -5,9 +5,9 @@ from __future__ import annotations
 import html
 import math
 from datetime import UTC, datetime
-from typing import Any, Literal
+from typing import Any, Literal, Self
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from rdkit import Chem
 
 from ..chemistry.descriptors import (
@@ -55,7 +55,7 @@ def _run_descriptors(table: Table, config: DescriptorConfig, ctx: NodeContext) -
             spec = DESCRIPTORS[column.name]
             try:
                 values[column.name].append(float(spec.fn(mol)))
-            except Exception:
+            except (ValueError, TypeError, ZeroDivisionError, ArithmeticError, RuntimeError):
                 values[column.name].append(None)
         if index % 250 == 0 or index == total:
             ctx.report_progress(index / total if total else None)
@@ -126,6 +126,46 @@ class RuleConfig(BaseModel):
     value2: float | None = None
     label: str | None = None
 
+    @model_validator(mode="after")
+    def _validate_rule(self) -> Self:
+        if self.op in {"le", "lt", "ge", "gt"}:
+            if isinstance(self.value, bool):
+                raise ValueError(f"Numeric filter '{self.op}' requires a number, not boolean")
+            try:
+                numeric_val = float(self.value)
+            except (ValueError, TypeError) as exc:
+                raise ValueError(f"Numeric filter '{self.op}' requires a numeric value, got '{self.value}'") from exc
+            if not math.isfinite(numeric_val):
+                raise ValueError(f"Filter threshold for '{self.column}' must be a finite number.")
+            self.value = numeric_val
+            self.value2 = None
+        elif self.op == "between":
+            if self.value2 is None:
+                raise ValueError(f"Rule on '{self.column}' uses 'between' without value2")
+            if isinstance(self.value, bool) or isinstance(self.value2, bool):
+                raise ValueError("'between' filter requires numeric bounds, not boolean")
+            try:
+                v1 = float(self.value)
+                v2 = float(self.value2)
+            except (ValueError, TypeError) as exc:
+                raise ValueError(
+                    f"'between' filter requires numeric bounds, got '{self.value}' and '{self.value2}'"
+                ) from exc
+            if not math.isfinite(v1) or not math.isfinite(v2):
+                raise ValueError(f"'between' bounds for '{self.column}' must be finite numbers.")
+            self.value = min(v1, v2)
+            self.value2 = max(v1, v2)
+        elif self.op in {"eq", "ne"}:
+            if not isinstance(self.value, (bool, str)):
+                try:
+                    num = float(self.value)
+                    if not math.isfinite(num):
+                        raise ValueError(f"Filter threshold for '{self.column}' must be finite.")
+                    self.value = num
+                except (ValueError, TypeError):
+                    pass
+        return self
+
 
 class FilterConfig(BaseModel):
     rules: list[RuleConfig] = Field(min_length=1)
@@ -147,12 +187,16 @@ def _numeric(value: Any) -> float | None:
         number = float(value)
     except (TypeError, ValueError):
         return None
-    return None if math.isnan(number) else number
+    return None if (math.isnan(number) or math.isinf(number)) else number
 
 
 def _check(rule: RuleConfig, value: Any) -> bool:
+    if value is None:
+        return False
     number = _numeric(value)
     if rule.op in {"eq", "ne"} and not isinstance(rule.value, (int, float)):
+        if isinstance(rule.value, bool):
+            return (bool(value) == rule.value) if rule.op == "eq" else (bool(value) != rule.value)
         equal = str(value).strip().lower() == str(rule.value).strip().lower()
         return equal if rule.op == "eq" else not equal
     if number is None:
@@ -170,8 +214,8 @@ def _check(rule: RuleConfig, value: Any) -> bool:
         return math.isclose(number, threshold, rel_tol=1e-9, abs_tol=1e-9)
     if rule.op == "ne":
         return not math.isclose(number, threshold, rel_tol=1e-9, abs_tol=1e-9)
-    low = min(threshold, float(rule.value2))  # type: ignore[arg-type]
-    high = max(threshold, float(rule.value2))  # type: ignore[arg-type]
+    low = float(rule.value)
+    high = float(rule.value2)  # type: ignore[arg-type]
     return low <= number <= high
 
 
@@ -218,10 +262,47 @@ def _run_filters(table: Table, config: FilterConfig, ctx: NodeContext) -> Table:
 
 
 # --------------------------------------------------------------------------- ranking
+ObjectiveDirection = Literal[
+    "higher",
+    "lower",
+    "maximize",
+    "minimize",
+    "target_range",
+    "constraint",
+    "informational",
+]
+
+
 class ObjectiveConfig(BaseModel):
     column: str
-    direction: Literal["higher", "lower"]
+    direction: ObjectiveDirection = "higher"
     weight: float = Field(default=1.0, ge=0.0, le=100.0)
+    target_min: float | None = None
+    target_max: float | None = None
+    tolerance: float | None = None
+    participates_in_pareto: bool | None = None
+
+    @model_validator(mode="after")
+    def _validate_objective(self) -> Self:
+        if self.direction == "target_range":
+            if self.target_min is None or self.target_max is None:
+                raise ValueError(
+                    f"Objective on '{self.column}' with direction 'target_range' requires target_min and target_max."
+                )
+            if not math.isfinite(self.target_min) or not math.isfinite(self.target_max):
+                raise ValueError(f"target_min and target_max for '{self.column}' must be finite numbers.")
+            if self.target_min > self.target_max:
+                self.target_min, self.target_max = self.target_max, self.target_min
+            if self.tolerance is not None and (not math.isfinite(self.tolerance) or self.tolerance < 0):
+                raise ValueError(f"tolerance for '{self.column}' must be a non-negative finite number.")
+        elif self.direction == "constraint":
+            if self.target_min is None and self.target_max is None:
+                raise ValueError(f"Constraint objective on '{self.column}' requires at least target_min or target_max.")
+        elif self.direction == "informational":
+            self.weight = 0.0
+            if self.participates_in_pareto is None:
+                self.participates_in_pareto = False
+        return self
 
 
 class RankConfig(BaseModel):
@@ -231,15 +312,73 @@ class RankConfig(BaseModel):
     @field_validator("objectives")
     @classmethod
     def _weights(cls, objectives: list[ObjectiveConfig]) -> list[ObjectiveConfig]:
-        if sum(objective.weight for objective in objectives) <= 0:
-            raise ValueError("At least one objective must have a positive weight")
+        active_weights = [obj.weight for obj in objectives if obj.direction != "informational"]
+        has_pareto = any(
+            (obj.participates_in_pareto is True)
+            or (obj.participates_in_pareto is None and obj.weight > 0 and obj.direction != "informational")
+            for obj in objectives
+        )
+        if sum(active_weights) <= 0 and not has_pareto:
+            raise ValueError("At least one objective must have a positive weight or participate in Pareto ranking")
         return objectives
 
 
-def _dominates(a: list[float], b: list[float]) -> bool:
-    better_or_equal = all(x >= y for x, y in zip(a, b, strict=True))
-    strictly_better = any(x > y for x, y in zip(a, b, strict=True))
+def _dominates(a: list[float], b: list[float], eps: float = 1e-12) -> bool:
+    better_or_equal = all(x >= y - eps for x, y in zip(a, b, strict=True))
+    strictly_better = any(x > y + eps for x, y in zip(a, b, strict=True))
     return better_or_equal and strictly_better
+
+
+def fast_nondominated_sort(
+    candidate_indices: list[int],
+    vectors: list[list[float]],
+    max_fronts: int = 10,
+) -> list[list[int]]:
+    """Deb et al. Fast Non-dominated Sorting algorithm (NSGA-II).
+
+    Invariants:
+    1. Permutation invariance: changing the order of candidate_indices does not alter front memberships.
+    2. Dominance invariant: no member of front i can be dominated by any member of front >= i.
+    3. Tie handling: identical vectors are assigned to the exact same front.
+    """
+    N = len(candidate_indices)
+    if N == 0:
+        return []
+
+    S: list[list[int]] = [[] for _ in range(N)]
+    n: list[int] = [0] * N
+    first_front: list[int] = []
+
+    for p in range(N):
+        vec_p = vectors[p]
+        for q in range(p + 1, N):
+            vec_q = vectors[q]
+            p_dom_q = _dominates(vec_p, vec_q)
+            q_dom_p = _dominates(vec_q, vec_p)
+            if p_dom_q:
+                S[p].append(q)
+                n[q] += 1
+            elif q_dom_p:
+                S[q].append(p)
+                n[p] += 1
+        if n[p] == 0:
+            first_front.append(p)
+
+    fronts: list[list[int]] = [first_front]
+    i = 0
+    while i < len(fronts) and fronts[i] and (i + 1) < max_fronts:
+        next_front: list[int] = []
+        for p in fronts[i]:
+            for q in S[p]:
+                n[q] -= 1
+                if n[q] == 0:
+                    next_front.append(q)
+        if not next_front:
+            break
+        fronts.append(next_front)
+        i += 1
+
+    return [[candidate_indices[idx] for idx in front] for front in fronts if front]
 
 
 def _run_rank(table: Table, config: RankConfig, ctx: NodeContext) -> Table:
@@ -254,7 +393,11 @@ def _run_rank(table: Table, config: RankConfig, ctx: NodeContext) -> Table:
         if column.type != "number":
             raise ValidationError(f"Objective column '{objective.column}' is not numeric.")
         expected = column.direction
-        if expected in {"higher", "lower"} and expected != objective.direction:
+        if (
+            expected in {"higher", "lower"}
+            and expected != objective.direction
+            and objective.direction in {"higher", "lower"}
+        ):
             ctx.log(
                 f"Objective '{objective.column}' uses direction '{objective.direction}' while the column "
                 f"metadata says '{expected}'. The explicit objective wins.",
@@ -271,23 +414,55 @@ def _run_rank(table: Table, config: RankConfig, ctx: NodeContext) -> Table:
         high = max(values) if values else None
         series: list[float | None] = []
         for value in raw[objective.column]:
-            if value is None or low is None or high is None:
+            if value is None:
                 series.append(None)
-            elif math.isclose(high, low):
-                series.append(0.5)
-            elif objective.direction == "higher":
-                series.append((value - low) / (high - low))
-            else:
-                series.append((high - value) / (high - low))
+            elif objective.direction in {"higher", "maximize"}:
+                if low is None or high is None or math.isclose(high, low):
+                    series.append(0.5)
+                else:
+                    series.append((value - low) / (high - low))
+            elif objective.direction in {"lower", "minimize"}:
+                if low is None or high is None or math.isclose(high, low):
+                    series.append(0.5)
+                else:
+                    series.append((high - value) / (high - low))
+            elif objective.direction == "target_range":
+                t_min = objective.target_min
+                t_max = objective.target_max
+                assert t_min is not None and t_max is not None
+                if t_min <= value <= t_max:
+                    series.append(1.0)
+                else:
+                    tol = (
+                        objective.tolerance
+                        if objective.tolerance and objective.tolerance > 0
+                        else max(1.0, 0.5 * (t_max - t_min))
+                    )
+                    dist = (t_min - value) if value < t_min else (value - t_max)
+                    series.append(max(0.0, 1.0 - dist / tol))
+            elif objective.direction == "constraint":
+                t_min = objective.target_min
+                t_max = objective.target_max
+                ok = True
+                if t_min is not None and value < t_min:
+                    ok = False
+                if t_max is not None and value > t_max:
+                    ok = False
+                series.append(1.0 if ok else 0.0)
+            elif objective.direction == "informational":
+                series.append(0.0)
         normalized[objective.column] = series
 
-    total_weight = sum(objective.weight for objective in config.objectives)
+    scoring_objectives = [obj for obj in config.objectives if obj.weight > 0 and obj.direction != "informational"]
+    total_weight = sum(obj.weight for obj in scoring_objectives)
     scores: list[float | None] = []
-    mentioned: list[str] = []
     for index in range(total_rows):
+        if total_weight <= 0:
+            scores.append(None)
+            continue
         weighted = 0.0
         complete = True
-        for objective in config.objectives:
+        for objective in scoring_objectives:
             value = normalized[objective.column][index]
             if value is None:
                 complete = False
@@ -295,21 +470,38 @@ def _run_rank(table: Table, config: RankConfig, ctx: NodeContext) -> Table:
             weighted += value * objective.weight
         if not complete:
             scores.append(None)
-            mentioned.append("missing objective value")
         else:
             scores.append(weighted / total_weight)
 
-    # Pareto fronts on objective vectors (direction-normalised, higher is better).
+    pareto_objectives = [
+        obj
+        for obj in config.objectives
+        if (obj.participates_in_pareto is True)
+        or (obj.participates_in_pareto is None and obj.weight > 0 and obj.direction != "informational")
+    ]
     vectors: list[list[float] | None] = []
     for index in range(total_rows):
+        if not pareto_objectives:
+            vectors.append(None)
+            continue
         vector: list[float] = []
-        for objective in config.objectives:
+        complete = True
+        for objective in pareto_objectives:
             value = raw[objective.column][index]
             if value is None:
-                vector = []
+                complete = False
                 break
-            vector.append(float(value) if objective.direction == "higher" else -float(value))
-        vectors.append(vector or None)
+            if objective.direction in {"higher", "maximize"}:
+                vector.append(float(value))
+            elif objective.direction in {"lower", "minimize"}:
+                vector.append(-float(value))
+            elif objective.direction in {"target_range", "constraint"}:
+                norm_val = normalized[objective.column][index]
+                if norm_val is None:
+                    complete = False
+                    break
+                vector.append(float(norm_val))
+        vectors.append(vector if complete else None)
 
     order = sorted(
         range(total_rows),
@@ -317,44 +509,27 @@ def _run_rank(table: Table, config: RankConfig, ctx: NodeContext) -> Table:
             not bool(table.rows[i].get("filter_pass", True)),
             scores[i] is None,
             -float(scores[i] or 0.0),
+            i,
         ),
     )
-    pareto_rank: list[int | None] = [None] * total_rows
+
     candidates = [
         index for index in order if vectors[index] is not None and bool(table.rows[index].get("filter_pass", True))
     ]
+    candidate_vectors: list[list[float]] = [v for idx in candidates if (v := vectors[idx]) is not None]
+    fronts = fast_nondominated_sort(candidates, candidate_vectors, max_fronts=config.pareto_front_limit)
+    pareto_rank: list[int | None] = [None] * total_rows
+    for front_idx, front_members in enumerate(fronts, start=1):
+        for member_idx in front_members:
+            pareto_rank[member_idx] = front_idx
+
     skipped = total_rows - len(candidates)
     if skipped:
-        ctx.log(f"Excluded {skipped} filter-failing record(s) from Pareto fronts.")
-    rank_value = 1
+        ctx.log(f"Excluded {skipped} filter-failing or incomplete record(s) from Pareto fronts.")
     ctx.log(
         f"Ranking {total_rows} record(s) on {len(config.objectives)} objective(s); "
-        "composite scores use min-max normalisation with the configured weights.",
+        "composite scores use normalized objectives with the configured weights.",
     )
-    while candidates and rank_value <= config.pareto_front_limit:
-        front: list[int] = []
-        remaining: list[int] = []
-        for index in candidates:
-            current_vector: list[float] | None = vectors[index]
-            assert current_vector is not None
-            if any(_dominates(vectors[other], current_vector) for other in front):  # type: ignore[arg-type]
-                remaining.append(index)
-            else:
-                front.append(index)
-        if not front:
-            break
-        for index in front:
-            pareto_rank[index] = rank_value
-        candidates = remaining
-        rank_value += 1
-        if total_rows > 2000:
-            ctx.check_cancel()
-    if candidates:
-        ctx.log(
-            f"{len(candidates)} record(s) were not assigned a Pareto front within the configured "
-            f"limit of {config.pareto_front_limit} fronts.",
-            level="warning",
-        )
 
     result = table.copy()
     result.add_values(
