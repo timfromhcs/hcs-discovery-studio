@@ -17,6 +17,9 @@ env:
   PYTHON_VERSION: "3.12"
   NODE_VERSION: "22"
   UV_VERSION: "0.12.3"
+  # Official AutoDock Vina 1.2.5 Linux build used by the docking science gate.
+  VINA_URL: https://github.com/ccsb-scripps/AutoDock-Vina/releases/download/v1.2.5/vina_1.2.5_linux_x86_64
+  VINA_SHA256: fa0126a28a9ea9162d1b161dfa92bc76e632416db28ca246278ea4b2dc6860cb
 
 jobs:
   backend:
@@ -147,6 +150,50 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+  science-vina:
+    name: Docking science gate (AutoDock Vina redocking)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install uv
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+      - name: Install dependencies
+        run: uv sync --frozen
+      - name: Download the pinned AutoDock Vina binary
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/vina" "$VINA_URL"
+          echo "$VINA_SHA256  $RUNNER_TEMP/vina" | sha256sum --check --strict
+          chmod +x "$RUNNER_TEMP/vina"
+          "$RUNNER_TEMP/vina" --version
+      - name: Run the live Vina tests
+        env:
+          HCS_VINA_BINARY: ${{ runner.temp }}/vina
+          HCS_REQUIRE_VINA: "1"
+        run: uv run pytest -q tests/scientific/test_vina_adapter.py -rs
+      - name: Redock imatinib into 1IEP and enforce the pose-recovery criterion
+        run: >-
+          uv run python scripts/science/redock_vina_reference.py
+          --vina "$RUNNER_TEMP/vina"
+          --out-dir "$RUNNER_TEMP/vina-redocking"
+          --gate
+      - name: Upload the redocking report
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: vina-redocking-report
+          path: ${{ runner.temp }}/vina-redocking
+          if-no-files-found: ignore
+          retention-days: 30
+
   migrations:
     name: Clean SQLite migration
     runs-on: ubuntu-latest
@@ -178,9 +225,16 @@ jobs:
           uv run hcs-discovery doctor
 
   wheel:
-    name: Wheel build and install smoke test
-    runs-on: ubuntu-latest
+    name: Wheel build and install smoke test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    defaults:
+      run:
+        shell: bash
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -207,16 +261,25 @@ jobs:
         run: uv build --wheel
       - name: Install the wheel in a clean virtual environment
         run: |
+          set -euo pipefail
           uv venv "$RUNNER_TEMP/wheel-venv"
-          uv pip install --python "$RUNNER_TEMP/wheel-venv/bin/python" dist/*.whl
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            VENV_BIN="$RUNNER_TEMP/wheel-venv/Scripts"
+          else
+            VENV_BIN="$RUNNER_TEMP/wheel-venv/bin"
+          fi
+          echo "VENV_BIN=$VENV_BIN" >> "$GITHUB_ENV"
+          uv pip install --python "$VENV_BIN/python" dist/*.whl
       - name: Smoke test the installed application
         env:
           HCS_DATA_DIR: ${{ runner.temp }}/hcs-wheel-data
         run: |
           set -euo pipefail
-          BIN="$RUNNER_TEMP/wheel-venv/bin/hcs-discovery"
+          BIN="$VENV_BIN/hcs-discovery"
           "$BIN" version
           "$BIN" doctor
+          "$BIN" db upgrade
+          "$BIN" db current
           "$BIN" serve --port 8793 > "$RUNNER_TEMP/wheel-server.log" 2>&1 &
           SERVER_PID=$!
           trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
@@ -234,6 +297,7 @@ jobs:
             exit 1
           fi
           curl -fsS http://127.0.0.1:8793/api/v1/health
+          curl -fsS http://127.0.0.1:8793/api/v1/ready | grep -q '"status":"ready"'
           curl -fsS http://127.0.0.1:8793/ | grep -q 'id="root"'
       - name: Show server log on failure
         if: failure()
@@ -359,6 +423,7 @@ jobs:
       - backend
       - frontend
       - e2e
+      - science-vina
       - migrations
       - wheel
       - licenses
@@ -374,6 +439,7 @@ jobs:
             backend=${{ needs.backend.result }}
             frontend=${{ needs.frontend.result }}
             e2e=${{ needs.e2e.result }}
+            science-vina=${{ needs.science-vina.result }}
             migrations=${{ needs.migrations.result }}
             wheel=${{ needs.wheel.result }}
             licenses=${{ needs.licenses.result }}
