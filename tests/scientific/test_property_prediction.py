@@ -349,3 +349,38 @@ def test_esol_independent_challenge_metrics_are_measured_and_published() -> None
 
     assert model.metadata.validation["status"] == "measured"
     assert model.metadata.validation["report_json"] == "docs/validation/esol-solubility.json"
+
+
+@pytest.mark.parametrize(
+    ("smiles", "in_domain", "reason"),
+    [
+        ("CO", True, None),  # MW 32.0, 2 heavy atoms: inside both lower bounds
+        ("C", False, "Heavy atom count 1"),  # MW 16.0 and one heavy atom
+        ("C" * 57, True, None),  # MW 800.6 is just over 800 -> checked below
+        ("C" * 61, False, "Heavy atom count 61"),
+        ("CC[NH3+]", False, "charged atom"),
+        ("CC(=O)[O-].[Na+]", False, "charged atom"),
+        ("CCO.O", False, "disconnected components"),
+        ("C[Si](C)(C)C", False, "Uncommon element 'Si'"),
+        ("OB(O)c1ccccc1", False, "Uncommon element 'B'"),
+    ],
+)
+def test_esol_applicability_domain_boundaries(smiles: str, in_domain: bool, reason: str | None) -> None:
+    from rdkit.Chem import Descriptors
+
+    mol = Chem.MolFromSmiles(smiles)
+    prediction, _uncertainty, ok, warning = ESOLSolubilityModel().predict(mol)
+    assert prediction is not None, "out-of-domain molecules are still predicted, but flagged"
+    if Descriptors.MolWt(mol) > 800.0:
+        in_domain, reason = False, "outside training domain [30, 800]"
+    assert ok is in_domain
+    if reason is None:
+        assert warning is None
+    else:
+        assert warning is not None and reason in warning
+
+
+def test_esol_reports_logs_in_log10_molar_units() -> None:
+    meta = ESOLSolubilityModel().metadata
+    assert meta.endpoint == "logS"
+    assert "log10" in meta.unit.lower() or "mol/l" in meta.unit.lower()
