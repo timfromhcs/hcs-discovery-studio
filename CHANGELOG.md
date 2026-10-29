@@ -107,10 +107,21 @@ intentional.
   permissions. See `docs/developer-guide/RELEASING.md`.
 - Release candidate tags (`vX.Y.Z-rc.N`) now map to PEP 440 versions
   (`X.Y.ZrcN`); previously no candidate tag could pass the version check.
+- **UI:** `Input`, `Select` and `Textarea` lost their base styling whenever a
+  caller passed `className` (the spread props overwrote it). The editor's
+  "Node ID" field had no accessible name. At 320 px, long local paths in the
+  diagnostics and long SMILES/IDs in page headers caused horizontal scrolling.
+  The workflow editor's node table hid its Edit/Delete actions behind a
+  horizontal scroll at every width, and table action cells used `display: flex`
+  on `<td>`, misaligning row borders.
 - Docked pose SDF files now carry bonds, rebuilt from `REMARK SMILES` records
   that Vina copies into its output; previously they contained atoms only.
 
 ### Validation
+
+- Visual QA (`apps/web/scripts/visual_qa.mjs`): 17 routes × 320/390/768/1280/1440
+  px × light/dark against a synthetic dataset; 170 captures with no automatic
+  findings after the fixes above, and the screenshots were reviewed by hand.
 
 - Full local gates: Ruff format/check, mypy, pytest with coverage, frontend
   typecheck/build and Playwright end-to-end tests.

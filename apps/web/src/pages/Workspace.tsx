@@ -204,13 +204,15 @@ export function WorkspacePage() {
                       <RunStatusBadge status={run.status} />
                     </td>
                     <td className="muted small hide-narrow">{formatRelative(run.created_at)}</td>
-                    <td className="row-actions">
-                      <Link className="text-link" to={`/runs/${run.id}`}>
-                        Monitor
-                      </Link>
-                      <Link className="text-link" to={`/runs/${run.id}/results`}>
-                        Results
-                      </Link>
+                    <td>
+                      <div className="row-actions">
+                        <Link className="text-link" to={`/runs/${run.id}`}>
+                          Monitor
+                        </Link>
+                        <Link className="text-link" to={`/runs/${run.id}/results`}>
+                          Results
+                        </Link>
+                      </div>
                     </td>
                   </tr>
                 ))}
