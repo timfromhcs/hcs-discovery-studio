@@ -352,6 +352,43 @@ observed; it is not a marketing summary.
 - No provider API key is configured or required for the demo.
 - Local data lives under `data/` and is ignored by Git.
 
+## 2026-10-29 — Phase 8: integrity hardening and measured validation
+
+- Removed fabricated scaffold-test metrics from ESOL model; replaced with 45-molecule independent challenge set from AqSolDB/Llinas et al. 2008, with recomputed RMSE 0.968, R² 0.072 and documented bootstrap CI.
+- Model uncertainty column now explicitly labelled as a heuristic descriptor-distance error scale, not a calibrated confidence interval.
+- Every workflow node config and agent tool payload now enforces `extra="forbid"`; unknown fields are rejected rather than silently ignored.
+- Constraint objectives now gate eligibility: weight forced to zero, excluded from composite scores and Pareto front, exposed via `constraint_pass` / `constraint_reasons` columns.
+- `table.join` now rejects duplicate right-side keys and suffix collisions with `ValidationError`.
+- Cache entries record table `content_hash` and artifact SHA-256; missing/tampered artifacts are cache misses; partial entries are refused.
+- Background `_LeaseHeartbeat` renews leases; `LeaseLostError` prevents stale owners from writing terminal run state.
+- Vina probe requires exit code 0 + recognised version output; fabricated `ENGINE_VERSION` removed.
+- Connectors block 3xx redirects, raise honest 404 unless `allow_not_found=True`, convert malformed JSON to `ValidationError`, require JSON objects, and normalise allowlisted hosts against case, trailing dot, ports and IDNA lookalikes.
+- Agent plans are persisted under `data_dir/agent_plans` with a digest. `run` requires `plan_id` and rejects missing, mutated, reordered or tampered calls. Tool payloads use `extra="forbid"`.
+- SSE generator made async with `request.is_disconnected()` and `asyncio.sleep`; stops on client disconnect.
+- ESOL metadata updated with measured independent-challenge metrics and citation to Sorkun et al. 2019 AqSolDB.
+- New file `scripts/science/validate_esol.py` regenerates `docs/validation/esol-solubility.md` and `esol-solubility.json` from the checked-in fixture.
+
+## 2026-10-29 — Phase 9: local gate audit before first v2 push
+
+Local gates on Windows 11, Python via uv 0.12.3: `uv lock --check`, Ruff format
+and lint, mypy, pytest (164 passed, 77% line coverage), license checks, `npm ci`,
+`npm audit`, typecheck, build, Playwright E2E (3 passed), wheel build/install
+smoke test. Defects found and fixed:
+
+- Installed wheels shipped no Alembic scripts, fell back to `create_all` and never
+  recorded a revision (`db current` → "not initialised"), so future migrations
+  would not reach wheel installs. Migration scripts are now packaged under
+  `hcs_discovery/_alembic`; regression test covers the wheel layout.
+- E2E `globalSetup` pointed at `apps/.e2e-data` and never cleaned anything; the
+  web server also starts before `globalSetup`, so runs reused stale databases.
+  Each invocation now gets its own `.e2e-data/run-*` directory and older ones are
+  removed.
+- E2E expected the pre-v2 Pareto description; updated to the constraint-aware
+  wording the backend now emits.
+- README and implementation status claimed a published, verified `v2.0.0`
+  release that does not exist (and linked to it with a broken relative URL).
+  Status now says release candidate; cloud CI and publication are outstanding.
+
 ## Blockers
 
 - None technical at the time of writing. The `v0.1.0` preview is published and

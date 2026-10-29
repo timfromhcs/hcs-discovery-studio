@@ -30,7 +30,7 @@ class ChEMBLConnector(BaseConnector):
             raise ValidationError("Target search query cannot be empty.")
 
         url = f"{CHEMBL_BASE_URL}/target/search.json"
-        res_json = self.get_json(url, params={"q": cleaned, "limit": limit})
+        res_json = self.get_json(url, params={"q": cleaned, "limit": limit}) or {}
         targets = res_json.get("targets", [])
         records: list[ConnectorRecord] = []
         retrieval_time = self.now_iso()
@@ -65,7 +65,7 @@ class ChEMBLConnector(BaseConnector):
             raise ValidationError("Compound search query cannot be empty.")
 
         url = f"{CHEMBL_BASE_URL}/molecule/search.json"
-        res_json = self.get_json(url, params={"q": cleaned, "limit": limit})
+        res_json = self.get_json(url, params={"q": cleaned, "limit": limit}) or {}
         molecules = res_json.get("molecules", [])
         records: list[ConnectorRecord] = []
         retrieval_time = self.now_iso()
@@ -102,7 +102,7 @@ class ChEMBLConnector(BaseConnector):
             raise ValidationError("Target ChEMBL ID cannot be empty.")
 
         url = f"{CHEMBL_BASE_URL}/activity.json"
-        res_json = self.get_json(url, params={"target_chembl_id": cleaned_id, "limit": limit})
+        res_json = self.get_json(url, params={"target_chembl_id": cleaned_id, "limit": limit}) or {}
         activities = res_json.get("activities", [])
         records: list[ConnectorRecord] = []
         retrieval_time = self.now_iso()

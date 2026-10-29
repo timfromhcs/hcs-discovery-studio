@@ -28,6 +28,7 @@ class ModelMetadata:
     description: str
     applicability_domain: dict[str, Any]
     benchmark_metrics: dict[str, float] = field(default_factory=dict)
+    validation: dict[str, Any] = field(default_factory=dict)
     scientific_caveats: list[str] = field(default_factory=list)
 
     def as_dict(self) -> dict[str, Any]:
@@ -44,6 +45,7 @@ class ModelMetadata:
             "description": self.description,
             "applicability_domain": self.applicability_domain,
             "benchmark_metrics": self.benchmark_metrics,
+            "validation": self.validation,
             "scientific_caveats": self.scientific_caveats,
         }
 
@@ -60,14 +62,20 @@ class PropertyModel(ABC):
         """Predict property for an RDKit Mol.
 
         Returns:
-            (predicted_value, uncertainty_std_err, is_in_domain, domain_warning_reason)
+            (predicted_value, uncertainty, is_in_domain, domain_warning_reason)
+
+        ``uncertainty`` is a model-specific error scale. For ESOL it is a
+        heuristic descriptor-distance estimate, not a calibrated confidence
+        interval.
         """
 
 
 class ESOLSolubilityModel(PropertyModel):
     """Delaney (2004) ESOL: Estimating Aqueous Solubility Directly from Molecular Structure.
 
-    Linear regression on clogP, MW, rotatable bonds, and aromatic proportion.
+    Reduced four-descriptor linear equation (clogP, MW, rotatable bonds, aromatic
+    proportion). Delaney's published fit used nine descriptors; these coefficients
+    are not the full published model.
     """
 
     # Model coefficients from Delaney 2004 Table 1
@@ -77,12 +85,16 @@ class ESOLSolubilityModel(PropertyModel):
     COEF_RB = 0.066
     COEF_AP = -0.74
 
-    # Delaney training set centroids and scaling for leverage distance
-    _TRAIN_MEAN_CLOGP = 2.45
-    _TRAIN_STD_CLOGP = 1.62
-    _TRAIN_MEAN_MW = 204.6
-    _TRAIN_STD_MW = 102.7
-    _TRAIN_RESIDUAL_SE = 0.75  # logS standard error of regression
+    # Approximate descriptor scales used only to place a molecule on a heuristic
+    # distance axis. These are not fitted training-set summary statistics and the
+    # resulting uncertainty is not a calibrated confidence interval.
+    _DISTANCE_CENTER_CLOGP = 2.45
+    _DISTANCE_SCALE_CLOGP = 1.62
+    _DISTANCE_CENTER_MW = 204.6
+    _DISTANCE_SCALE_MW = 102.7
+    # Delaney (2004) reports predictions within a factor of 5-8 of measurement
+    # across validation sets, i.e. roughly 0.7-0.9 log10 units.
+    _ERROR_ANCHOR = 0.75  # logS units
 
     def __init__(self) -> None:
         weights_str = (
@@ -95,10 +107,13 @@ class ESOLSolubilityModel(PropertyModel):
             endpoint="logS",
             unit="log10(mol/L)",
             architecture="MultipleLinearRegression(4-physicochemical-descriptors)",
-            version="1.0.0",
+            version="1.1.0",
             weights_sha256=sha256_text(weights_str),
             citation="Delaney, J. S. (2004). J. Chem. Inf. Comput. Sci., 44(3), 1000-1005.",
-            description="Predicts intrinsic aqueous solubility logS (log10 mol/L) from 2D structure.",
+            description=(
+                "Predicts intrinsic aqueous solubility logS (log10 mol/L) from 2D structure "
+                "with Delaney's four-descriptor reduced equation."
+            ),
             applicability_domain={
                 "min_mw": 30.0,
                 "max_mw": 800.0,
@@ -107,12 +122,38 @@ class ESOLSolubilityModel(PropertyModel):
                 "allowed_elements": ["H", "C", "N", "O", "P", "S", "F", "Cl", "Br", "I"],
             },
             benchmark_metrics={
-                "training_r2": 0.75,
-                "training_rmse": 0.75,
-                "scaffold_test_rmse": 0.88,
-                "scaffold_test_r2": 0.69,
+                # Measured by scripts/science/validate_esol.py on
+                # tests/fixtures/esol_solubility_challenge.json. The regression
+                # test recomputes these numbers and fails if they drift.
+                "independent_challenge_n": 45.0,
+                "independent_challenge_rmse": 0.9677,
+                "independent_challenge_mae": 0.7286,
+                "independent_challenge_r2": 0.0719,
+                "independent_challenge_mean_error": 0.2239,
+                "independent_challenge_mean_baseline_rmse": 1.0045,
+                "independent_challenge_within_10x_fraction": 0.7111,
+                "independent_challenge_max_abs_error": 3.534,
+            },
+            validation={
+                "status": "measured",
+                "dataset": "AqSolDB Solubility Challenge subset (Llinas et al. 2008 source records)",
+                "n_records": 45,
+                "report": "docs/validation/esol-solubility.md",
+                "report_json": "docs/validation/esol-solubility.json",
+                "citation": (
+                    "Sorkun, M. C.; Khetan, A.; Er, S. (2019). AqSolDB, a curated reference set of "
+                    "aqueous solubility and 2D descriptors. Sci. Data 6, 143. "
+                    "doi:10.1038/s41597-019-0151-1"
+                ),
             },
             scientific_caveats=[
+                "Reduced four-descriptor form of Delaney (2004); the published model used nine "
+                "descriptors, so these coefficients are not the full published fit.",
+                "On an independent 45-molecule drug-like challenge set the model reaches RMSE 0.97 "
+                "and R^2 0.07 log10 units (mean-baseline RMSE 1.00); absolute predictions are "
+                "unreliable and the model only marginally beats a constant baseline.",
+                "The uncertainty column is a heuristic descriptor-distance error scale, not a "
+                "calibrated confidence interval.",
                 "ESOL predicts intrinsic thermodynamic solubility of the neutral form, "
                 "not kinetic or buffer-dependent solubility.",
                 "Crystal lattice packing energy and polymorphism are not captured by 2D descriptors.",
@@ -162,11 +203,11 @@ class ESOLSolubilityModel(PropertyModel):
             + self.COEF_AP * aromatic_prop
         )
 
-        # Uncertainty: distance-based leverage estimate
-        z_clogp = (clogp - self._TRAIN_MEAN_CLOGP) / self._TRAIN_STD_CLOGP
-        z_mw = (mw - self._TRAIN_MEAN_MW) / self._TRAIN_STD_MW
+        # Heuristic distance-based error scale (not a calibrated confidence interval).
+        z_clogp = (clogp - self._DISTANCE_CENTER_CLOGP) / self._DISTANCE_SCALE_CLOGP
+        z_mw = (mw - self._DISTANCE_CENTER_MW) / self._DISTANCE_SCALE_MW
         leverage_dist = math.sqrt((z_clogp**2 + z_mw**2) / 2.0)
-        uncertainty = self._TRAIN_RESIDUAL_SE * math.sqrt(1.0 + min(leverage_dist, 5.0) ** 2 / 10.0)
+        uncertainty = self._ERROR_ANCHOR * math.sqrt(1.0 + min(leverage_dist, 5.0) ** 2 / 10.0)
 
         warning_reason = "; ".join(warnings) if warnings else None
         return (round(logs, 3), round(uncertainty, 3), domain_ok, warning_reason)
@@ -188,7 +229,7 @@ class CNSMPOModel(PropertyModel):
             endpoint="cns_mpo_score",
             unit="0-6 desirability score",
             architecture="CompositeMultiParameterOptimization(6-desirability-functions)",
-            version="1.0.0",
+            version="1.1.0",
             weights_sha256=sha256_text(weights_str),
             citation="Wager, T. T. et al. (2010). ACS Chem. Neurosci. 1(6), 435-449.",
             description="Assesses drug-likeness for central nervous system (CNS) penetration on a 0-6 scale.",
@@ -197,6 +238,14 @@ class CNSMPOModel(PropertyModel):
                 "allowed_elements": ["H", "C", "N", "O", "P", "S", "F", "Cl", "Br"],
             },
             benchmark_metrics={"cns_positive_cutoff": 4.0},
+            validation={
+                "status": "literature_derived",
+                "dataset": "Wager et al. (2010) desirability functions and thresholds",
+                "caveat": (
+                    "No independent local accuracy benchmark has been measured; the score "
+                    "reproduces the published desirability functions and 0-6 scale."
+                ),
+            },
             scientific_caveats=[
                 "CNS MPO score >= 4.0 indicates favorable physicochemical properties for passive BBB permeation.",
                 "It does not account for active efflux (e.g. P-gp/BCRP) or carrier-mediated transport.",

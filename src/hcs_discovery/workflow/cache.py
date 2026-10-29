@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from ..core.hashing import stable_json_hash
+from ..core.hashing import sha256_file, stable_json_hash
 from ..core.paths import safe_join
 from .table import Column, Table
 
@@ -65,16 +65,32 @@ class NodeCache:
             payload = json.loads(manifest.read_text(encoding="utf-8"))
             columns = [Column(**column) for column in payload["columns"]]
             table = Table(rows=payload["rows"], columns=columns)
+            content_hash = payload["content_hash"]
+            artifacts = payload.get("artifacts", [])
+            summary = payload.get("summary", {})
         except (KeyError, TypeError, json.JSONDecodeError, ValueError):
             shutil.rmtree(entry, ignore_errors=True)
             return None
+        if content_hash != table.content_hash():
+            shutil.rmtree(entry, ignore_errors=True)
+            return None
+        for artifact in artifacts:
+            cache_file = artifact.get("cache_file")
+            expected_sha = artifact.get("sha256")
+            if not isinstance(cache_file, str) or not isinstance(expected_sha, str):
+                shutil.rmtree(entry, ignore_errors=True)
+                return None
+            path = safe_join(entry / "artifacts", cache_file)
+            if not path.is_file() or sha256_file(path) != expected_sha:
+                shutil.rmtree(entry, ignore_errors=True)
+                return None
         return CachedOutput(
             table=table,
-            artifacts=payload.get("artifacts", []),
-            summary=payload.get("summary", {}),
+            artifacts=artifacts,
+            summary=summary,
         )
 
-    def put(self, key: str, output: CachedOutput, artifact_files: dict[str, Path]) -> None:
+    def put(self, key: str, output: CachedOutput, artifact_files: dict[str, Path]) -> bool:
         entry = self._entry_dir(key)
         entry.mkdir(parents=True, exist_ok=True)
         artifacts_dir = entry / "artifacts"
@@ -84,19 +100,24 @@ class NodeCache:
             name = artifact["filename"]
             source = artifact_files.get(name)
             if source is None or not source.exists():
-                continue
+                # Never publish a partial cache entry: it would replay a run with
+                # missing artifacts while still reporting success.
+                shutil.rmtree(entry, ignore_errors=True)
+                return False
             destination = safe_join(artifacts_dir, name)
             shutil.copy2(source, destination)
-            stored.append({**artifact, "cache_file": name})
+            stored.append({**artifact, "cache_file": name, "sha256": sha256_file(destination)})
         payload = {
             "columns": [column.as_dict() for column in output.table.columns],
             "rows": output.table.rows,
+            "content_hash": output.table.content_hash(),
             "artifacts": stored,
             "summary": output.summary,
         }
         tmp = entry / "entry.json.tmp"
         tmp.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
         tmp.replace(entry / "entry.json")
+        return True
 
     def artifact_path(self, key: str, filename: str) -> Path:
         return safe_join(self._entry_dir(key) / "artifacts", filename)

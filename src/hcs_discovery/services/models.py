@@ -16,9 +16,6 @@ from ..plugins.science.docking.vina import (
     ADAPTER_ID as VINA_ID,
 )
 from ..plugins.science.docking.vina import (
-    ENGINE_VERSION as VINA_VERSION,
-)
-from ..plugins.science.docking.vina import (
     SCIENTIFIC_CAVEAT as VINA_CAVEAT,
 )
 from ..plugins.science.docking.vina import (
@@ -124,7 +121,7 @@ def _vina_card(settings: Settings, *, probe: bool) -> AdapterCard:
         id=VINA_ID,
         display_name="AutoDock Vina",
         category="docking",
-        version=probe_res.get("version") or VINA_VERSION,
+        version=probe_res.get("version") or "unknown",
         license=LicenseInfo(code="Apache-2.0", weights="n/a", data="n/a"),
         capabilities=["docking", "pose_search", "binding_affinity"],
         device_providers=["cpu"],
@@ -141,15 +138,21 @@ def _vina_card(settings: Settings, *, probe: bool) -> AdapterCard:
 def _property_predictor_card() -> AdapterCard:
     probe_res = probe_property_predictor()
     notes = [
-        "Learned and validated molecular property prediction models: ESOL aqueous solubility, CNS MPO BBB scoring.",
+        (
+            "Literature-derived molecular property models: ESOL aqueous solubility and CNS MPO "
+            "BBB scoring, with uncertainty and applicability-domain flags."
+        ),
         probe_res["detail"],
-        "Models provide calibrated uncertainty and applicability domain checks.",
+        (
+            "Measured ESOL accuracy on an independent challenge set is modest "
+            "(RMSE 0.97, R^2 0.07 log10 units); see docs/validation/esol-solubility.md."
+        ),
     ]
     return AdapterCard(
         id=PROP_PRED_ID,
         display_name="Property Predictor",
         category="property",
-        version="1.0.0",
+        version="1.1.0",
         license=LicenseInfo(
             code="Apache-2.0",
             weights="open-literature",

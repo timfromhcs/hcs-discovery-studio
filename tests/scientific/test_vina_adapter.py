@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
 import pytest
 
+import hcs_discovery.plugins.science.docking.vina as vina_module
+from hcs_discovery.core.errors import ValidationError
 from hcs_discovery.plugins.science.docking.prep import (
     LigandPreparationError,
     ReceptorValidationError,
@@ -188,6 +191,92 @@ def test_vina_real_docking_smoke(tmp_path: Path) -> None:
     assert "REMARK VINA RESULT" in pose_pdbqt
     assert pose_sdf is not None
     assert "$$$$" in pose_sdf
+
+
+def _fake_vina(tmp_path: Path, *, output: str, exit_code: int = 0) -> Path:
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    if os.name == "nt":
+        path = tmp_path / "fake_vina.bat"
+        lines = ["@echo off", f"echo {output}"]
+        if exit_code:
+            lines.append(f"exit /b {exit_code}")
+        path.write_text("\r\n".join(lines) + "\r\n", encoding="utf-8")
+    else:
+        path = tmp_path / "fake_vina"
+        path.write_text(f"#!/bin/sh\necho '{output}'\nexit {exit_code}\n", encoding="utf-8")
+        path.chmod(0o755)
+    return path
+
+
+def test_probe_vina_requires_successful_version_output(tmp_path: Path) -> None:
+    good = _fake_vina(tmp_path, output="AutoDock Vina v9.9.9")
+    probe = probe_vina(binary=good)
+    assert probe["available"] is True
+    assert probe["status"] == "available"
+    assert probe["version"] == "9.9.9"
+
+    failing = _fake_vina(tmp_path / "failing", output="boom", exit_code=7)
+    failed = probe_vina(binary=failing)
+    assert failed["available"] is False
+    assert failed["status"] == "unavailable"
+    assert failed["version"] is None
+    assert "code 7" in failed["detail"]
+
+
+def test_probe_vina_rejects_unrecognised_output(tmp_path: Path) -> None:
+    fake = _fake_vina(tmp_path, output="not actually vina")
+    probe = probe_vina(binary=fake)
+    assert probe["available"] is False
+    assert probe["version"] is None
+    assert "did not report" in probe["detail"]
+    assert VinaAdapter(fake).is_available() is False
+
+
+def test_vina_node_records_per_ligand_status_and_errors(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    class FakeAdapter:
+        def is_available(self) -> bool:
+            return True
+
+        def dock_single(self, *, ligand_id: str, **_kwargs: Any):
+            if ligand_id == "lig_3":
+                raise ValidationError("engine crashed for this ligand")
+            return (-5.0, 0.0, 0.0, SAMPLE_VINA_OUTPUT, None)
+
+    monkeypatch.setattr(vina_module, "VinaAdapter", lambda *_args, **_kwargs: FakeAdapter())
+
+    receptor_file = tmp_path / "receptor.pdbqt"
+    receptor_file.write_text(SAMPLE_RECEPTOR_PDBQT, encoding="utf-8")
+    config = VinaConfig(
+        receptor_path=str(receptor_file),
+        center_x=2.5,
+        center_y=1.5,
+        center_z=0.0,
+        size_x=12.0,
+        size_y=12.0,
+        size_z=12.0,
+        exhaustiveness=1,
+        num_modes=1,
+        seed=42,
+        output_prefix="dock",
+    )
+    table = Table(
+        columns=[Column("smiles", "SMILES", "string"), Column("id", "ID", "string")],
+        rows=[
+            {"smiles": "CCO", "id": "ethanol"},
+            {"smiles": "INVALID_SMILES", "id": "bad_mol"},
+            {"smiles": "CC", "id": "ethane"},
+        ],
+    )
+    result = run_vina_docking(table, config, DummyContext(tmp_path))  # type: ignore[arg-type]
+
+    assert [row["dock_status"] for row in result.rows] == [
+        "docked",
+        "ligand_preparation_failed",
+        "docking_failed",
+    ]
+    assert result.rows[0]["dock_error"] is None
+    assert "Cannot parse" in result.rows[1]["dock_error"]
+    assert result.rows[2]["dock_error"] == "engine crashed for this ligand"
 
 
 def test_vina_workflow_node(tmp_path: Path) -> None:

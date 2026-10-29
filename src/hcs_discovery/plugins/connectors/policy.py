@@ -17,6 +17,28 @@ class NetworkPolicyViolationError(ValidationError):
     code = "network_policy_violation"
 
 
+def _normalize_host(host: str) -> str:
+    """Canonicalise a URL host before allowlist comparison.
+
+    Lower-cases, strips a trailing root dot, removes an optional port and converts
+    internationalised names to their IDNA (punycode) form. Anything that cannot be
+    canonicalised is rejected rather than guessed at.
+    """
+    cleaned = host.strip().lower().rstrip(".")
+    if not cleaned:
+        raise NetworkPolicyViolationError("Outbound request has an empty host.")
+    if cleaned.startswith("["):
+        cleaned = cleaned.split("]", 1)[0].lstrip("[")
+    elif ":" in cleaned:
+        cleaned = cleaned.split(":", 1)[0]
+    if any(ord(char) > 127 for char in cleaned):
+        try:
+            cleaned = cleaned.encode("idna").decode("ascii")
+        except UnicodeError as exc:
+            raise NetworkPolicyViolationError(f"Host '{host}' cannot be canonicalised.") from exc
+    return cleaned
+
+
 def check_network_allowed(
     host: str,
     *,
@@ -35,7 +57,7 @@ def check_network_allowed(
             "To enable external connectors, set HCS_NETWORK_POLICY=remote."
         )
 
-    clean_host = host.lower().split(":")[0].strip()
+    clean_host = _normalize_host(host)
     if clean_host not in ALLOWED_CONNECTOR_HOSTS:
         raise NetworkPolicyViolationError(
             f"Host '{clean_host}' is not on the connector allowlist.",

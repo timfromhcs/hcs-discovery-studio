@@ -183,6 +183,13 @@ class Table:
             final_name = col.name
             if final_name in existing_names:
                 final_name = f"{col.name}{suffix}"
+            if final_name in existing_names:
+                raise ValidationError(
+                    f"Cannot join: right column '{col.name}' collides with existing column '{final_name}' "
+                    f"even after applying suffix '{suffix}'.",
+                    details={"column": col.name, "suffix": suffix, "columns": sorted(existing_names)},
+                )
+            existing_names.add(final_name)
             right_col_map[col.name] = final_name
             merged_columns.append(
                 Column(
@@ -197,10 +204,28 @@ class Table:
             )
 
         right_index: dict[Any, dict[str, Any]] = {}
+        duplicate_keys: set[Any] = set()
         for r in other.rows:
             k = r.get(key_column)
-            if k is not None:
-                right_index[k] = r
+            if k is None:
+                continue
+            try:
+                if k in right_index:
+                    duplicate_keys.add(k)
+                else:
+                    right_index[k] = r
+            except TypeError as exc:
+                raise ValidationError(
+                    f"Join key in column '{key_column}' must be a scalar value.",
+                    details={"value_type": type(k).__name__},
+                ) from exc
+        if duplicate_keys:
+            preview = sorted(str(key) for key in duplicate_keys)[:10]
+            raise ValidationError(
+                f"Cannot join on '{key_column}': the right table contains {len(duplicate_keys)} duplicate key(s). "
+                "A one-to-one join is required so rows are neither duplicated nor silently discarded.",
+                details={"duplicate_keys": preview, "duplicate_count": len(duplicate_keys)},
+            )
 
         new_rows: list[dict[str, Any]] = []
         seen_right_keys: set[Any] = set()

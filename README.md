@@ -15,7 +15,7 @@ from the CLI or HTTP API — without Docker, CUDA, an account, or a cloud key.
 [![CodeQL](https://github.com/timfromhcs/hcs-discovery-studio/actions/workflows/codeql.yml/badge.svg)](https://github.com/timfromhcs/hcs-discovery-studio/actions/workflows/codeql.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Python 3.12–3.13](https://img.shields.io/badge/python-3.12%E2%80%933.13-3776ab.svg)](pyproject.toml)
-[![Status: v1.0.0 Stable](https://img.shields.io/badge/status-v1.0.0%20stable-3dd6c3.svg)](docs/engineering/IMPLEMENTATION_STATUS.md)
+[![Status: v2.0.0 release candidate](https://img.shields.io/badge/status-v2.0.0%20candidate-3dd6c3.svg)](docs/engineering/IMPLEMENTATION_STATUS.md)
 
 <img src="docs/screenshots/workspace-dark.png" alt="HCS Discovery Studio workspace showing projects, machine diagnostics, queue state and recent runs" width="1200">
 
@@ -99,13 +99,14 @@ cd apps/web && npm run dev        # http://127.0.0.1:5173, proxies /api to 8787
 ### Option B — release wheel
 
 Download the wheel from the
-[`v1.0.0` release](https://github.com/timfromhcs/hcs-discovery-studio/releases/tag/v1.0.0).
+[latest release](https://github.com/timfromhcs/hcs-discovery-studio/releases/latest)
+(`v2.0.0` is published there only once all release gates pass).
 It bundles the built UI:
 
 ```bash
 python -m venv .venv
 . .venv/bin/activate              # Windows: .venv\Scripts\Activate.ps1
-pip install hcs_discovery_studio-0.1.0-py3-none-any.whl
+pip install hcs_discovery_studio-2.0.0-py3-none-any.whl
 hcs-discovery doctor
 hcs-discovery serve
 ```
@@ -300,7 +301,7 @@ If you use this work, cite the repository using [CITATION.cff](CITATION.cff):
   author  = {hcsmedia},
   title   = {HCS Discovery Studio},
   year    = {2026},
-  version = {0.1.0},
+  version = {2.0.0},
   url     = {https://github.com/timfromhcs/hcs-discovery-studio},
   license = {Apache-2.0}
 }
@@ -316,6 +317,5 @@ No third-party model weights or proprietary datasets are bundled.
 
 ---
 
-**Status:** `0.1.0` preview, released only after the local gates and cloud CI
-pass for the tagged commit. Stable `v1.0.0` requires real engine breadth and
-scientific validation that this preview does not claim.
+**Status:** `2.0.0` release candidate in preparation; it is published only after
+the local gates and cloud CI pass for the tagged commit. See `IMPLEMENTATION_STATUS.md` for the full feature ledger and `CHANGELOG.md` for the change list.

@@ -1,0 +1,385 @@
+{
+  "schema_version": 1,
+  "dataset_name": "AqSolDB Solubility Challenge subset (Llinas et al. 2008 source records)",
+  "description": "Measured aqueous solubility (logS, log10 mol/L) for the records that AqSolDB curated from the Llinas, Glen & Goodman (2008) Solubility Challenge, filtered to the ESOL applicability domain. This set postdates and is independent of the Delaney (2004) training data used to fit the ESOL coefficients; overlap with that training set has not been audited beyond source provenance.",
+  "provenance": {
+    "distribution": "AqSolDB curated dataset, results/data_curated.csv",
+    "url": "https://raw.githubusercontent.com/mcsorkun/AqSolDB/master/results/data_curated.csv",
+    "sha256": "363a42a4e4ea8e6039758146d34efdd95cde2da81c665316cacc1869e0a805ed",
+    "doi": "10.1038/s41597-019-0151-1",
+    "license": "MIT",
+    "original_source": "Llinas, A.; Glen, R. C.; Goodman, J. M. (2008). Solubility Challenge: Can You Predict Solubilities of 32 Molecules Using a Database of 100 Reliable Measurements? J. Chem. Inf. Model. 48(7), 1289-1303.",
+    "original_source_doi": "10.1021/ci800058v",
+    "retrieved_utc": "2026-10-29",
+    "selection_rule": "All AqSolDB rows whose ID begins with 'I-' (the Llinas et al. 2008 source), retained only if RDKit parses the SMILES, the record is single-component and formally neutral, every element is in the ESOL domain (H, C, N, O, P, S, F, Cl, Br, I), molecular weight is in [30, 800] Da, and heavy-atom count is in [2, 60].",
+    "excluded": [
+      {
+        "id": "I-75",
+        "name": "ranitidine",
+        "reason": "contains a formally charged atom"
+      }
+    ]
+  },
+  "records": [
+    {
+      "id": "I-2",
+      "name": "2_amino_5_bromobenzoic_acid",
+      "smiles": "Brc1cc(C(O)=O)c(N)cc1",
+      "measured_logS": -3.07,
+      "aqsoldb_sd": 0.0,
+      "aqsoldb_reliability_group": "G1"
+    },
+    {
+      "id": "I-4",
+      "name": "5_bromo_2_4_dihydroxybenzoic_acid",
+      "smiles": "Oc1c(Br)cc(C(O)=O)c(O)c1",
+      "measured_logS": -2.62,
+      "aqsoldb_sd": 0.0,
+      "aqsoldb_reliability_group": "G1"
+    },
+    {
+      "id": "I-6",
+      "name": "acetazolamide",
+      "smiles": "S(=O)(=O)(N)c1sc(NC(=O)C)nn1",
+      "measured_logS": -2.44,
+      "aqsoldb_sd": 0.059230922854723665,
+      "aqsoldb_reliability_group": "G5"
+    },
+    {
+      "id": "I-9",
+      "name": "amitryptyline",
+      "smiles": "CN(C)CC\\C=C1\\c2ccccc2CCc2ccccc12",
+      "measured_logS": -4.55,
+      "aqsoldb_sd": 0.047050000000000036,
+      "aqsoldb_reliability_group": "G3"
+    },
+    {
+      "id": "I-10",
+      "name": "amodiaquine",
+      "smiles": "c1(c(CN(CC)CC)cc(cc1)Nc1ccnc2c1ccc(c2)Cl)O",
+      "measured_logS": -5.79,
+      "aqsoldb_sd": 0.0,
+      "aqsoldb_reliability_group": "G1"
+    },
+    {
+      "id": "I-11",
+      "name": "atropine",
+      "smiles": "CN1[C@H]2CC[C@@H]1C[C@@H](C2)OC(=O)C(CO)C1=CC=CC=C1",
+      "measured_logS": -2.0,
+      "aqsoldb_sd": 0.0,
+      "aqsoldb_reliability_group": "G1"
+    },
+    {
+      "id": "I-13",
+      "name": "benzylimidazole",
+      "smiles": "n1(Cc2ccccc2)cncc1",
+      "measured_logS": -2.26,
+      "aqsoldb_sd": 0.0,
+      "aqsoldb_reliability_group": "G1"
+    },
+    {
+      "id": "I-14",
+      "name": "bromogramine",
+      "smiles": "Brc1cc2c(CN(C)C)c[nH]c2cc1",
+      "measured_logS": -4.06,
+      "aqsoldb_sd": 0.0,
+      "aqsoldb_reliability_group": "G1"
+    },
+    {
+      "id": "I-17",
+      "name": "carvedilol",
+      "smiles": "COc1ccccc1OCCNCC(O)COc1cccc2[nH]c3ccccc3c12",
+      "measured_logS": -4.26,
+      "aqsoldb_sd": 0.0,
+      "aqsoldb_reliability_group": "G1"
+    },
+    {
+      "id": "I-18",
+      "name": "cephalothin",
+      "smiles": "C1(=C(COC(C)=O)CS[C@@H]2[C@H](NC(=O)Cc3cccs3)C(N12)=O)C(O)=O",
+      "measured_logS": -2.94,
+      "aqsoldb_sd": 0.0,
+      "aqsoldb_reliability_group": "G1"
+    },
+    {
+      "id": "I-19",
+      "name": "chlorpheniramine",
+      "smiles": "C([C@H](c1ccccn1)c1ccc(cc1)Cl)CN(C)C",
+      "measured_logS": -2.67,
+      "aqsoldb_sd": 0.0,
+      "aqsoldb_reliability_group": "G1"
+    },
+    {
+      "id": "I-20",
+      "name": "chlorpromazine",
+      "smiles": "c1c(Cl)ccc2Sc3ccccc3N(CCCN(C)C)c12",
+      "measured_logS": -5.07,
+      "aqsoldb_sd": 0.03639416925216963,
+      "aqsoldb_reliability_group": "G5"
+    },
+    {
+      "id": "I-21",
+      "name": "chlorpropamide",
+      "smiles": "Clc1ccc(S(=O)(NC(=O)NCCC)=O)cc1",
+      "measured_logS": -3.25,
+      "aqsoldb_sd": 0.10975000000000001,
+      "aqsoldb_reliability_group": "G3"
+    },
+    {
+      "id": "I-24",
+      "name": "chlorzoxazone",
+      "smiles": "c1cc2c(cc1Cl)[nH]c(=O)o2",
+      "measured_logS": -2.66,
+      "aqsoldb_sd": 0.08499999999999996,
+      "aqsoldb_reliability_group": "G3"
+    },
+    {
+      "id": "I-26",
+      "name": "ciprofloxacin",
+      "smiles": "O=C(c1cn(C2CC2)c2c(cc(F)c(N3CCNCC3)c2)c1=O)O",
+      "measured_logS": -3.6,
+      "aqsoldb_sd": 1.1314883649423886,
+      "aqsoldb_reliability_group": "G4"
+    },
+    {
+      "id": "I-27",
+      "name": "danofloxacin",
+      "smiles": "C[N@]1C[C@@H]2C[C@H]1CN2c1c(cc2c(n(cc(C(=O)O)c2=O)C2CC2)c1)F",
+      "measured_logS": -2.9,
+      "aqsoldb_sd": 0.0,
+      "aqsoldb_reliability_group": "G1"
+    },
+    {
+      "id": "I-28",
+      "name": "deprenyl",
+      "smiles": "C[C@H](CC1=CC=CC=C1)N(C)CC#C",
+      "measured_logS": -2.51,
+      "aqsoldb_sd": 0.0,
+      "aqsoldb_reliability_group": "G1"
+    },
+    {
+      "id": "I-33",
+      "name": "diltiazem",
+      "smiles": "O=C1[C@H](OC(C)=O)[C@H](c2ccc(OC)cc2)Sc2ccccc2N1CCN(C)C",
+      "measured_logS": -3.16,
+      "aqsoldb_sd": 0.1049500000000001,
+      "aqsoldb_reliability_group": "G3"
+    },
+    {
+      "id": "I-34",
+      "name": "diphenydramine",
+      "smiles": "CN(C)CCOC(c1ccccc1)c1ccccc1",
+      "measured_logS": -2.95,
+      "aqsoldb_sd": 0.0,
+      "aqsoldb_reliability_group": "G1"
+    },
+    {
+      "id": "I-37",
+      "name": "famotidine",
+      "smiles": "N\\C(CCSCc1csc(\\N=C(\\N)N)n1)=N\\S(=O)(N)=O",
+      "measured_logS": -2.65,
+      "aqsoldb_sd": 0.16500000000000004,
+      "aqsoldb_reliability_group": "G3"
+    },
+    {
+      "id": "I-38",
+      "name": "fenoprofen",
+      "smiles": "CC(C(O)=O)c1cccc(Oc2ccccc2)c1",
+      "measured_logS": -3.7,
+      "aqsoldb_sd": 0.9100000000000001,
+      "aqsoldb_reliability_group": "G2"
+    },
+    {
+      "id": "I-42",
+      "name": "glipizide",
+      "smiles": "O=C(NC1CCCCC1)NS(=O)(c1ccc(CCNC(c2cnc(cn2)C)=O)cc1)=O",
+      "measured_logS": -5.49,
+      "aqsoldb_sd": 0.0,
+      "aqsoldb_reliability_group": "G1"
+    },
+    {
+      "id": "I-43",
+      "name": "guanine",
+      "smiles": "[nH]1cnc2nc(N)[nH]c(=O)c12",
+      "measured_logS": -4.43,
+      "aqsoldb_sd": 0.5025178824899889,
+      "aqsoldb_reliability_group": "G4"
+    },
+    {
+      "id": "I-45",
+      "name": "hydroflumethiazide",
+      "smiles": "S1(=O)(=O)NCNc2c1cc(S(=O)(N)=O)c(c2)C(F)(F)F",
+      "measured_logS": -2.97,
+      "aqsoldb_sd": 0.03654999999999986,
+      "aqsoldb_reliability_group": "G3"
+    },
+    {
+      "id": "I-54",
+      "name": "nalidixic_acid",
+      "smiles": "CCn1cc(c(=O)c2ccc(nc12)C)C(=O)O",
+      "measured_logS": -3.61,
+      "aqsoldb_sd": 0.20583208366692182,
+      "aqsoldb_reliability_group": "G5"
+    },
+    {
+      "id": "I-55",
+      "name": "naloxone",
+      "smiles": "O[C@]1([C@H](N(CC=C)CC2)C3)[C@@]42C5=C3C=CC(O)=C5O[C@H]4C(CC1)=O",
+      "measured_logS": -2.9,
+      "aqsoldb_sd": 0.0,
+      "aqsoldb_reliability_group": "G1"
+    },
+    {
+      "id": "I-56",
+      "name": "naproxen",
+      "smiles": "O=C(O)[C@@H](C)c1ccc2cc(ccc2c1)OC",
+      "measured_logS": -4.5,
+      "aqsoldb_sd": 0.0,
+      "aqsoldb_reliability_group": "G1"
+    },
+    {
+      "id": "I-60",
+      "name": "nortriptiline",
+      "smiles": "N(CC\\C=C1\\c2c(CCc3c1cccc3)cccc2)C",
+      "measured_logS": -4.02,
+      "aqsoldb_sd": 0.0,
+      "aqsoldb_reliability_group": "G1"
+    },
+    {
+      "id": "I-62",
+      "name": "oxytetracycline",
+      "smiles": "OC1=C(C(O)=C(C([C@@](C(C(C(N)=O)=C(O)[C@H]2N(C)C)=O)(O)[C@@]2([H])[C@H]3O)=O)[C@@]3([H])[C@@]4(O)C)C4=CC=C1",
+      "measured_logS": -3.09,
+      "aqsoldb_sd": 0.0,
+      "aqsoldb_reliability_group": "G1"
+    },
+    {
+      "id": "I-63",
+      "name": "papaverine",
+      "smiles": "c1(nccc2cc(c(OC)cc12)OC)Cc1cc(c(cc1)OC)OC",
+      "measured_logS": -3.87,
+      "aqsoldb_sd": 0.79,
+      "aqsoldb_reliability_group": "G2"
+    },
+    {
+      "id": "I-65",
+      "name": "phenazopyridine",
+      "smiles": "c1ccc(cc1)\\N=N\\c1c(nc(cc1)N)N",
+      "measured_logS": -4.19,
+      "aqsoldb_sd": 0.0,
+      "aqsoldb_reliability_group": "G1"
+    },
+    {
+      "id": "I-66",
+      "name": "phenobarbital",
+      "smiles": "C1(NC(C(c2ccccc2)(C(=O)N1)CC)=O)=O",
+      "measured_logS": -2.29,
+      "aqsoldb_sd": 0.0956697318904992,
+      "aqsoldb_reliability_group": "G5"
+    },
+    {
+      "id": "I-70",
+      "name": "pindolol",
+      "smiles": "CC(C)NCC(O)COc1cccc2[nH]ccc12",
+      "measured_logS": -3.79,
+      "aqsoldb_sd": 0.0946337971105226,
+      "aqsoldb_reliability_group": "G5"
+    },
+    {
+      "id": "I-72",
+      "name": "procaine",
+      "smiles": "Nc1ccc(C(OCCN(CC)CC)=O)cc1",
+      "measured_logS": -1.72,
+      "aqsoldb_sd": 0.3163883323939112,
+      "aqsoldb_reliability_group": "G5"
+    },
+    {
+      "id": "I-74",
+      "name": "quinine",
+      "smiles": "[H]C1(CN2CCC1C[C@@]2([H])[C@H](O)C1=CC=NC2=C1C=C(OC)C=C2)C=C",
+      "measured_logS": -2.79,
+      "aqsoldb_sd": 0.0,
+      "aqsoldb_reliability_group": "G1"
+    },
+    {
+      "id": "I-76",
+      "name": "sarafloxacin",
+      "smiles": "C1CN(CCN1)c1c(cc2c(n(cc(C(=O)O)c2=O)c2ccc(cc2)F)c1)F",
+      "measured_logS": -3.13,
+      "aqsoldb_sd": 0.0050000000000001155,
+      "aqsoldb_reliability_group": "G3"
+    },
+    {
+      "id": "I-77",
+      "name": "sparfloxacin",
+      "smiles": "C[C@H]1CN(C[C@@H](C)N1)C1=C(F)C2=C(C(=O)C(=CN2C2CC2)C(O)=O)C(N)=C1F",
+      "measured_logS": -3.37,
+      "aqsoldb_sd": 0.0,
+      "aqsoldb_reliability_group": "G1"
+    },
+    {
+      "id": "I-79",
+      "name": "sulfamethazine",
+      "smiles": "S(=O)(=O)(Nc1nc(C)cc(n1)C)c1ccc(N)cc1",
+      "measured_logS": -2.73,
+      "aqsoldb_sd": 0.23075,
+      "aqsoldb_reliability_group": "G3"
+    },
+    {
+      "id": "I-80",
+      "name": "sulfasalazine",
+      "smiles": "C(=O)(O)c1cc(ccc1O)\\N=N\\c1ccc(cc1)S(=O)(Nc1ccccn1)=O",
+      "measured_logS": -6.14,
+      "aqsoldb_sd": 0.0,
+      "aqsoldb_reliability_group": "G1"
+    },
+    {
+      "id": "I-83",
+      "name": "sulindac_form_II",
+      "smiles": "CC1=C(CC(O)=O)c2cc(F)ccc2C\\1=C\\c1ccc(cc1)S(C)=O",
+      "measured_logS": -4.5,
+      "aqsoldb_sd": 0.4099999999999999,
+      "aqsoldb_reliability_group": "G3"
+    },
+    {
+      "id": "I-84",
+      "name": "tetracaine",
+      "smiles": "C(c1ccc(cc1)NCCCC)(=O)OCCN(C)C",
+      "measured_logS": -3.01,
+      "aqsoldb_sd": 0.0,
+      "aqsoldb_reliability_group": "G1"
+    },
+    {
+      "id": "I-85",
+      "name": "tetracycline",
+      "smiles": "OC1=C(C(C2=C(O)[C@@](C(C(C(N)=O)=C(O)[C@H]3N(C)C)=O)(O)[C@@]3([H])C[C@]2([H])[C@@]4(O)C)=O)C4=CC=C1",
+      "measured_logS": -2.93,
+      "aqsoldb_sd": 0.0,
+      "aqsoldb_reliability_group": "G1"
+    },
+    {
+      "id": "I-86",
+      "name": "thymol",
+      "smiles": "c1(cc(ccc1C(C)C)C)O",
+      "measured_logS": -2.19,
+      "aqsoldb_sd": 0.019221812913424226,
+      "aqsoldb_reliability_group": "G5"
+    },
+    {
+      "id": "I-93",
+      "name": "verapamil",
+      "smiles": "COc1ccc(CCN(C)CCCC(C#N)(C(C)C)c2ccc(OC)c(OC)c2)cc1OC",
+      "measured_logS": -3.98,
+      "aqsoldb_sd": 0.0,
+      "aqsoldb_reliability_group": "G1"
+    },
+    {
+      "id": "I-94",
+      "name": "warfarin",
+      "smiles": "CC(=O)CC(c1ccccc1)c1c(O)c2ccccc2oc1=O",
+      "measured_logS": -4.78,
+      "aqsoldb_sd": 0.45050588848044554,
+      "aqsoldb_reliability_group": "G5"
+    }
+  ]
+}

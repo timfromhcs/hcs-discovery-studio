@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-import math
+import json
 from pathlib import Path
 from typing import Any
 
 import pytest
 from rdkit import Chem
 
+from hcs_discovery.core.errors import ValidationError
 from hcs_discovery.plugins.science.properties.adapter import (
     ADAPTER_ID,
     PropertyPredictorConfig,
@@ -23,7 +24,17 @@ from hcs_discovery.plugins.science.properties.scaffold import (
     bemis_murcko_scaffold,
     scaffold_split,
 )
+from hcs_discovery.plugins.science.properties.validation import (
+    bootstrap_rmse_interval,
+    dataset_sha256,
+    evaluate_property_model,
+    load_validation_dataset,
+)
 from hcs_discovery.workflow.table import Column, Table
+
+ROOT = Path(__file__).resolve().parents[2]
+VALIDATION_FIXTURE = ROOT / "tests" / "fixtures" / "esol_solubility_challenge.json"
+VALIDATION_REPORT = ROOT / "docs" / "validation" / "esol-solubility.json"
 
 
 class DummyContext:
@@ -186,49 +197,88 @@ def test_property_prediction_workflow_node(tmp_path: Path) -> None:
     assert result.rows[2]["solubility_in_domain"] is False
 
 
-@pytest.mark.scientific
-def test_esol_benchmark_scaffold_evaluation() -> None:
-    """Benchmark ESOL predictions on held-out scaffold split against trivial mean baseline."""
-    # 14 benchmark small molecules with published experimental logS
-    # Delaney (2004) reference values
-    benchmark_dataset = [
-        {"smiles": "c1ccccc1", "exp_logS": -1.54},  # benzene
-        {"smiles": "c1ccc(cc1)Cl", "exp_logS": -2.39},  # chlorobenzene
-        {"smiles": "c1ccc(cc1)O", "exp_logS": -0.05},  # phenol
-        {"smiles": "c1ccc(cc1)N", "exp_logS": -0.40},  # aniline
-        {"smiles": "c1ccc(cc1)C", "exp_logS": -2.25},  # toluene
-        {"smiles": "c1ccc(cc1)CC", "exp_logS": -2.78},  # ethylbenzene
-        {"smiles": "c1ccc2ccccc2c1", "exp_logS": -3.58},  # naphthalene
-        {"smiles": "c1ccc2c(c1)ccc3ccccc23", "exp_logS": -4.89},  # phenanthrene
-        {"smiles": "CCO", "exp_logS": 0.49},  # ethanol
-        {"smiles": "CCCO", "exp_logS": 0.14},  # propanol
-        {"smiles": "CCCCO", "exp_logS": -0.04},  # butanol
-        {"smiles": "CCCCCO", "exp_logS": -0.60},  # pentanol
-        {"smiles": "c1cncnc1", "exp_logS": 0.70},  # pyrimidine
-        {"smiles": "c1ccncc1", "exp_logS": 0.65},  # pyridine
+def test_esol_validation_fixture_is_complete_and_in_domain() -> None:
+    """The measured dataset must be provenance-complete and inside the stated domain."""
+    dataset = load_validation_dataset(VALIDATION_FIXTURE)
+    records = dataset["records"]
+    assert len(records) == 45
+    assert len({record["id"] for record in records}) == len(records)
+
+    provenance = dataset["provenance"]
+    assert provenance["license"] == "MIT"
+    assert provenance["original_source_doi"] == "10.1021/ci800058v"
+    assert len(provenance["sha256"]) == 64
+    assert provenance["excluded"] == [
+        {
+            "id": "I-75",
+            "name": "ranitidine",
+            "reason": "contains a formally charged atom",
+        }
     ]
 
-    train, test = scaffold_split(benchmark_dataset, train_ratio=0.6, seed=123)
-    assert len(train) > 0
-    assert len(test) > 0
-
-    # Trivial baseline: mean of training set
-    train_mean = sum(it["exp_logS"] for it in train) / len(train)
-    trivial_mse = sum((it["exp_logS"] - train_mean) ** 2 for it in test) / len(test)
-    trivial_rmse = math.sqrt(trivial_mse)
-
-    # ESOL model predictions on held-out test split
     model = ESOLSolubilityModel()
-    esol_errors = []
-    for it in test:
-        mol = Chem.MolFromSmiles(it["smiles"])
-        pred, _, _, _ = model.predict(mol)
-        assert pred is not None
-        esol_errors.append((pred - it["exp_logS"]) ** 2)
+    for record in records:
+        mol = Chem.MolFromSmiles(record["smiles"])
+        pred, _uncertainty, in_domain, warning = model.predict(mol)
+        assert pred is not None, record["id"]
+        assert in_domain is True, record["id"]
+        assert warning is None, record["id"]
 
-    esol_rmse = math.sqrt(sum(esol_errors) / len(esol_errors))
 
-    # ESOL model must outperform trivial mean baseline on held-out test split
-    assert esol_rmse < trivial_rmse, (
-        f"ESOL RMSE ({esol_rmse:.3f}) should be lower than trivial baseline RMSE ({trivial_rmse:.3f})"
+def test_esol_validation_protocol_rejects_out_of_domain_records() -> None:
+    """A difficult molecule must abort the evaluation, not be silently dropped."""
+    dataset = load_validation_dataset(VALIDATION_FIXTURE)
+    bad = [dict(dataset["records"][0], id="Hg-outside-domain", smiles="CC[Hg]CC")]
+    with pytest.raises(ValidationError, match="outside the model applicability domain"):
+        evaluate_property_model(ESOLSolubilityModel(), bad)
+
+
+def test_esol_validation_protocol_rejects_malformed_fixture(tmp_path: Path) -> None:
+    path = tmp_path / "malformed.json"
+    path.write_text(
+        json.dumps(
+            {
+                "records": [
+                    {"id": "x", "name": "x", "smiles": "CCO", "measured_logS": True},
+                ]
+            }
+        ),
+        encoding="utf-8",
     )
+    with pytest.raises(ValidationError, match="non-finite"):
+        load_validation_dataset(path)
+
+
+@pytest.mark.scientific
+def test_esol_independent_challenge_metrics_are_measured_and_published() -> None:
+    """Recompute every published metric from the fixture; fabricated values cannot pass."""
+    dataset = load_validation_dataset(VALIDATION_FIXTURE)
+    model = ESOLSolubilityModel()
+    metrics = evaluate_property_model(model, dataset["records"])
+    assert metrics.n == 45
+
+    published = model.metadata.benchmark_metrics
+    assert published["independent_challenge_n"] == 45.0
+    for key, value in metrics.as_dict().items():
+        if key == "n":
+            continue
+        assert published[f"independent_challenge_{key}"] == pytest.approx(round(value, 4), abs=1e-9), key
+
+    report = json.loads(VALIDATION_REPORT.read_text(encoding="utf-8"))
+    assert report["dataset"]["sha256"] == dataset_sha256(VALIDATION_FIXTURE)
+    assert report["model"]["weights_sha256"] == model.metadata.weights_sha256
+    for key, value in metrics.as_dict().items():
+        assert report["metrics"][key] == pytest.approx(value, abs=1e-12), key
+
+    report_records = report["records"]
+    assert len(report_records) == metrics.n
+    for record, report_record in zip(dataset["records"], report_records, strict=True):
+        assert report_record["id"] == record["id"]
+        pred, _uncertainty, _in_domain, _warning = model.predict(Chem.MolFromSmiles(record["smiles"]))
+        assert report_record["predicted_logS"] == pytest.approx(pred, abs=1e-12), record["id"]
+
+    errors = [record["error"] for record in report_records]
+    assert bootstrap_rmse_interval(errors) == pytest.approx(tuple(report["rmse_95pct_bootstrap_ci"]), abs=1e-12)
+
+    assert model.metadata.validation["status"] == "measured"
+    assert model.metadata.validation["report_json"] == "docs/validation/esol-solubility.json"

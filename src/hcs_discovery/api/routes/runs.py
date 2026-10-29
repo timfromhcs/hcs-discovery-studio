@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import time
 from pathlib import Path
@@ -95,7 +96,7 @@ def get_events(
 def stream_events(run_id: str, request: Request, after: int = Query(default=0, ge=0)) -> StreamingResponse:
     factory: sessionmaker[Session] = request.app.state.session_factory
 
-    def generator():
+    async def generator():
         last = after
         deadline = time.monotonic() + 900
         with factory() as session:
@@ -103,8 +104,8 @@ def stream_events(run_id: str, request: Request, after: int = Query(default=0, g
                 yield 'event: error\ndata: {"message":"run not found"}\n\n'
                 return
         while time.monotonic() < deadline:
-            if request.client is None:
-                pass
+            if await request.is_disconnected():
+                return
             with factory() as session:
                 events = services.events_after(session, run_id, after_seq=last)
                 run = services.get_run(session, run_id)
@@ -117,7 +118,7 @@ def stream_events(run_id: str, request: Request, after: int = Query(default=0, g
                 yield f"event: done\ndata: {json.dumps({'status': status})}\n\n"
                 return
             yield ": keep-alive\n\n"
-            time.sleep(0.4)
+            await asyncio.sleep(0.4)
         yield 'event: timeout\ndata: {"message":"stream window ended"}\n\n'
 
     return StreamingResponse(

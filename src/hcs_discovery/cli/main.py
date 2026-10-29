@@ -1044,12 +1044,13 @@ def agent_plan_cmd(
 def agent_run_cmd(
     ctx: typer.Context,
     prompt: str = typer.Argument(..., help="Execution instructions."),
+    plan_id: str = typer.Option(..., "--plan-id", help="Approved plan id returned by 'agent plan'."),
     tool: str = typer.Option(..., "--tool", "-t", help="Allowlisted tool name to execute."),
     args: str = typer.Option("{}", "--args", "-a", help="JSON dictionary of tool arguments."),
     approve: bool = typer.Option(False, "--approve", help="Explicit human approval confirmation for tool execution."),
     project_id: str | None = typer.Option(None, "--project-id", "-p", help="Optional project context."),
 ) -> None:
-    """Run mode: execute approved typed allowlisted tools."""
+    """Run mode: execute the exact approved steps of a saved plan."""
     settings = get_settings()
     from ..plugins.llm.agent import AgentRequest, ResearchAgent
 
@@ -1067,6 +1068,7 @@ def agent_run_cmd(
         mode="run",
         prompt=prompt,
         project_id=project_id,
+        plan_id=plan_id,
         approved_tool_calls=[tool_call],
     )
     with get_session_factory(settings)() as session:

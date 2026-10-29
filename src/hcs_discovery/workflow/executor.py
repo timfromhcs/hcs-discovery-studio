@@ -7,6 +7,7 @@ import os
 import platform
 import shutil
 import sys
+import threading
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -26,6 +27,7 @@ from ..core.paths import relative_artifact_path, safe_filename, safe_join
 from ..core.redaction import redact_text
 from ..core.timeutil import db_now
 from ..database.models import Artifact, Compound, Dataset, Run, RunEvent, RunNode, RunResult
+from ..jobs.queue import heartbeat as renew_lease
 from .cache import CachedOutput, NodeCache, cache_key
 from .registry import NodeContext, NodeRegistry, default_registry
 from .schema import WorkflowSpec, dataset_table, validate_workflow
@@ -34,6 +36,63 @@ from .table import IDENTITY_COLUMNS, Table
 logger = get_logger("hcs.run")
 
 TERMINAL_STATUSES = {"succeeded", "failed", "cancelled"}
+
+
+class LeaseLostError(RuntimeError):
+    """Raised when this worker can no longer prove that it owns the run lease.
+
+    The worker must stop without writing a terminal state, because another worker
+    may already have recovered the run.
+    """
+
+
+class _LeaseHeartbeat:
+    """Renew the run lease from a background thread while a node is executing."""
+
+    def __init__(
+        self,
+        session_factory: sessionmaker[Session],
+        *,
+        run_id: str,
+        worker_id: str,
+        lease_seconds: int,
+        interval: float | None = None,
+    ) -> None:
+        self._session_factory = session_factory
+        self._run_id = run_id
+        self._worker_id = worker_id
+        self._interval = interval if interval is not None else max(5.0, lease_seconds / 3.0)
+        self._stop = threading.Event()
+        self._lost = threading.Event()
+        self._thread = threading.Thread(target=self._loop, name=f"lease-{run_id}", daemon=True)
+
+    @property
+    def lost(self) -> bool:
+        return self._lost.is_set()
+
+    def start(self) -> None:
+        self._thread.start()
+
+    def stop(self) -> None:
+        self._stop.set()
+        if self._thread.is_alive():
+            self._thread.join(timeout=5.0)
+
+    def _loop(self) -> None:
+        while not self._stop.wait(self._interval):
+            try:
+                renewed = renew_lease(
+                    self._session_factory,
+                    self._run_id,
+                    worker_id=self._worker_id,
+                    lease_seconds=max(1, int(self._interval * 3)),
+                )
+            except Exception as exc:  # transient database contention must not lose the lease
+                logger.warning("lease heartbeat failed", extra={"run_id": self._run_id, "error": str(exc)})
+                continue
+            if not renewed:
+                self._lost.set()
+                return
 
 
 def _iso(value: datetime | None) -> str | None:
@@ -106,6 +165,7 @@ class RunExecutor:
         self._node_started = 0.0
         self._node_timeout = 300
         self._node_row: RunNode | None = None
+        self._heartbeat: _LeaseHeartbeat | None = None
         self.warnings: list[str] = []
 
     # ------------------------------------------------------------------ public
@@ -121,9 +181,17 @@ class RunExecutor:
             self.events = EventRecorder(session, run)
             self.session = session
             self.run = run
+            self._heartbeat = _LeaseHeartbeat(
+                self.session_factory,
+                run_id=self.run_id,
+                worker_id=self.worker_id,
+                lease_seconds=self.settings.run_lease_seconds,
+            )
+            self._heartbeat.start()
             try:
                 return self._execute_inner(run)
             finally:
+                self._heartbeat.stop()
                 session.close()
 
     # ------------------------------------------------------------------ internals
@@ -180,6 +248,7 @@ class RunExecutor:
             final_table = node_tables[validated.order[-1].id]
             self._persist_results(run, final_table)
             self._write_manifest(run, validated.spec, final_table, started)
+            self._ensure_lease()
             run.status = "succeeded"
             run.finished_at = db_now()
             run.lease_owner = None
@@ -200,6 +269,13 @@ class RunExecutor:
             self.session.commit()
             self.events.emit("run.cancelled", "Run cancelled.", level="warning")
             return "cancelled"
+
+        except LeaseLostError as exc:
+            # Another worker may own (or be about to own) this run. Do not write a
+            # terminal state from a stale owner.
+            logger.warning("lease lost; abandoning run execution", extra={"run_id": run.id, "error": str(exc)})
+            self.session.rollback()
+            return "lease_lost"
 
         except AppError as exc:
             self._fail_open_node(run, "failed", exc.message)
@@ -287,8 +363,8 @@ class RunExecutor:
         self.session.commit()
 
         cached = self.cache.get(key)
-        if cached is not None:
-            self._restore_from_cache(node_row, node_id, cached)
+        if cached is not None and self._restore_from_cache(node_row, node_id, cached):
+            self._ensure_lease()
             node_row.status = "succeeded"
             node_row.cached = True
             node_row.progress = 1.0
@@ -344,6 +420,7 @@ class RunExecutor:
             raise
 
         duration_ms = int((time.perf_counter() - self._node_started) * 1000)
+        self._ensure_lease()
         artifacts = self._persist_artifacts(node_id)
         summary = output.summary()
         node_row.status = "succeeded"
@@ -356,11 +433,13 @@ class RunExecutor:
         }
         self.session.commit()
 
-        self.cache.put(
+        stored_cache = self.cache.put(
             key,
             CachedOutput(table=output, artifacts=self._pending_artifacts, summary=summary),
             self._artifact_files,
         )
+        if not stored_cache:
+            logger.warning("cache entry was not written", extra={"run_id": self.run_id, "node_id": node_id, "key": key})
         self.events.emit(
             "node.succeeded",
             f"{definition.title} finished in {duration_ms / 1000:.1f}s ({len(output.rows)} rows).",
@@ -369,25 +448,33 @@ class RunExecutor:
         )
         return output
 
-    def _restore_from_cache(self, node_row: RunNode, node_id: str, cached: CachedOutput) -> None:
+    def _restore_from_cache(self, node_row: RunNode, node_id: str, cached: CachedOutput) -> bool:
+        """Copy cached artifacts into the run directory.
+
+        Returns False (cache miss) instead of accepting a partially restored entry.
+        """
         work_dir = self.run_dir / "nodes" / node_id
         work_dir.mkdir(parents=True, exist_ok=True)
+        prefixed: list[tuple[dict[str, Any], Path, Path]] = []
         for artifact in cached.artifacts:
             filename = artifact.get("filename")
             cache_file = artifact.get("cache_file")
             if not filename or not cache_file:
-                continue
+                return False
             source = self.cache.artifact_path(node_row.cache_key or "", cache_file)
             if not source.exists():
-                continue
-            destination = work_dir / filename
+                return False
+            prefixed.append((artifact, source, work_dir / filename))
+        for _artifact, source, destination in prefixed:
             shutil.copy2(source, destination)
+        for artifact, _source, _destination in prefixed:
             self._record_artifact(
                 node_id=node_id,
-                filename=filename,
+                filename=artifact["filename"],
                 media_type=artifact.get("media_type", "application/octet-stream"),
                 kind=artifact.get("kind", "artifact"),
             )
+        return True
 
     def _engine_versions(self) -> dict[str, str]:
         versions = self.registry.engine_versions()
@@ -481,7 +568,12 @@ class RunExecutor:
         self.session.commit()
 
     # ------------------------------------------------------------------ state helpers
+    def _ensure_lease(self) -> None:
+        if self._heartbeat is not None and self._heartbeat.lost:
+            raise LeaseLostError("The worker lease was lost or revoked.")
+
     def _check_cancelled(self, run: Run) -> None:
+        self._ensure_lease()
         flag = self.session.execute(text("SELECT cancel_requested FROM runs WHERE id = :id"), {"id": run.id}).scalar()
         if flag:
             raise RunCancelledError("Run cancellation was requested.")
