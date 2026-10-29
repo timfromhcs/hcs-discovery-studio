@@ -73,8 +73,61 @@ intentional.
   missing or modified.
 - Docking input failures are recorded per ligand rather than masking the
   remaining library.
+- Node cache keys now include a fingerprint of the installed package (so edits
+  to helper modules or model coefficients invalidate cached results), the
+  AutoDock Vina version actually detected on the host and the SHA-256 of the
+  docking receptor. Previously a replaced receptor file reused stale poses.
+- Installed wheels ship their Alembic migrations and record a revision instead
+  of falling back to `create_all`.
+- **Docking ligands were rigid.** Ligand PDBQT files put every atom in `ROOT`
+  with no `BRANCH` records, so Vina never sampled torsions despite the
+  `TORSDOF` line. Preparation (`hcs-pdbqt-1`) now builds a real torsion tree
+  with Meeko's default conventions: non-polar hydrogens merged, AutoDock 4 atom
+  types on the original aromaticity, rigid rings and amides, graph-centre root.
+  On the 51 fixture ligands it matches Meeko 0.8.0 for torsion count, atom count,
+  root size, atom types and charges in 48 cases; the other 3 contain 7+-membered
+  rings that are kept rigid here (see `docs/validation/ligand-prep-meeko.md`).
+- Ligand preparation no longer swallows MMFF94 or Gasteiger failures. Undefined
+  charges and unsupported elements are per-ligand errors; skipped optimisation,
+  random-coordinate embedding, salt stripping and rigid macrocycles are reported
+  in the new `{prefix}_prep_notes` column.
+- **CNS MPO used invented inputs.** ClogD was cLogP − 0.5 and the "pKa" was
+  7 + 1.5 × (nitrogens bearing H), which counted amides and anilines as basic
+  and ignored tertiary amines; a fixed 0.25 "standard error" was reported and
+  invented lower penalties were applied to cLogP and MW. The model (now v2.0.0,
+  "CNS MPO approximation") uses Wager's six functions exactly, cLogP in place of
+  ClogD, and an explicitly reported assumed pKa (9.0 aliphatic amines, 11.0
+  amidines/guanidines) only when a basic centre is detected. It reports no
+  uncertainty and is not described as a BBB-penetration probability.
+- **Release workflow could publish untested or overwrite releases.** A tag ran
+  only `pytest` before publishing and `--clobber` replaced assets of an existing
+  release. Publication now requires successful CI and CodeQL runs for the exact
+  tagged SHA, refuses existing releases, smoke-tests the installed wheel, and
+  verifies assets in a draft before publishing; only the publish job has write
+  permissions. See `docs/developer-guide/RELEASING.md`.
+- Release candidate tags (`vX.Y.Z-rc.N`) now map to PEP 440 versions
+  (`X.Y.ZrcN`); previously no candidate tag could pass the version check.
+- **UI:** `Input`, `Select` and `Textarea` lost their base styling whenever a
+  caller passed `className` (the spread props overwrote it). The editor's
+  "Node ID" field had no accessible name. At 320 px, long local paths in the
+  diagnostics and long SMILES/IDs in page headers caused horizontal scrolling.
+  The workflow editor's node table hid its Edit/Delete actions behind a
+  horizontal scroll at every width, and table action cells used `display: flex`
+  on `<td>`, misaligning row borders.
+- **Agent Ask mode hid provider failures.** When the configured LLM failed or
+  was unavailable, the error was swallowed and a canned local answer returned as
+  if nothing happened. Responses now carry `source` (`llm` or `local_rules`) and
+  `provider_error`, and a fallback answer says that no language model answered.
+  The local ESOL answer no longer claims atom contributions or leverage-based
+  domain bounds.
+- Docked pose SDF files now carry bonds, rebuilt from `REMARK SMILES` records
+  that Vina copies into its output; previously they contained atoms only.
 
 ### Validation
+
+- Visual QA (`apps/web/scripts/visual_qa.mjs`): 17 routes × 320/390/768/1280/1440
+  px × light/dark against a synthetic dataset; 170 captures with no automatic
+  findings after the fixes above, and the screenshots were reviewed by hand.
 
 - Full local gates: Ruff format/check, mypy, pytest with coverage, frontend
   typecheck/build and Playwright end-to-end tests.
@@ -90,6 +143,12 @@ intentional.
 - Connector 3xx responses are errors; 404s raise unless explicitly tolerated.
 - Constraint objectives no longer contribute to composite scores or Pareto
   ranking; they gate eligibility instead.
+- `cns_mpo_bbb` scores change (see Fixed) and its uncertainty column is empty.
+- `dock.vina` reads receptors only from `<HCS_DATA_DIR>/receptors` (relative
+  names resolve there). Absolute paths elsewhere, and resolution against the
+  server's working directory, are refused unless
+  `HCS_ALLOW_EXTERNAL_RECEPTOR_PATHS=true`, so an HTTP client cannot make the
+  server read arbitrary host files.
 
 ## [1.0.0] - 2026-10-28
 

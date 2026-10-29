@@ -51,6 +51,11 @@ class Settings(BaseSettings):
     # Required when binding to a non-loopback interface.
     api_token: str | None = None
 
+    # Docking receptors are read from ``<data_dir>/receptors``. Absolute paths
+    # elsewhere on the host are refused unless a trusted local operator opts in, so
+    # an HTTP client cannot make the server read arbitrary files.
+    allow_external_receptor_paths: bool = False
+
     @field_validator("data_dir", mode="before")
     @classmethod
     def _expand(cls, value: str | Path) -> Path:
@@ -77,6 +82,10 @@ class Settings(BaseSettings):
         return self.data_dir / "uploads"
 
     @property
+    def receptors_dir(self) -> Path:
+        return self.data_dir / "receptors"
+
+    @property
     def database_url(self) -> str:
         return f"sqlite+pysqlite:///{self.db_path.as_posix()}"
 
@@ -91,6 +100,7 @@ class Settings(BaseSettings):
             self.cache_dir,
             self.logs_dir,
             self.uploads_dir,
+            self.receptors_dir,
         ):
             path.mkdir(parents=True, exist_ok=True)
 
@@ -110,6 +120,8 @@ class Settings(BaseSettings):
             "remote_llm_enabled": self.remote_llm_enabled,
             "remote_llm_api_key": "configured" if self.remote_llm_api_key else "missing",
             "api_token": "configured" if self.api_token else "missing",
+            "receptors_dir": str(self.receptors_dir),
+            "allow_external_receptor_paths": self.allow_external_receptor_paths,
         }
 
 

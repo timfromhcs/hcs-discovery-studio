@@ -1,4 +1,4 @@
-"""Adapter and workflow execution handler for learned property prediction."""
+"""Adapter and workflow execution handler for literature-derived property estimates."""
 
 from __future__ import annotations
 
@@ -16,9 +16,9 @@ ADAPTER_ID = "science:property-predict"
 
 
 class PropertyPredictorConfig(BaseModel):
-    """Configuration for learned property prediction node."""
+    """Configuration for the property estimate node."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
 
     model_id: str = Field(
         default="esol_solubility",
@@ -120,7 +120,7 @@ def property_prediction_columns(
 
 
 class PropertyPredictorAdapter:
-    """Scientific adapter executing learned property prediction."""
+    """Scientific adapter executing literature-derived property estimates."""
 
     def __init__(self, model_id: str = "esol_solubility") -> None:
         self.model = get_property_model(model_id)

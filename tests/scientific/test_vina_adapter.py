@@ -9,6 +9,7 @@ from typing import Any
 import pytest
 
 import hcs_discovery.plugins.science.docking.vina as vina_module
+from hcs_discovery.core.config import Settings
 from hcs_discovery.core.errors import ValidationError
 from hcs_discovery.plugins.science.docking.prep import (
     LigandPreparationError,
@@ -24,7 +25,9 @@ from hcs_discovery.plugins.science.docking.vina import (
     VinaAdapter,
     VinaConfig,
     probe_vina,
+    resolve_receptor_path,
     run_vina_docking,
+    vina_runtime_fingerprint,
 )
 from hcs_discovery.workflow.table import Column, Table
 
@@ -232,7 +235,9 @@ def test_probe_vina_rejects_unrecognised_output(tmp_path: Path) -> None:
     assert VinaAdapter(fake).is_available() is False
 
 
-def test_vina_node_records_per_ligand_status_and_errors(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_vina_node_records_per_ligand_status_and_errors(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, settings: Settings
+) -> None:
     class FakeAdapter:
         def is_available(self) -> bool:
             return True
@@ -244,10 +249,9 @@ def test_vina_node_records_per_ligand_status_and_errors(tmp_path: Path, monkeypa
 
     monkeypatch.setattr(vina_module, "VinaAdapter", lambda *_args, **_kwargs: FakeAdapter())
 
-    receptor_file = tmp_path / "receptor.pdbqt"
-    receptor_file.write_text(SAMPLE_RECEPTOR_PDBQT, encoding="utf-8")
+    (settings.receptors_dir / "receptor.pdbqt").write_text(SAMPLE_RECEPTOR_PDBQT, encoding="utf-8")
     config = VinaConfig(
-        receptor_path=str(receptor_file),
+        receptor_path="receptor.pdbqt",
         center_x=2.5,
         center_y=1.5,
         center_z=0.0,
@@ -279,16 +283,15 @@ def test_vina_node_records_per_ligand_status_and_errors(tmp_path: Path, monkeypa
     assert result.rows[2]["dock_error"] == "engine crashed for this ligand"
 
 
-def test_vina_workflow_node(tmp_path: Path) -> None:
+def test_vina_workflow_node(tmp_path: Path, settings: Settings) -> None:
     adapter = VinaAdapter()
     if not adapter.is_available():
         pytest.skip("Vina binary not found on host; skipping workflow node live test.")
 
-    receptor_file = tmp_path / "receptor.pdbqt"
-    receptor_file.write_text(SAMPLE_RECEPTOR_PDBQT, encoding="utf-8")
+    (settings.receptors_dir / "receptor.pdbqt").write_text(SAMPLE_RECEPTOR_PDBQT, encoding="utf-8")
 
     config = VinaConfig(
-        receptor_path=str(receptor_file),
+        receptor_path="receptor.pdbqt",
         center_x=2.5,
         center_y=1.5,
         center_z=0.0,
@@ -322,3 +325,58 @@ def test_vina_workflow_node(tmp_path: Path) -> None:
     assert result.rows[1]["dock_affinity_kcal_mol"] is None
     # Pose artifact saved
     assert any("docking/ethanol_poses.pdbqt" in k for k in ctx.artifacts)
+
+
+def _receptor_config(path: str) -> VinaConfig:
+    return VinaConfig(
+        receptor_path=path,
+        center_x=0.0,
+        center_y=0.0,
+        center_z=0.0,
+        size_x=10.0,
+        size_y=10.0,
+        size_z=10.0,
+    )
+
+
+def test_receptor_paths_are_confined_to_the_receptor_directory(tmp_path: Path, settings: Settings) -> None:
+    inside = settings.receptors_dir / "target.pdbqt"
+    inside.write_text(SAMPLE_RECEPTOR_PDBQT, encoding="utf-8")
+    outside = tmp_path / "elsewhere.pdbqt"
+    outside.write_text(SAMPLE_RECEPTOR_PDBQT, encoding="utf-8")
+
+    assert resolve_receptor_path("target.pdbqt") == inside.resolve()
+    assert resolve_receptor_path(str(inside)) == inside.resolve()
+    for rejected in (str(outside), "../elsewhere.pdbqt", "missing.pdbqt"):
+        with pytest.raises(ValidationError):
+            resolve_receptor_path(rejected)
+
+    trusted = settings.model_copy(update={"allow_external_receptor_paths": True})
+    assert resolve_receptor_path(str(outside), trusted) == outside.resolve()
+    with pytest.raises(ValidationError):
+        resolve_receptor_path("../elsewhere.pdbqt", trusted)
+
+
+def test_runtime_fingerprint_tracks_receptor_content_and_vina_version(
+    settings: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    receptor = settings.receptors_dir / "target.pdbqt"
+    receptor.write_text(SAMPLE_RECEPTOR_PDBQT, encoding="utf-8")
+    config = _receptor_config("target.pdbqt")
+    version = {"value": "1.2.5"}
+    monkeypatch.setattr(vina_module, "probe_vina", lambda *_a, **_k: {"version": version["value"]})
+
+    baseline = vina_runtime_fingerprint(config)
+    assert baseline["autodock_vina"] == "1.2.5"
+    assert vina_runtime_fingerprint(config) == baseline
+
+    receptor.write_text(SAMPLE_RECEPTOR_PDBQT + "REMARK changed\n", encoding="utf-8")
+    changed_receptor = vina_runtime_fingerprint(config)
+    assert changed_receptor["receptor_sha256"] != baseline["receptor_sha256"]
+
+    version["value"] = "1.2.6"
+    assert vina_runtime_fingerprint(config)["autodock_vina"] == "1.2.6"
+
+    version["value"] = None
+    missing = vina_runtime_fingerprint(_receptor_config("absent.pdbqt"))
+    assert missing == {"autodock_vina": "unavailable", "receptor_sha256": "unresolved"}

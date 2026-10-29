@@ -21,6 +21,7 @@ from ..plugins.science.docking.vina import (
     VinaConfig,
     run_vina_docking,
     vina_docking_columns,
+    vina_runtime_fingerprint,
 )
 from ..plugins.science.properties.adapter import (
     PropertyPredictorConfig,
@@ -36,7 +37,7 @@ NODE_VERSION = "1.0.0"
 
 # --------------------------------------------------------------------------- descriptors
 class DescriptorConfig(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
 
     descriptors: list[str] = Field(default_factory=lambda: list(DEFAULT_DESCRIPTORS))
 
@@ -87,7 +88,7 @@ def _run_descriptors(table: Table, config: DescriptorConfig, ctx: NodeContext) -
 
 # --------------------------------------------------------------------------- similarity
 class SimilarityConfig(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
 
     query_smiles: str
     column: str = Field(default="similarity_query", pattern=r"^[a-z][a-z0-9_]{0,47}$")
@@ -135,7 +136,7 @@ Operator = Literal["le", "lt", "ge", "gt", "eq", "ne", "between"]
 
 
 class RuleConfig(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
 
     column: str
     op: Operator
@@ -185,7 +186,7 @@ class RuleConfig(BaseModel):
 
 
 class FilterConfig(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
 
     rules: list[RuleConfig] = Field(min_length=1)
     mode: Literal["flag", "drop"] = "flag"
@@ -293,7 +294,7 @@ ObjectiveDirection = Literal[
 
 
 class ObjectiveConfig(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
 
     column: str
     direction: ObjectiveDirection = "higher"
@@ -340,7 +341,7 @@ class ObjectiveConfig(BaseModel):
 
 
 class RankConfig(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
 
     objectives: list[ObjectiveConfig] = Field(min_length=1)
     pareto_front_limit: int = Field(default=10, ge=1, le=50)
@@ -606,7 +607,11 @@ def _run_rank(table: Table, config: RankConfig, ctx: NodeContext) -> Table:
             unit="0-1",
             direction="higher",
             method="Weighted min-max normalised objectives",
-            description="Transparent composite of the configured objectives. Inspect the weights before use.",
+            description=(
+                "Transparent composite of the configured objectives. Min-max normalisation is relative to "
+                "this run's rows, so scores change when rows are added and are not comparable across runs. "
+                "Inspect the weights before use."
+            ),
         ),
         scores,
     )
@@ -663,7 +668,7 @@ def _run_rank(table: Table, config: RankConfig, ctx: NodeContext) -> Table:
 
 # --------------------------------------------------------------------------- summary report
 class SummaryConfig(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
 
     title: str = "Run summary"
     top_n: int = Field(default=10, ge=1, le=100)
@@ -745,7 +750,7 @@ def _run_summary(table: Table, config: SummaryConfig, ctx: NodeContext) -> Table
 
 # --------------------------------------------------------------------------- table.join
 class JoinConfig(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
 
     key_column: str = Field(default="id", description="Common column to align rows on.")
     how: Literal["inner", "left", "outer"] = Field(
@@ -849,6 +854,7 @@ def register_builtin_nodes(registry: NodeRegistry) -> None:
                     unit="0-1",
                     direction="higher",
                     method="Weighted min-max normalised objectives",
+                    description="Dataset-relative: not comparable across runs or datasets.",
                 ),
                 Column(
                     "pareto_rank",
@@ -891,6 +897,7 @@ def register_builtin_nodes(registry: NodeRegistry) -> None:
             description="CPU molecular docking and binding pose prediction with AutoDock Vina.",
             config_model=VinaConfig,
             handler=run_vina_docking,
+            runtime_fingerprint=vina_runtime_fingerprint,
             requires=("smiles",),
             outputs=lambda config: vina_docking_columns(config.output_prefix),
             documentation=(
@@ -901,10 +908,10 @@ def register_builtin_nodes(registry: NodeRegistry) -> None:
     registry.register(
         NodeDefinition(
             type="predict.property",
-            title="Learned property prediction",
+            title="Property estimate (literature models)",
             category="properties",
             version="1.0.0",
-            description="Predict molecular properties (ESOL aqueous solubility, CNS MPO BBB) with uncertainty.",
+            description="Literature-derived property estimates: reduced ESOL logS and a CNS MPO approximation.",
             config_model=PropertyPredictorConfig,
             handler=run_property_prediction,
             requires=("smiles",),

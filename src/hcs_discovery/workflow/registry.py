@@ -8,6 +8,8 @@ registry is the single source of truth used by validation, the API and the UI.
 from __future__ import annotations
 
 import builtins
+import functools
+import hashlib
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -56,6 +58,10 @@ class NodeDefinition:
     extra_requires: Callable[[Any], tuple[str, ...]] | None = None
     outputs: Callable[[Any], list[Column]] = lambda _config: []
     documentation: str = ""
+    # Host-dependent inputs that change output for a given config (for example the
+    # installed engine version or the content of a referenced file). Included in
+    # the node cache key.
+    runtime_fingerprint: Callable[[Any], dict[str, str]] | None = None
 
     def parse_config(self, config: dict[str, Any]) -> Any:
         try:
@@ -101,6 +107,32 @@ class NodeDefinition:
         import json
 
         return sha256_text(f"{self.type}|{self.version}|{source}|{json.dumps(schema, sort_keys=True)}")
+
+
+@functools.cache
+def package_fingerprint() -> str:
+    """Hash of every source and data file shipped in the ``hcs_discovery`` package.
+
+    The handler-only ``implementation_hash`` misses helper modules, model
+    coefficients and preprocessing code. Including this fingerprint in cache keys
+    means any change to the installed code invalidates cached scientific output.
+    The trade-off is deliberate: an unrelated code edit also forces recomputation.
+    The bundled SPA and migration scripts cannot change node output and are skipped.
+    """
+    root = Path(__file__).resolve().parents[1]
+    digest = hashlib.sha256()
+    for path in sorted(root.rglob("*")):
+        relative = path.relative_to(root)
+        if not path.is_file() or relative.parts[0] in {"web", "_alembic"}:
+            continue
+        if "__pycache__" in relative.parts or path.suffix in {".pyc", ".pyo"}:
+            continue
+        digest.update(relative.as_posix().encode("utf-8"))
+        digest.update(bytes(1))
+        # Normalise line endings so a CRLF checkout and an LF wheel agree.
+        digest.update(path.read_bytes().replace(b"\r\n", b"\n"))
+        digest.update(bytes(1))
+    return digest.hexdigest()
 
 
 class NodeRegistry:

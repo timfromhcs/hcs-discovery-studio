@@ -72,16 +72,44 @@ Reports are generated from persisted run data. They faithfully reproduce the
 stored numbers and methods, but a well-formatted report is not evidence of
 validity.
 
+## Docking (AutoDock Vina)
+
+- Vina scores are an empirical scoring function in kcal/mol. They rank poses;
+  they are not binding free energies, affinities, selectivity or efficacy.
+- Ligands are prepared by RDKit (ETKDGv3 + MMFF94, Gasteiger charges, AutoDock 4
+  types, merged non-polar hydrogens). Protonation and tautomers are taken as
+  given in the input; no pH-dependent enumeration is done. Rings of 7+ atoms
+  are kept rigid. Salts are reduced to the largest fragment and the row says so.
+- Receptors must already be prepared PDBQT. The application validates the
+  format but does not add hydrogens, assign charges or check the binding site.
+- The search box, exhaustiveness and seed are user choices and change results.
+- Preparation was compared with Meeko 0.8.0 on 51 fixture ligands; that is a
+  format check, not evidence of docking accuracy.
+
+## Property estimates
+
+- **ESOL** is a reduced four-descriptor form of Delaney (2004). On 45 measured
+  compounds from the Solubility Challenge it reaches RMSE 0.97 and R² 0.07
+  log10 units, barely better than predicting the mean. Its uncertainty column is
+  a heuristic descriptor-distance scale, not a confidence interval.
+- **CNS MPO** uses Wager et al. (2010) desirability functions, with cLogP in
+  place of ClogD and an assumed pKa (9.0 aliphatic amines, 11.0 amidines and
+  guanidines) when a basic centre is detected. It is a physicochemical
+  desirability score, not a probability of brain penetration, and reports no
+  uncertainty.
+
 ## What is not implemented
 
-- No docking, scoring-function evaluation or pose validation.
+- No docking benchmark: Vina runs, but no redocking or pose-recovery study has
+  been performed (see Docking above).
 - No molecular dynamics or free-energy calculation.
 - No learned ADMET, toxicity or activity prediction.
 - No structure prediction or co-folding.
 - No target or structure database integration.
 - No experimental data ingestion or assay curve fitting.
 - No uncertainty calibration for any score.
-- No applicability-domain model.
+- No statistical applicability-domain model; ESOL and CNS MPO flag simple
+  descriptor ranges only.
 
 The model registry lists several of these as `planned`. They are not runnable and
 must not be described as available.

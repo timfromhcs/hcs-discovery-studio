@@ -193,13 +193,15 @@ export function ProjectPage() {
                         {dataset.error_count ? <span className="error-text">{dataset.error_count}</span> : "0"}
                       </td>
                       <td className="muted small hide-narrow">{formatRelative(dataset.created_at)}</td>
-                      <td className="row-actions">
-                        <button className="text-link hide-narrow" onClick={() => setSelectedDataset(dataset)}>
-                          Inspect rows
-                        </button>
-                        <button className="icon-btn danger-hover" aria-label={`Delete ${dataset.name}`} onClick={() => setDeletingDataset(dataset)}>
-                          <Icon name="trash" size={15} />
-                        </button>
+                      <td>
+                        <div className="row-actions">
+                          <button className="text-link hide-narrow" onClick={() => setSelectedDataset(dataset)}>
+                            Inspect rows
+                          </button>
+                          <button className="icon-btn danger-hover" aria-label={`Delete ${dataset.name}`} onClick={() => setDeletingDataset(dataset)}>
+                            <Icon name="trash" size={15} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -316,8 +318,8 @@ export function ProjectPage() {
         <CardHeader title="Project maintenance" subtitle="Deletion is permanent and removes linked datasets, compounds and runs." />
         <div className="row-between">
           <p className="muted small">
-            Export anything you need first. The original upload file remains in the configured data directory until
-            manually removed.
+            Export anything you need first. Deletion also removes this project&apos;s run directories and uploaded files;
+            shared node-cache entries remain until <code>hcs-discovery cache prune</code>.
           </p>
           <Button variant="danger" icon="trash" onClick={() => setConfirmProject(true)}>
             Delete project

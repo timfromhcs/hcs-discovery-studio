@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Literal
+from typing import Any, ClassVar, Literal
 
 from rdkit import Chem
 from rdkit.Chem import Crippen, Descriptors, Lipinski, rdMolDescriptors
@@ -214,41 +214,66 @@ class ESOLSolubilityModel(PropertyModel):
 
 
 class CNSMPOModel(PropertyModel):
-    """Central Nervous System Multiparameter Optimization (CNS MPO) scoring model.
+    """Approximation of the CNS MPO desirability score (Wager et al., 2010).
 
-    Wager et al. (2010) ACS Chem. Neurosci. 1(6), 435-449.
-    Composite 0-6 score assessing probability of blood-brain barrier penetration.
+    Uses Wager's six desirability functions on a 0-6 scale. Two inputs cannot be
+    computed from RDKit alone and are approximated, which is why the output is
+    labelled an approximation:
+
+    - ClogD (pH 7.4) is replaced by Crippen cLogP. This is exact for non-ionisable
+      molecules and overestimates logD for ionisable ones, which lowers the score.
+    - The most basic pKa is not computed. Molecules without a detected basic centre
+      get the pKa term's full desirability (a pKa <= 8 is assumed); detected basic
+      centres use the class-typical pKa values in ``ASSUMED_PKA`` and say so in the
+      row's warning.
+
+    The score describes physicochemical alignment with marketed CNS drugs. It is
+    not a probability of blood-brain barrier penetration or brain exposure.
     """
 
+    # Assumed most-basic pKa by detected group; typical values, not predictions.
+    ASSUMED_PKA: ClassVar[dict[str, float]] = {"amidine_or_guanidine": 11.0, "aliphatic_amine": 9.0}
+    _AMIDINE = Chem.MolFromSmarts("[CX3;!$(C=O);!a](=[NX2;!a;!$(N-[O,S])])[NX3;!a;!$(N-C=O)]")
+    _ALIPHATIC_AMINE = Chem.MolFromSmarts(
+        "[NX3;+0;!a;!$(N-a);!$(N-[#6]=[#7,#8,#16]);!$(N-[#6]#*);!$(N-[#6]=[#6]);!$(N-[!#6;!#1]);!$(N=*)]"
+    )
+
     def __init__(self) -> None:
-        weights_str = "CNS_MPO:v1.0:clogp_tpsa_mw_hbd_pka_logd"
+        weights_str = "CNS_MPO:v2.0:wager2010_functions;clogd=clogp;pka_assumed=" + ",".join(
+            f"{k}:{v}" for k, v in sorted(self.ASSUMED_PKA.items())
+        )
         self._metadata = ModelMetadata(
             model_id="cns_mpo_bbb",
-            display_name="CNS MPO Blood-Brain Barrier Score",
+            display_name="CNS MPO approximation (Wager 2010)",
             task="scoring",
             endpoint="cns_mpo_score",
             unit="0-6 desirability score",
-            architecture="CompositeMultiParameterOptimization(6-desirability-functions)",
-            version="1.1.0",
+            architecture="Wager2010 desirability functions; ClogD approximated by cLogP; class-based assumed pKa",
+            version="2.0.0",
             weights_sha256=sha256_text(weights_str),
             citation="Wager, T. T. et al. (2010). ACS Chem. Neurosci. 1(6), 435-449.",
-            description="Assesses drug-likeness for central nervous system (CNS) penetration on a 0-6 scale.",
+            description=(
+                "Approximate CNS MPO desirability score (0-6) using Wager's six functions with cLogP in place "
+                "of ClogD and an assumed pKa for detected basic centres."
+            ),
             applicability_domain={
                 "max_mw": 700.0,
                 "allowed_elements": ["H", "C", "N", "O", "P", "S", "F", "Cl", "Br"],
             },
-            benchmark_metrics={"cns_positive_cutoff": 4.0},
+            benchmark_metrics={},
             validation={
-                "status": "literature_derived",
-                "dataset": "Wager et al. (2010) desirability functions and thresholds",
+                "status": "approximation",
+                "dataset": None,
                 "caveat": (
-                    "No independent local accuracy benchmark has been measured; the score "
-                    "reproduces the published desirability functions and 0-6 scale."
+                    "Desirability functions follow Wager et al. (2010). ClogD and pKa are approximated, so "
+                    "scores can differ from the published method; no local benchmark has been run."
                 ),
             },
             scientific_caveats=[
-                "CNS MPO score >= 4.0 indicates favorable physicochemical properties for passive BBB permeation.",
-                "It does not account for active efflux (e.g. P-gp/BCRP) or carrier-mediated transport.",
+                "Approximation: ClogD is replaced by cLogP and the most basic pKa is assumed, not computed.",
+                "A physicochemical desirability score, not a probability of BBB penetration or brain exposure.",
+                "Does not account for active efflux (e.g. P-gp/BCRP) or carrier-mediated transport.",
+                "No uncertainty is reported: there is no calibration evidence for one.",
             ],
         )
 
@@ -257,55 +282,62 @@ class CNSMPOModel(PropertyModel):
         return self._metadata
 
     @staticmethod
-    def _desirability(val: float, low_opt: float, high_opt: float, low_pen: float, high_pen: float) -> float:
-        """Trapezoidal/monotonic desirability function normalized between 0.0 and 1.0."""
-        if low_opt <= val <= high_opt:
+    def _decreasing(val: float, full: float, zero: float) -> float:
+        """Wager monotonic decreasing desirability: 1 at or below ``full``, 0 at or above ``zero``."""
+        if val <= full:
             return 1.0
-        if val < low_opt:
-            if val <= low_pen:
-                return 0.0
-            return (val - low_pen) / (low_opt - low_pen)
-        # val > high_opt
-        if val >= high_pen:
+        if val >= zero:
             return 0.0
-        return (high_pen - val) / (high_pen - high_opt)
+        return (zero - val) / (zero - full)
+
+    @staticmethod
+    def _tpsa_hump(tpsa: float) -> float:
+        """Wager TPSA desirability: 0 at <= 20, rising to 1 at 40, 1 to 90, falling to 0 at 120 A^2."""
+        if tpsa <= 20.0 or tpsa >= 120.0:
+            return 0.0
+        if tpsa < 40.0:
+            return (tpsa - 20.0) / 20.0
+        if tpsa <= 90.0:
+            return 1.0
+        return (120.0 - tpsa) / 30.0
+
+    def basic_centre(self, mol: Chem.Mol) -> str | None:
+        if mol.HasSubstructMatch(self._AMIDINE):
+            return "amidine_or_guanidine"
+        if mol.HasSubstructMatch(self._ALIPHATIC_AMINE):
+            return "aliphatic_amine"
+        return None
 
     def predict(self, mol: Chem.Mol) -> tuple[float | None, float | None, bool, str | None]:
         if mol is None or mol.GetNumHeavyAtoms() == 0:
             return (None, None, False, "Invalid or empty molecule")
 
         mw = Descriptors.MolWt(mol)
+        notes: list[str] = []
         domain_ok = mw <= 700.0
-        warning = f"MW {mw:.1f} > 700 Da exceeds typical CNS MPO domain" if not domain_ok else None
+        if not domain_ok:
+            notes.append(f"MW {mw:.1f} > 700 Da exceeds typical CNS MPO domain")
 
         clogp = Crippen.MolLogP(mol)
         tpsa = rdMolDescriptors.CalcTPSA(mol)
         hbd = Lipinski.NumHDonors(mol)
+        centre = self.basic_centre(mol)
+        if centre is None:
+            pka_term = 1.0
+        else:
+            assumed = self.ASSUMED_PKA[centre]
+            pka_term = self._decreasing(assumed, 8.0, 10.0)
+            notes.append(f"pKa not computed; assumed {assumed:.1f} for detected {centre.replace('_', ' ')}")
 
-        # 1. CLogP: optimal <= 3.0, unacceptable > 5.0
-        s_clogp = self._desirability(clogp, -5.0, 3.0, -10.0, 5.0)
-
-        # 2. CLogD estimate (approximate using neutral clogP for non-ionizable)
-        s_clogd = self._desirability(clogp - 0.5, -5.0, 2.0, -10.0, 4.0)
-
-        # 3. MW: optimal <= 360, unacceptable >= 500
-        s_mw = self._desirability(mw, 50.0, 360.0, 0.0, 500.0)
-
-        # 4. TPSA: optimal 40-90 Å², unacceptable < 20 or > 120
-        s_tpsa = self._desirability(tpsa, 40.0, 90.0, 20.0, 120.0)
-
-        # 5. HBD: optimal <= 0.5, unacceptable >= 3.5
-        s_hbd = self._desirability(float(hbd), 0.0, 0.5, 0.0, 3.5)
-
-        # 6. pKa basic center proxy (based on amine presence and charge)
-        basic_nitrogens = sum(1 for a in mol.GetAtoms() if a.GetSymbol() == "N" and a.GetTotalNumHs() > 0)
-        pka_proxy = 7.0 + (1.5 * basic_nitrogens)
-        s_pka = self._desirability(pka_proxy, 0.0, 8.0, 0.0, 10.0)
-
-        score = s_clogp + s_clogd + s_mw + s_tpsa + s_hbd + s_pka
-        uncertainty = 0.25  # Estimated standard error of the composite scoring index
-
-        return (round(score, 2), uncertainty, domain_ok, warning)
+        score = (
+            self._decreasing(clogp, 3.0, 5.0)
+            + self._decreasing(clogp, 2.0, 4.0)  # ClogD approximated by cLogP
+            + self._decreasing(mw, 360.0, 500.0)
+            + self._tpsa_hump(tpsa)
+            + self._decreasing(float(hbd), 0.5, 3.5)
+            + pka_term
+        )
+        return (round(score, 2), None, domain_ok, "; ".join(notes) or None)
 
 
 AVAILABLE_MODELS: dict[str, type[PropertyModel]] = {
