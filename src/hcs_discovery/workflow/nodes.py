@@ -625,7 +625,8 @@ def _run_rank(table: Table, config: RankConfig, ctx: NodeContext) -> Table:
             method="Non-dominated sorting",
             description=(
                 "1 = non-dominated front among filter- and constraint-passing records. "
-                "Filtered or constraint-failing records are not ranked."
+                "Filtered or constraint-failing records, records missing a Pareto objective and records "
+                "beyond the configured front limit are left empty."
             ),
         ),
         pareto_rank,
@@ -771,6 +772,16 @@ def _run_join(table: Table, config: JoinConfig, ctx: NodeContext) -> Table:
     result = tables[0]
     for idx, other in enumerate(tables[1:], start=2):
         sfx = f"{config.suffix}_{idx}" if len(tables) > 2 else config.suffix
+        left_keys = {row.get(config.key_column) for row in result.rows} - {None}
+        right_keys = {row.get(config.key_column) for row in other.rows} - {None}
+        unmatched_left = sum(1 for row in result.rows if row.get(config.key_column) not in right_keys)
+        unmatched_right = sum(1 for row in other.rows if row.get(config.key_column) not in left_keys)
+        if unmatched_left or unmatched_right:
+            ctx.log(
+                f"Join input {idx}: {unmatched_left} left row(s) and {unmatched_right} right row(s) have no "
+                f"matching '{config.key_column}' ({config.how} join).",
+                level="warning",
+            )
         result = result.join(other, key_column=config.key_column, how=config.how, suffix=sfx)
 
     ctx.log(
