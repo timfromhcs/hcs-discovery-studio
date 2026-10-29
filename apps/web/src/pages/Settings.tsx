@@ -28,6 +28,10 @@ const ENV_VARS: Array<{ name: string; description: string }> = [
   { name: "HCS_MAX_IMPORT_ROWS", description: "Reject imports above this row count (default 50,000)." },
   { name: "HCS_MAX_UPLOAD_MB", description: "Upload size limit in MiB (default 64)." },
   {
+    name: "HCS_ALLOW_EXTERNAL_RECEPTOR_PATHS",
+    description: "Docking receptors are read from <data dir>/receptors. Set to true only on a trusted local install to allow other paths.",
+  },
+  {
     name: "HCS_LLM_BASE_URL / HCS_LLM_MODEL",
     description: "Optional OpenAI-compatible endpoint for the provider probe; no LLM workflow node is registered yet.",
   },

@@ -73,6 +73,12 @@ intentional.
   missing or modified.
 - Docking input failures are recorded per ligand rather than masking the
   remaining library.
+- Node cache keys now include a fingerprint of the installed package (so edits
+  to helper modules or model coefficients invalidate cached results), the
+  AutoDock Vina version actually detected on the host and the SHA-256 of the
+  docking receptor. Previously a replaced receptor file reused stale poses.
+- Installed wheels ship their Alembic migrations and record a revision instead
+  of falling back to `create_all`.
 
 ### Validation
 
@@ -90,6 +96,11 @@ intentional.
 - Connector 3xx responses are errors; 404s raise unless explicitly tolerated.
 - Constraint objectives no longer contribute to composite scores or Pareto
   ranking; they gate eligibility instead.
+- `dock.vina` reads receptors only from `<HCS_DATA_DIR>/receptors` (relative
+  names resolve there). Absolute paths elsewhere, and resolution against the
+  server's working directory, are refused unless
+  `HCS_ALLOW_EXTERNAL_RECEPTOR_PATHS=true`, so an HTTP client cannot make the
+  server read arbitrary host files.
 
 ## [1.0.0] - 2026-10-28
 

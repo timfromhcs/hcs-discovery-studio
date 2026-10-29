@@ -1,9 +1,10 @@
 """Content-addressed node output cache.
 
-A cache key covers the node implementation version, its configuration, the exact
-input table content, the pinned scientific engine versions and the workflow schema
-version. Any change invalidates the entry, so results cannot silently mix
-incompatible scientific versions.
+A cache key covers the node implementation version, a fingerprint of the whole
+installed package, its configuration, the exact input table content, the scientific
+engine versions (including host-detected ones such as the installed Vina binary and
+referenced input files) and the workflow schema version. Any change invalidates
+the entry, so results cannot silently mix incompatible scientific versions.
 """
 
 from __future__ import annotations
@@ -28,12 +29,14 @@ def cache_key(
     engine_versions: dict[str, str],
     schema_version: int = 1,
     implementation_hash: str | None = None,
+    package_fingerprint: str | None = None,
 ) -> str:
     return stable_json_hash(
         {
             "node_type": node_type,
             "node_version": node_version,
             "implementation_hash": implementation_hash,
+            "package_fingerprint": package_fingerprint,
             "config": config,
             "input_hash": input_hash,
             "engines": engine_versions,

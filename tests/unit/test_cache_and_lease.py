@@ -117,3 +117,62 @@ def test_lease_heartbeat_renews_and_detects_loss(settings, session, triage_defin
     time.sleep(0.3)
     stale.stop()
     assert stale.lost is True
+
+
+def test_cache_key_changes_with_every_output_relevant_factor():
+    from hcs_discovery.workflow.cache import cache_key
+
+    base = {
+        "node_type": "dock.vina",
+        "node_version": "1.2.5",
+        "config": {"seed": 1},
+        "input_hash": "a" * 64,
+        "engine_versions": {"rdkit": "1", "autodock_vina": "1.2.5", "receptor_sha256": "r1"},
+        "schema_version": 1,
+        "implementation_hash": "impl",
+        "package_fingerprint": "pkg",
+    }
+    reference = cache_key(**base)
+    assert cache_key(**base) == reference
+    variants = {
+        "node_version": "1.2.6",
+        "config": {"seed": 2},
+        "input_hash": "b" * 64,
+        "engine_versions": {**base["engine_versions"], "autodock_vina": "1.2.6"},
+        "schema_version": 2,
+        "implementation_hash": "impl2",
+        "package_fingerprint": "pkg2",
+    }
+    for field, value in variants.items():
+        assert cache_key(**{**base, field: value}) != reference, field
+    receptor_changed = {**base["engine_versions"], "receptor_sha256": "r2"}
+    assert cache_key(**{**base, "engine_versions": receptor_changed}) != reference
+
+
+def test_package_fingerprint_covers_helper_modules(monkeypatch, tmp_path):
+    from hcs_discovery.workflow import registry
+
+    package = tmp_path / "hcs_discovery"
+    (package / "workflow").mkdir(parents=True)
+    (package / "web").mkdir()
+    (package / "workflow" / "registry.py").write_text("# stub\n", encoding="utf-8")
+    helper = package / "helper.py"
+    helper.write_text("COEFFICIENT = 1.0\n", encoding="utf-8")
+    (package / "web" / "index.html").write_text("<html></html>", encoding="utf-8")
+    monkeypatch.setattr(registry, "__file__", str(package / "workflow" / "registry.py"))
+
+    def fingerprint() -> str:
+        registry.package_fingerprint.cache_clear()
+        return registry.package_fingerprint()
+
+    try:
+        first = fingerprint()
+        (package / "web" / "index.html").write_text("<html>changed</html>", encoding="utf-8")
+        assert fingerprint() == first, "bundled SPA must not affect scientific cache keys"
+        helper.write_text("COEFFICIENT = 1.1\n", encoding="utf-8")
+        changed = fingerprint()
+        assert changed != first
+        helper.write_bytes(b"COEFFICIENT = 1.1\r\n")
+        assert fingerprint() == changed, "CRLF and LF checkouts must share cache keys"
+    finally:
+        registry.package_fingerprint.cache_clear()

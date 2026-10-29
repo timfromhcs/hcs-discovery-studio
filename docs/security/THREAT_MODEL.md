@@ -84,13 +84,18 @@ outside the application's control.
 ### 3. Path traversal and unsafe filenames
 
 **Threat:** A crafted upload name or artifact name writes outside the data
-directory.
+directory, or a workflow config (for example a docking `receptor_path` or an
+agent `plan_id`) makes the server read an arbitrary host file.
 
 **Mitigations:**
 
 - `safe_filename` strips path separators, control characters and reserved
   Windows names.
-- `safe_join` resolves and rejects absolute paths and escapes.
+- `safe_join` resolves symlinks with `realpath` and rejects absolute paths,
+  escapes and sibling directories that share the base prefix.
+- `dock.vina` reads receptors only under `<data_dir>/receptors` unless the
+  local operator sets `HCS_ALLOW_EXTERNAL_RECEPTOR_PATHS=true`.
+- Agent plan ids must match `^plan_[0-9a-f]{12}$` before any path is built.
 - `relative_artifact_path` verifies the artifact is under the run directory.
 - The SPA file handler resolves and checks the candidate is under `WEB_DIST`.
 

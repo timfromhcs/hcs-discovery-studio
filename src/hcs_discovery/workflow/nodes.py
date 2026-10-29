@@ -21,6 +21,7 @@ from ..plugins.science.docking.vina import (
     VinaConfig,
     run_vina_docking,
     vina_docking_columns,
+    vina_runtime_fingerprint,
 )
 from ..plugins.science.properties.adapter import (
     PropertyPredictorConfig,
@@ -891,6 +892,7 @@ def register_builtin_nodes(registry: NodeRegistry) -> None:
             description="CPU molecular docking and binding pose prediction with AutoDock Vina.",
             config_model=VinaConfig,
             handler=run_vina_docking,
+            runtime_fingerprint=vina_runtime_fingerprint,
             requires=("smiles",),
             outputs=lambda config: vina_docking_columns(config.output_prefix),
             documentation=(

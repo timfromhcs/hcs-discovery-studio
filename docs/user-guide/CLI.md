@@ -201,5 +201,6 @@ hcs-discovery --json run status "$RUN" | jq '.status'
 | `HCS_LLM_API_KEY` | unset | Provider key; never printed |
 | `HCS_REMOTE_LLM_ENABLED` | `false` | Explicit opt-in for remote LLM |
 | `HCS_API_TOKEN` | unset | Required for non-loopback binding |
+| `HCS_ALLOW_EXTERNAL_RECEPTOR_PATHS` | `false` | Let `dock.vina` read receptor files outside `<HCS_DATA_DIR>/receptors`; trusted local installs only |
 
 See `.env.example` for a documented template.
