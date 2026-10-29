@@ -515,3 +515,38 @@ def test_constraint_objective_cannot_be_scored_or_enter_pareto():
     objective = ObjectiveConfig(column="logp", direction="constraint", target_max=3.0)
     assert objective.weight == 0.0
     assert objective.participates_in_pareto is False
+
+
+def _float_fields(model, prefix=""):
+    """Yield (path, model, field_name) for every float field, including nested models."""
+    import typing
+
+    from pydantic import BaseModel
+
+    for name, field in model.model_fields.items():
+        args = [field.annotation]
+        for arg in list(args):
+            args.extend(typing.get_args(arg))
+        for arg in list(args):
+            args.extend(typing.get_args(arg))
+        if float in args:
+            yield f"{prefix}{name}", model, name
+        for arg in args:
+            if isinstance(arg, type) and issubclass(arg, BaseModel) and arg is not model:
+                yield from _float_fields(arg, f"{prefix}{name}.")
+
+
+def test_every_float_config_field_rejects_nan_and_infinity():
+    from pydantic import ValidationError as PydanticValidationError
+
+    from hcs_discovery.workflow.registry import default_registry
+
+    checked = 0
+    for node_type in default_registry().types():
+        for path, model, name in _float_fields(default_registry().get(node_type).config_model):
+            for bad in (float("nan"), float("inf"), float("-inf")):
+                with pytest.raises(PydanticValidationError):
+                    model.__pydantic_validator__.validate_assignment(model.model_construct(), name, bad)
+            checked += 1
+            assert path
+    assert checked >= 14  # Vina box/energy/timeout, rule bounds, objective weights and targets

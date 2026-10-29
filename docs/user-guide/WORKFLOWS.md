@@ -146,7 +146,9 @@ Output columns: `filter_pass` (boolean) and `filter_reasons` (string).
 - Each objective must reference a numeric column.
 - Weights are 0–100 and at least one must be positive.
 - Composite score is a weighted average of min-max normalised objectives. If an
-  objective value is missing, the composite score is empty.
+  objective value is missing, the composite score is empty. Normalisation uses
+  the rows of the current run, so scores are not comparable across runs or
+  datasets and shift when rows are added.
 - Pareto fronts use the raw objective vectors (direction-normalised) and are
   computed only among filter-passing rows.
 - Filter-failing rows get `pareto_rank = null` and are ranked after passing
