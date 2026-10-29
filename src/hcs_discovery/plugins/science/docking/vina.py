@@ -19,6 +19,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from ....core.config import Settings, get_settings
 from ....core.errors import ValidationError
 from ....core.hashing import sha256_file
+from ....core.paths import safe_join
 from ....workflow.registry import NodeContext
 from ....workflow.table import Column, Table
 from .prep import (
@@ -153,6 +154,56 @@ def resolve_vina_binary(settings: Settings | None = None) -> Path | None:
         return Path(which_vina).resolve()
 
     return None
+
+
+def resolve_receptor_path(raw: str, settings: Settings | None = None) -> Path:
+    """Resolve a configured receptor path inside the allowed receptor directory.
+
+    Relative paths are resolved under ``<data_dir>/receptors``. Absolute paths are
+    accepted only inside that directory, unless the local operator has set
+    ``HCS_ALLOW_EXTERNAL_RECEPTOR_PATHS=true``.
+    """
+    cfg = settings or get_settings()
+    root = cfg.receptors_dir
+    if Path(raw).anchor:
+        candidate = Path(os.path.realpath(raw))
+        inside = candidate == Path(os.path.realpath(root)) or Path(os.path.realpath(root)) in candidate.parents
+        if not inside and not cfg.allow_external_receptor_paths:
+            raise ValidationError(
+                "Receptor paths outside the receptor directory are not allowed.",
+                details={
+                    "receptors_dir": str(root),
+                    "remediation": (
+                        "Copy the receptor into the receptor directory and reference it by file name, "
+                        "or set HCS_ALLOW_EXTERNAL_RECEPTOR_PATHS=true on a trusted local install."
+                    ),
+                },
+            )
+    else:
+        candidate = safe_join(root, raw)
+    if not candidate.is_file():
+        raise ValidationError(
+            f"Receptor file does not exist: {raw}",
+            details={"receptors_dir": str(root)},
+        )
+    return candidate
+
+
+def vina_runtime_fingerprint(config: VinaConfig) -> dict[str, str]:
+    """Host-dependent inputs that change docking output, for the node cache key.
+
+    Failures are encoded as markers rather than raised: the handler reports the
+    real error, and a marker can never collide with a successful fingerprint.
+    """
+    probe = probe_vina()
+    try:
+        receptor_sha = sha256_file(resolve_receptor_path(config.receptor_path))
+    except ValidationError:
+        receptor_sha = "unresolved"
+    return {
+        "autodock_vina": str(probe.get("version") or "unavailable"),
+        "receptor_sha256": receptor_sha,
+    }
 
 
 def probe_vina(settings: Settings | None = None, *, binary: Path | None = None) -> dict[str, Any]:
@@ -403,17 +454,7 @@ def run_vina_docking(table: Table, config: VinaConfig, ctx: NodeContext) -> Tabl
             },
         )
 
-    # Locate and validate receptor
-    receptor_path = Path(config.receptor_path)
-    if not receptor_path.is_absolute():
-        # Try relative to cwd or work_dir
-        if (Path.cwd() / receptor_path).is_file():
-            receptor_path = (Path.cwd() / receptor_path).resolve()
-        elif (ctx.work_dir / receptor_path).is_file():
-            receptor_path = (ctx.work_dir / receptor_path).resolve()
-        else:
-            raise ValidationError(f"Receptor file does not exist: {config.receptor_path}")
-
+    receptor_path = resolve_receptor_path(config.receptor_path)
     receptor_meta = validate_receptor_pdbqt(receptor_path)
     receptor_sha256 = sha256_file(receptor_path)
 

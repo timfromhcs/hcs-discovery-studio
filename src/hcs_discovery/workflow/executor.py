@@ -29,7 +29,7 @@ from ..core.timeutil import db_now
 from ..database.models import Artifact, Compound, Dataset, Run, RunEvent, RunNode, RunResult
 from ..jobs.queue import heartbeat as renew_lease
 from .cache import CachedOutput, NodeCache, cache_key
-from .registry import NodeContext, NodeRegistry, default_registry
+from .registry import NodeContext, NodeRegistry, default_registry, package_fingerprint
 from .schema import WorkflowSpec, dataset_table, validate_workflow
 from .table import IDENTITY_COLUMNS, Table
 
@@ -350,14 +350,18 @@ class RunExecutor:
         self.events.emit("node.started", f"Starting {definition.title}.", node_id=node_id)
 
         input_hash = input_table.content_hash()
+        engine_versions = self._engine_versions()
+        if definition.runtime_fingerprint is not None:
+            engine_versions.update(definition.runtime_fingerprint(parsed_config))
         key = cache_key(
             node_type=node_type,
             node_version=definition.version,
             config=parsed_config.model_dump(mode="json"),
             input_hash=input_hash,
-            engine_versions=self._engine_versions(),
+            engine_versions=engine_versions,
             schema_version=run.workflow_snapshot.get("schema_version", 1),
             implementation_hash=definition.implementation_hash,
+            package_fingerprint=package_fingerprint(),
         )
         node_row.cache_key = key
         self.session.commit()
@@ -389,7 +393,7 @@ class RunExecutor:
             report_progress=self._node_progress,
             check_cancel=lambda: self._check_cancelled(run),
             write_artifact=self._write_artifact,
-            engine_versions=self._engine_versions(),
+            engine_versions=engine_versions,
             incoming_tables=incoming_tables or {},
         )
         try:
@@ -688,6 +692,7 @@ class RunExecutor:
                 "platform": platform.platform(),
                 "rdkit": rdkit.__version__,
                 "engines": self._engine_versions(),
+                "package_fingerprint": package_fingerprint(),
             },
             "hardware": {
                 "cpu_count": os.cpu_count(),
