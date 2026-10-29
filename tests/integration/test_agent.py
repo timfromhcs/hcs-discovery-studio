@@ -361,3 +361,53 @@ def test_agent_cli_commands(agent_env: tuple[Settings, Any], monkeypatch: pytest
     res = runner.invoke(cli_app, ["agent", "plan", "Screen compounds for logS > -4"])
     assert res.exit_code == 0
     assert "Formulated research plan" in res.stdout
+
+
+class _FakeProvider:
+    configured = True
+
+    def __init__(self, *, status: str = "available", reply: str | None = None, error: Exception | None = None):
+        self._status, self._reply, self._error = status, reply, error
+
+    def probe(self) -> Any:
+        from hcs_discovery.plugins.llm.openai_compat import ProviderHealth
+
+        return ProviderHealth(status=self._status, detail=f"fake {self._status}", models=[])
+
+    def chat(self, messages: list[dict[str, str]], *, max_tokens: int = 512) -> str:
+        if self._error is not None:
+            raise self._error
+        assert self._reply is not None
+        return self._reply
+
+
+def test_agent_ask_reports_which_source_answered(agent_env: tuple[Settings, Any]) -> None:
+    settings, factory = agent_env
+    with factory() as session:
+        llm = ResearchAgent(settings=settings, provider=_FakeProvider(reply="from the model"))  # type: ignore[arg-type]
+        answered = llm.handle(AgentRequest(mode="ask", prompt="hello"), session=session)
+        assert (answered.source, answered.text, answered.provider_error) == ("llm", "from the model", None)
+
+        offline = ResearchAgent(settings=settings)
+        local = offline.handle(AgentRequest(mode="ask", prompt="hello"), session=session)
+        assert local.source == "local_rules"
+        assert local.provider_error is None
+
+
+@pytest.mark.parametrize(
+    "provider",
+    [
+        _FakeProvider(error=ConnectionError("connection refused")),
+        _FakeProvider(status="unavailable"),
+    ],
+)
+def test_agent_ask_never_hides_a_provider_failure(agent_env: tuple[Settings, Any], provider: Any) -> None:
+    settings, factory = agent_env
+    with factory() as session:
+        response = ResearchAgent(settings=settings, provider=provider).handle(
+            AgentRequest(mode="ask", prompt="Tell me about solubility"), session=session
+        )
+    assert response.source == "local_rules"
+    assert response.provider_error
+    assert response.text.startswith("The configured language model did not answer")
+    assert "R^2 0.07" in response.text
