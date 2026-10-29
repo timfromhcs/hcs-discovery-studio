@@ -31,34 +31,134 @@ class VinaPose:
     pdbqt: str
 
 
-def _autodock_atom_type(atom: Chem.Atom) -> str:
-    elem = atom.GetSymbol()
-    if elem == "C":
-        return "A" if atom.GetIsAromatic() else "C"
-    if elem == "N":
-        # NA for hydrogen bond acceptors (tertiary or pyridine-like), N for donors
-        if atom.GetTotalNumHs() == 0 and not atom.GetFormalCharge() > 0:
-            return "NA"
-        return "N"
-    if elem == "O":
-        return "OA"
-    if elem == "S":
-        return "SA" if atom.GetIsAromatic() else "S"
-    if elem == "P":
-        return "P"
-    if elem in ("F", "Cl", "Br", "I"):
-        return elem
-    if elem == "H":
-        neighbors = atom.GetNeighbors()
-        if neighbors and neighbors[0].GetSymbol() in ("N", "O", "S"):
-            return "HD"
-        return "H"
-    # Fallback to uppercase element
-    return elem[:2].upper()
+PREPARATION_METHOD = "hcs-pdbqt-1"
+"""Identifier of the ligand preparation conventions below, recorded in provenance.
+
+The conventions follow Meeko's defaults (AutoDock 4 atom types, Gasteiger charges,
+non-polar hydrogens merged, rigid rings, rigid primary/secondary amides) so the
+torsion tree matches what the AutoDock tooling would produce. Macrocycles are kept
+rigid rather than opened with pseudo-atoms.
+"""
+
+SUPPORTED_ELEMENTS = frozenset({"H", "C", "N", "O", "S", "P", "F", "Cl", "Br", "I"})
+_POLAR_H_PARENTS = frozenset({"N", "O", "F", "P", "S"})
+
+# AutoDock 4 atom typing, later rules override earlier ones (Meeko ad4_types.json).
+_AD4_RULES: tuple[tuple[str, str], ...] = (
+    ("[#1]", "H"),
+    ("[#1][#7,#8,#9,#15,#16]", "HD"),
+    ("[C]", "C"),
+    ("[c]", "A"),
+    ("[#7]", "NA"),
+    ("[#8]", "OA"),
+    ("[#9]", "F"),
+    ("[#15]", "P"),
+    ("[#16]", "S"),
+    ("[#17]", "Cl"),
+    ("[#35]", "Br"),
+    ("[#53]", "I"),
+    ("[#7X3v3][a]", "N"),
+    ("[#7X3v3][#6X3v4]", "N"),
+    ("[#7X3v3][NX2]=[*]", "N"),
+    ("[#7+1]", "N"),
+    ("[SX2]", "SA"),
+)
+_AD4_PATTERNS = tuple((Chem.MolFromSmarts(smarts), atype) for smarts, atype in _AD4_RULES)
+_AMIDE = Chem.MolFromSmarts("[NX3]-[CX3]=[O,N,S]")
+_TERTIARY_AMIDE = Chem.MolFromSmarts("[NX3]([!#1])([!#1])-[CX3]=[O,N,S]")
+_SINGLE_TRIPLE_SINGLE = Chem.MolFromSmarts("[*]-[*]#[*]-[*]")
+_TERMINAL_TRIPLE = Chem.MolFromSmarts("[*]-[*]#[*X1]")
 
 
-def prepare_ligand_pdbqt(smiles_or_mol: str | Chem.Mol, *, seed: int = 42) -> str:
-    """Prepare a 3D PDBQT representation of a ligand from SMILES or RDKit Mol."""
+@dataclass(frozen=True)
+class PreparedLigand:
+    pdbqt: str
+    torsions: int
+    warnings: tuple[str, ...]
+    method: str = PREPARATION_METHOD
+
+
+def _ad4_types(mol: Chem.Mol) -> list[str]:
+    types = [""] * mol.GetNumAtoms()
+    for pattern, atype in _AD4_PATTERNS:
+        for match in mol.GetSubstructMatches(pattern, uniquify=False):
+            types[match[0]] = atype
+    return types
+
+
+def _bond_key(i: int, j: int) -> tuple[int, int]:
+    return (i, j) if i < j else (j, i)
+
+
+def _rotatable_bonds(mol: Chem.Mol, kept: set[int]) -> set[tuple[int, int]]:
+    """Rotatable bonds between kept atoms, using Meeko's default rules."""
+    amides = {_bond_key(m[0], m[1]) for m in mol.GetSubstructMatches(_AMIDE)}
+    ranks = list(Chem.CanonicalRankAtoms(mol, breakTies=False))
+    for n, r1, r2, c, _x in mol.GetSubstructMatches(_TERTIARY_AMIDE):
+        if ranks[r1] != ranks[r2]:
+            amides.discard(_bond_key(n, c))
+    rigid: set[tuple[int, int]] = set()
+    triple_rotors: set[tuple[int, int]] = set()
+    for i, j, k, m in mol.GetSubstructMatches(_SINGLE_TRIPLE_SINGLE):
+        triple_rotors.add(_bond_key(j, k))
+        rigid.update({_bond_key(i, j), _bond_key(k, m)})
+    rigid.update(_bond_key(i, j) for i, j, _k in mol.GetSubstructMatches(_TERMINAL_TRIPLE))
+
+    rotatable: set[tuple[int, int]] = set()
+    for bond in mol.GetBonds():
+        key = _bond_key(bond.GetBeginAtomIdx(), bond.GetEndAtomIdx())
+        if key[0] not in kept or key[1] not in kept or bond.IsInRing():
+            continue
+        if key in triple_rotors or (
+            bond.GetBondType() == Chem.BondType.SINGLE and key not in rigid and key not in amides
+        ):
+            rotatable.add(key)
+    return rotatable
+
+
+def _rigid_groups(mol: Chem.Mol, kept: list[int], rotatable: set[tuple[int, int]]) -> list[list[int]]:
+    """Connected components of kept atoms once rotatable bonds are cut."""
+    kept_set = set(kept)
+    group_of: dict[int, int] = {}
+    groups: list[list[int]] = []
+    for start in kept:
+        if start in group_of:
+            continue
+        stack, members = [start], []
+        group_of[start] = len(groups)
+        while stack:
+            atom = stack.pop()
+            members.append(atom)
+            for neighbor in mol.GetAtomWithIdx(atom).GetNeighbors():
+                other = neighbor.GetIdx()
+                if other in kept_set and other not in group_of and _bond_key(atom, other) not in rotatable:
+                    group_of[other] = len(groups)
+                    stack.append(other)
+        groups.append(sorted(members))
+    return groups
+
+
+def _choose_root(graph: dict[int, set[int]], groups: list[list[int]]) -> int:
+    """Graph centre of the rigid-group tree (Meeko's leaf-pruning rule)."""
+    remaining = {node: set(edges) for node, edges in graph.items()}
+    while len(remaining) > 2:
+        leaves = [node for node, edges in remaining.items() if len(edges) <= 1]
+        for leaf in leaves:
+            for other in remaining.pop(leaf):
+                remaining[other].discard(leaf)
+    candidates = sorted(remaining)
+    return max(candidates, key=lambda node: (len(groups[node]), -node))
+
+
+def prepare_ligand(smiles_or_mol: str | Chem.Mol, *, seed: int = 42) -> PreparedLigand:
+    """Prepare a flexible-ligand PDBQT (ROOT/BRANCH torsion tree) from SMILES or an RDKit Mol.
+
+    Expected chemistry problems (unparseable input, unsupported elements, failed
+    embedding, undefined charges) raise :class:`LigandPreparationError`.
+    Transformations that change the docked species, such as keeping only the
+    largest fragment, are returned as warnings.
+    """
+    warnings: list[str] = []
     if isinstance(smiles_or_mol, str):
         mol = Chem.MolFromSmiles(smiles_or_mol)
         if mol is None:
@@ -66,64 +166,130 @@ def prepare_ligand_pdbqt(smiles_or_mol: str | Chem.Mol, *, seed: int = 42) -> st
     else:
         mol = Chem.Mol(smiles_or_mol)
 
-    # Check for disconnected components (salts/mixtures)
     frags = Chem.GetMolFrags(mol, asMols=True)
     if len(frags) > 1:
-        # Pick largest fragment
         mol = max(frags, key=lambda m: m.GetNumHeavyAtoms())
-
+        warnings.append(
+            f"Input has {len(frags)} disconnected fragments; docked only the largest "
+            f"({mol.GetNumHeavyAtoms()} heavy atoms)."
+        )
     if mol.GetNumHeavyAtoms() == 0:
         raise LigandPreparationError("Ligand has zero heavy atoms.")
+    unsupported = sorted({a.GetSymbol() for a in mol.GetAtoms()} - SUPPORTED_ELEMENTS)
+    if unsupported:
+        raise LigandPreparationError(f"Unsupported element(s) for ligand preparation: {', '.join(unsupported)}.")
+    if any(len(ring) >= 7 for ring in mol.GetRingInfo().AtomRings()):
+        warnings.append("Macrocycle kept rigid: rings of 7+ atoms are not conformationally sampled.")
 
     mol = Chem.AddHs(mol)
-
-    # Generate 3D coordinates
-    embed_code = AllChem.EmbedMolecule(mol, randomSeed=seed)
-    if embed_code != 0:
-        # Fallback to random coordinate embedding if standard distance geometry fails
-        embed_code = AllChem.EmbedMolecule(mol, useRandomCoords=True, randomSeed=seed)
-        if embed_code != 0:
+    # MMFF setup rewrites aromaticity flags in place (MMFF aromaticity model), so
+    # atom typing and rotor detection use an untouched copy of the topology.
+    topology = Chem.Mol(mol)
+    params = AllChem.ETKDGv3()
+    params.randomSeed = seed
+    if AllChem.EmbedMolecule(mol, params) != 0:
+        params.useRandomCoords = True
+        if AllChem.EmbedMolecule(mol, params) != 0:
             raise LigandPreparationError("3D coordinate generation failed for ligand.")
+        warnings.append("Distance-geometry embedding failed; used random-coordinate embedding.")
 
-    import contextlib
+    if AllChem.MMFFHasAllMoleculeParams(mol):
+        if AllChem.MMFFOptimizeMolecule(mol, maxIters=500) != 0:
+            warnings.append("MMFF94 optimisation did not converge in 500 iterations.")
+    else:
+        warnings.append("MMFF94 parameters unavailable; using the unoptimised ETKDG geometry.")
 
-    with contextlib.suppress(Exception):
-        AllChem.MMFFOptimizeMolecule(mol, maxIters=500)
+    AllChem.ComputeGasteigerCharges(mol)
+    charges = [float(atom.GetProp("_GasteigerCharge")) for atom in mol.GetAtoms()]
+    if not all(math.isfinite(charge) for charge in charges):
+        raise LigandPreparationError("Gasteiger charges are undefined for this ligand.")
 
-    with contextlib.suppress(Exception):
-        AllChem.ComputeGasteigerCharges(mol)
-
-    conf = mol.GetConformer()
-    lines: list[str] = ["REMARK  Prepared by HCS Discovery Studio\n", "ROOT\n"]
-
+    # Merge non-polar hydrogens into their heavy atom, as AutoDock expects.
+    kept: list[int] = []
     for atom in mol.GetAtoms():
         idx = atom.GetIdx()
+        if atom.GetAtomicNum() == 1:
+            parent = atom.GetNeighbors()[0]
+            if parent.GetSymbol() not in _POLAR_H_PARENTS:
+                charges[parent.GetIdx()] += charges[idx]
+                continue
+        kept.append(idx)
+    kept_set = set(kept)
+
+    rotatable = _rotatable_bonds(topology, kept_set)
+    groups = _rigid_groups(topology, kept, rotatable)
+    group_of = {atom: g for g, members in enumerate(groups) for atom in members}
+    graph: dict[int, set[int]] = {g: set() for g in range(len(groups))}
+    for i, j in rotatable:
+        graph[group_of[i]].add(group_of[j])
+        graph[group_of[j]].add(group_of[i])
+
+    # Like Meeko, choose the root before folding terminal atoms, then fold: a rotor
+    # to a single atom moves nothing, so that atom joins its neighbour's group.
+    root = _choose_root(graph, groups)
+    for g in range(len(groups)):
+        if g != root and len(groups[g]) == 1 and len(graph[g]) == 1:
+            (host,) = graph.pop(g)
+            graph[host].discard(g)
+            rotatable = {bond for bond in rotatable if groups[g][0] not in bond}
+            groups[host] = sorted([*groups[host], *groups[g]])
+            groups[g] = []
+    live = [g for g in graph if groups[g]]
+
+    types = _ad4_types(topology)
+    conf = mol.GetConformer()
+    serial: dict[int, int] = {}
+    lines: list[str] = [f"REMARK  Prepared by HCS Discovery Studio ({PREPARATION_METHOD})\n"]
+
+    def atom_line(idx: int) -> str:
+        serial[idx] = len(serial) + 1
         pos = conf.GetAtomPosition(idx)
-        elem = atom.GetSymbol()
-
-        charge = 0.0
-        if atom.HasProp("_GasteigerCharge"):
-            try:
-                val = float(atom.GetProp("_GasteigerCharge"))
-                if not math.isnan(val) and not math.isinf(val):
-                    charge = val
-            except (ValueError, TypeError):
-                charge = 0.0
-
-        ad_type = _autodock_atom_type(atom)
-        atom_name = f"{elem}{idx + 1}"[:4].ljust(4)
-        line = (
-            f"ATOM  {idx + 1:5d} {atom_name} LIG     1    "
+        name = mol.GetAtomWithIdx(idx).GetSymbol()[:4].ljust(4)
+        return (
+            f"ATOM  {serial[idx]:5d} {name} LIG     1    "
             f"{pos.x:8.3f}{pos.y:8.3f}{pos.z:8.3f}  1.00  0.00    "
-            f"{charge:+6.3f} {ad_type:<2s}\n"
+            f"{charges[idx]:+6.3f} {types[idx]:<2s}\n"
         )
-        lines.append(line)
 
-    lines.append("ENDROOT\n")
-    rot_bonds = AllChem.CalcNumRotatableBonds(mol)
-    lines.append(f"TORSDOF {rot_bonds}\n")
+    body: list[str] = ["ROOT\n", *(atom_line(i) for i in groups[root]), "ENDROOT\n"]
 
-    return "".join(lines)
+    def emit_children(parent: int, visited: set[int]) -> None:
+        for child in sorted(graph[parent] - visited):
+            parent_atom, child_atom = next(
+                (i, j) if group_of[i] == parent else (j, i)
+                for i, j in sorted(rotatable)
+                if {group_of[i], group_of[j]} == {parent, child}
+            )
+            visited.add(child)
+            members = [child_atom, *(a for a in groups[child] if a != child_atom)]
+            body.append(f"BRANCH {serial[parent_atom]:3d} {len(serial) + 1:3d}\n")
+            child_serial = len(serial) + 1
+            body.extend(atom_line(a) for a in members)
+            emit_children(child, visited)
+            body.append(f"ENDBRANCH {serial[parent_atom]:3d} {child_serial:3d}\n")
+
+    # Group membership changed for folded atoms; refresh the lookup.
+    group_of = {atom: g for g in live for atom in groups[g]}
+    emit_children(root, {root})
+    torsions = len(live) - 1
+
+    # Heavy-atom SMILES with the PDBQT serial of each SMILES atom, so a docked pose
+    # can be rebuilt with its bonds. AddHs appends hydrogens, so heavy-atom indices
+    # are unchanged by RemoveHs.
+    heavy = Chem.RemoveHs(mol)
+    smiles = Chem.MolToSmiles(heavy)
+    output_order = list(heavy.GetPropsAsDict(includePrivate=True, includeComputed=True)["_smilesAtomOutputOrder"])
+    pairs = " ".join(f"{n + 1} {serial[idx]}" for n, idx in enumerate(output_order))
+    lines.append(f"REMARK SMILES {smiles}\n")
+    lines.append(f"REMARK SMILES IDX {pairs}\n")
+    lines.extend(body)
+    lines.append(f"TORSDOF {torsions}\n")
+    return PreparedLigand(pdbqt="".join(lines), torsions=torsions, warnings=tuple(warnings))
+
+
+def prepare_ligand_pdbqt(smiles_or_mol: str | Chem.Mol, *, seed: int = 42) -> str:
+    """Prepare a flexible-ligand PDBQT string; see :func:`prepare_ligand`."""
+    return prepare_ligand(smiles_or_mol, seed=seed).pdbqt
 
 
 def validate_receptor_pdbqt(pdbqt_text_or_path: str | Path) -> dict[str, Any]:
@@ -254,6 +420,35 @@ def parse_vina_poses(pdbqt_content: str) -> list[VinaPose]:
     return poses
 
 
+def _pose_from_smiles_remarks(pose_pdbqt: str, coords: list[tuple[float, float, float]]) -> Chem.Mol | None:
+    """Rebuild a heavy-atom pose with bonds from ``REMARK SMILES`` / ``SMILES IDX`` lines.
+
+    Returns ``None`` when the remarks are absent or do not match the atoms, so the
+    caller can fall back to an atoms-only representation.
+    """
+    smiles = None
+    pairs: list[int] = []
+    for line in pose_pdbqt.splitlines():
+        if line.startswith("REMARK SMILES IDX"):
+            pairs.extend(int(token) for token in line.split()[3:])
+        elif line.startswith("REMARK SMILES "):
+            smiles = line.split()[2]
+    if smiles is None or not pairs or len(pairs) % 2:
+        return None
+    mol = Chem.MolFromSmiles(smiles)
+    mapping = dict(zip(pairs[0::2], pairs[1::2], strict=True))
+    if mol is None or sorted(mapping) != list(range(1, mol.GetNumAtoms() + 1)):
+        return None
+    if any(not 1 <= serial <= len(coords) for serial in mapping.values()):
+        return None
+    conf = Chem.Conformer(mol.GetNumAtoms())
+    for smiles_index, serial in mapping.items():
+        conf.SetAtomPosition(smiles_index - 1, coords[serial - 1])
+    mol.AddConformer(conf, assignId=True)
+    Chem.AssignStereochemistryFrom3D(mol)
+    return mol
+
+
 def pose_pdbqt_to_sdf(pose_pdbqt: str, ref_mol: Chem.Mol | None = None) -> str:
     """Convert a single PDBQT pose into an SDF representation with Vina result properties."""
     # Extract coordinates and atoms from PDBQT
@@ -302,20 +497,23 @@ def pose_pdbqt_to_sdf(pose_pdbqt: str, ref_mol: Chem.Mol | None = None) -> str:
     if not coords:
         return ""
 
-    if ref_mol is not None and ref_mol.GetNumAtoms() == len(coords):
-        mol = Chem.Mol(ref_mol)
+    rebuilt = _pose_from_smiles_remarks(pose_pdbqt, coords)
+    if rebuilt is not None:
+        mol = rebuilt
     else:
-        # Build raw molecule from symbols
-        editable = Chem.EditableMol(Chem.Mol())
-        for sym in atom_symbols:
-            editable.AddAtom(Chem.Atom(sym))
-        mol = editable.GetMol()
-
-    conf = Chem.Conformer(len(coords))
-    for i, (x, y, z) in enumerate(coords):
-        conf.SetAtomPosition(i, (x, y, z))
-    mol.RemoveAllConformers()
-    mol.AddConformer(conf)
+        if ref_mol is not None and ref_mol.GetNumAtoms() == len(coords):
+            mol = Chem.Mol(ref_mol)
+        else:
+            # No bond information available: atoms only.
+            editable = Chem.EditableMol(Chem.Mol())
+            for sym in atom_symbols:
+                editable.AddAtom(Chem.Atom(sym))
+            mol = editable.GetMol()
+        conf = Chem.Conformer(len(coords))
+        for i, (x, y, z) in enumerate(coords):
+            conf.SetAtomPosition(i, (x, y, z))
+        mol.RemoveAllConformers()
+        mol.AddConformer(conf)
 
     block = Chem.MolToMolBlock(mol).rstrip()
     sd_tags: list[str] = []
