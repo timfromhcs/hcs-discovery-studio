@@ -139,8 +139,9 @@ def _property_predictor_card() -> AdapterCard:
     probe_res = probe_property_predictor()
     notes = [
         (
-            "Literature-derived molecular property models: ESOL aqueous solubility and CNS MPO "
-            "BBB scoring, with uncertainty and applicability-domain flags."
+            "Literature-derived molecular property estimates: a reduced ESOL logS equation (with a "
+            "heuristic error scale) and a CNS MPO approximation (cLogP for ClogD, assumed pKa), "
+            "with applicability-domain flags."
         ),
         probe_res["detail"],
         (

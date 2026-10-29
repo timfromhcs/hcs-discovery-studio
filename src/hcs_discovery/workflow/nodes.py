@@ -911,7 +911,7 @@ def register_builtin_nodes(registry: NodeRegistry) -> None:
             title="Learned property prediction",
             category="properties",
             version="1.0.0",
-            description="Predict molecular properties (ESOL aqueous solubility, CNS MPO BBB) with uncertainty.",
+            description="Literature-derived property estimates: reduced ESOL logS and a CNS MPO approximation.",
             config_model=PropertyPredictorConfig,
             handler=run_property_prediction,
             requires=("smiles",),
