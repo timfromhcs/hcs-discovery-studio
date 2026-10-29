@@ -2,14 +2,14 @@
   "schema_version": 1,
   "model": {
     "model_id": "esol_solubility",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "weights_sha256": "09fcfc4a4a1ea22756d2328267cbeec4566900f3c2f427f689162f395a60053c",
     "citation": "Delaney, J. S. (2004). J. Chem. Inf. Comput. Sci., 44(3), 1000-1005."
   },
   "dataset": {
     "name": "AqSolDB Solubility Challenge subset (Llinas et al. 2008 source records)",
     "path": "tests/fixtures/esol_solubility_challenge.json",
-    "sha256": "0864cff62467aaacf500f1c403c394f15b520c07e03f9671d9318bddaf0d6aa3",
+    "sha256": "3462c19372dab529c8f4128fcb4ddf482626a5a337093512c4a448f5928354a1",
     "n_records": 45,
     "provenance": {
       "distribution": "AqSolDB curated dataset, results/data_curated.csv",

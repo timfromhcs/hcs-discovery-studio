@@ -6,7 +6,7 @@ Generated from the checked-in measured dataset by `scripts/science/validate_esol
 
 - Dataset: AqSolDB Solubility Challenge subset (Llinas et al. 2008 source records)
 - Records evaluated: 45
-- Fixture: `tests/fixtures/esol_solubility_challenge.json` (SHA-256 `0864cff62467aaacf500f1c403c394f15b520c07e03f9671d9318bddaf0d6aa3`)
+- Fixture: `tests/fixtures/esol_solubility_challenge.json` (SHA-256 `3462c19372dab529c8f4128fcb4ddf482626a5a337093512c4a448f5928354a1`)
 - Distribution: [AqSolDB curated dataset, results/data_curated.csv](https://raw.githubusercontent.com/mcsorkun/AqSolDB/master/results/data_curated.csv), DOI 10.1038/s41597-019-0151-1, license MIT
 - Original measurements: Llinas, A.; Glen, R. C.; Goodman, J. M. (2008). Solubility Challenge: Can You Predict Solubilities of 32 Molecules Using a Database of 100 Reliable Measurements? J. Chem. Inf. Model. 48(7), 1289-1303. (DOI 10.1021/ci800058v)
 - Retrieved: 2026-10-29
