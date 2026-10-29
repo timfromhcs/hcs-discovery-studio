@@ -22,7 +22,7 @@ test or a recorded manual check; it does not mean validated science.
 | React UI | Done for shipped features | Visual QA: 17 routes × 5 widths × 2 themes, 0 automatic findings |
 | CLI/API parity | Done for shipped actions | Shared services; CLI tests |
 | Local LLM provider / Safe Research Agent | Done | Ask, Plan, Run modes with strict allowlisted tools |
-| AutoDock Vina docking | Runs; not benchmarked | Host-dependent binary; ligand PDBQT matches Meeko on 48/51 fixtures; no redocking study |
+| AutoDock Vina docking | Runs; reference-tested on one complex | Host-dependent binary; ligand PDBQT matches Meeko on 48/51 fixtures; 1IEP redocking ≤ 0.94 Å over 5 seeds, enforced in CI; not benchmarked |
 | Property estimates | Runs; weak/approximate | Reduced ESOL measured (RMSE 0.97, R² 0.07, n=45); CNS MPO approximation |
 | PubChem / ChEMBL connectors | Done | Policy-gated; mocked-transport tests; blocked by default |
 | DAG Workflows | Done | Multi-branch DAGs, Kahn topological sort, and table.join with strict-key checks |
@@ -114,7 +114,7 @@ test or a recorded manual check; it does not mean validated science.
 
 | Feature | What exists | What is missing |
 |---|---|---|
-| Docking | Vina adapter, flexible-ligand PDBQT, per-ligand status, pose SDF with bonds, receptor confinement | Redocking/pose-recovery benchmark; receptor preparation; protonation/tautomer enumeration; flexible macrocycles |
+| Docking | Vina adapter, flexible-ligand PDBQT, per-ligand status, pose SDF with bonds, receptor confinement, single-complex redocking gate | Multi-target pose-recovery benchmark; receptor preparation; protonation/tautomer enumeration; flexible macrocycles |
 | Property estimates | Reduced ESOL with measured independent-set metrics; CNS MPO approximation | Full published ESOL fit; computed ClogD/pKa; calibrated uncertainty |
 | Research agent | Ask/Plan/Run with allowlisted tools, digest-bound plans, optional local LLM for Ask | LLM-based planning; resource estimates; a UI page |
 | Auth | Static bearer token for non-loopback | No users, roles, per-project ACLs, token expiry or rotation |
@@ -142,24 +142,24 @@ test or a recorded manual check; it does not mean validated science.
 
 ## Release-gate assessment for v2.0.0
 
-Evidence below was produced on the `release/v2.0.0` branch on 2026-10-29.
+Evidence below was produced on the `release/v2.0.0` and `fix/v2-stable-gates` branches on 2026-10-29.
 
 | Gate | Status | Evidence |
 |---|---|---|
 | Lint, format, types | Pass locally and in CI | Ruff, mypy |
-| Backend tests | Pass locally and in CI | pytest with branch coverage ≥ 70% (77%) |
+| Backend tests | Pass locally and in CI | 295 pytest tests, branch coverage ≥ 70% (79%), Hypothesis properties for ranking and joins |
 | Frontend build and E2E | Pass locally and in CI | typecheck, build, 3 Playwright tests on isolated data |
-| Visual QA | Pass locally | `apps/web/scripts/visual_qa.mjs`, screenshots reviewed by hand |
+| Visual QA | Pass locally | `apps/web/scripts/visual_qa.mjs`: 16 routes × 6 widths (incl. 640 px = 200% zoom) × 2 themes, WCAG AA text contrast, heading order, keyboard focus; screenshots reviewed by hand |
 | Fresh migration and wheel | Pass locally and in CI | Wheel ships Alembic scripts and records a revision |
 | Cache provenance | Pass | Package fingerprint, detected Vina version and receptor hash in keys |
 | CodeQL, secret scan, audits, licenses | Pass in CI | Required jobs on the PR |
-| Docking reference validation | **Not met** | No redocking benchmark has been executed |
+| Docking reference validation | Pass (one complex) | 1IEP redocking: HCS preparation 0.42–0.94 Å, Vina-example control 0.29–0.37 Å, 5 seeds; CI job `science-vina` enforces ≤ 2.0 Å ([report](../validation/vina-redocking-1iep.md)) |
 | Release workflow | Hardened, untested end to end | Exact-SHA CI/CodeQL gate, draft-then-verify; first real run will be the RC |
 | Release candidate published and verified | **Not met** | No tag pushed yet |
 
-GEMINI.md requires an executed Vina redocking/reference result before Stable.
-Until that exists, `v2.0.0` can at most be published as a release candidate
-with the docking limitation stated.
+GEMINI.md required an executed Vina redocking/reference result before Stable;
+that now exists for one complex. Publishing still requires a release-candidate
+run of the release workflow and owner approval for tagging.
 
 ## Known defects and risks
 

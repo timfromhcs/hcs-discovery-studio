@@ -85,6 +85,12 @@ validity.
 - The search box, exhaustiveness and seed are user choices and change results.
 - Preparation was compared with Meeko 0.8.0 on 51 fixture ligands; that is a
   format check, not evidence of docking accuracy.
+- One redocking check: imatinib redocked into PDB 1IEP (the official Vina
+  example files) from SMILES with this preparation lands 0.42–0.94 Å from the
+  crystal pose over five seeds; the Vina authors' own preparation lands
+  0.29–0.37 Å ([report](../validation/vina-redocking-1iep.md)). CI repeats this
+  on Linux and fails above 2.0 Å. It is one holo complex: it does not measure
+  cross-docking, apo structures, other targets or affinity ranking.
 
 ## Property estimates
 
@@ -100,8 +106,9 @@ validity.
 
 ## What is not implemented
 
-- No docking benchmark: Vina runs, but no redocking or pose-recovery study has
-  been performed (see Docking above).
+- No docking benchmark: a single-complex redocking check runs in CI, but no
+  multi-target pose-recovery or virtual-screening benchmark has been performed
+  (see Docking above).
 - No molecular dynamics or free-energy calculation.
 - No learned ADMET, toxicity or activity prediction.
 - No structure prediction or co-folding.

@@ -418,6 +418,40 @@ Open: no Vina redocking benchmark has been run (requires a legally usable
 reference complex and receptor preparation). Stable is blocked on it; an RC can
 be published with the limitation stated.
 
+## Phase 11 — 2026-10-29, branch `fix/v2-stable-gates` from `556c76d`
+
+Worked through GEMINI.md again from the merged `main`.
+
+- P0 docking: added the 1IEP redocking check (official Vina example, Apache-2.0,
+  commit `bb64e5e`, SHA-256 pinned). The acceptance criterion (top pose ≤ 2.0 Å
+  for every seed, per arm) was written into the script before the first run.
+  `python scripts/science/redock_vina_reference.py --vina bin/vina.exe --gate`,
+  Vina 1.2.5 (binary SHA-256 `b5a23b22…`, identical to the official release),
+  exit 0: HCS 0.42/0.94/0.87/0.82/0.65 Å, control 0.29/0.37/0.32/0.37/0.30 Å.
+  Seed 1 reproduced exactly across two runs. New CI job `science-vina`.
+- P0 cache: staged, atomic entry publication; accounting ignores staging.
+- P0 ranking/joins: Hypothesis tests against the definition of non-dominated
+  fronts, front-limit truncation, permutation invariance, ties, constraint
+  separation, aliases and join cardinality. Found and fixed: outer join dropped
+  unkeyed right rows; single-input join nodes were accepted.
+- P0 chemistry: narrowed `except Exception` in standardisation; tests for
+  valence errors, explicit H, stereo, charges, tautomers, uncommon elements.
+- P1 connectors: PubChem's 2025 property rename meant every lookup returned no
+  structure; mocks still used the old format, so tests passed. Fixed and
+  confirmed with a live opt-in test. Policy now applies with mock transports.
+- P1 agent: digest-bound, single-use plans; CLI multi-step runs work.
+- P1 paths, ESOL domain, misleading Vina RMSD columns.
+- Visual QA extended with contrast, headings, keyboard focus and a 640 px
+  (200 % zoom) width; fixed the contrast tokens and error-page headings.
+- Local gates on Windows 11, Python 3.12.13, uv 0.12.3, Node 22.23.1: ruff,
+  mypy, 295 pytest (79.2 % coverage), typecheck, build, 3 Playwright tests,
+  wheel `hcs_discovery_studio-2.0.0-py3-none-any.whl` in a fresh venv (version,
+  db upgrade to `558a25772f08`, doctor, `/ready`, SPA), full CLI journey
+  (import 17 records/16 imported/1 duplicate, run, cache reuse of all 4 nodes,
+  manifest artifact hashes verified), 192 visual QA captures with 0 findings.
+- Not done: `actionlint` could not be run here (fetching it was not permitted);
+  the release workflow has still not run end to end.
+
 ## Blockers
 
 - None technical at the time of writing. The `v0.1.0` preview is published and

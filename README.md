@@ -52,7 +52,7 @@ prioritisation signals. Read
 |---|---|---|
 | CSV, SDF and SMILES import with row-level errors | **Available** | 16/17 demo rows imported; failures retained |
 | RDKit standardisation, descriptors and Morgan/Tanimoto similarity | **Available** | Deterministic fixture tests |
-| AutoDock Vina CPU docking | **Host-dependent** | Needs the official Vina 1.2.x binary; flexible-ligand PDBQT matches Meeko on 48/51 fixtures ([report](docs/validation/ligand-prep-meeko.md)); no redocking benchmark yet |
+| AutoDock Vina CPU docking | **Host-dependent** | Needs the official Vina 1.2.x binary; flexible-ligand PDBQT matches Meeko on 48/51 fixtures ([report](docs/validation/ligand-prep-meeko.md)); one-complex redocking check (1IEP, top pose ≤ 0.94 Å over 5 seeds, [report](docs/validation/vina-redocking-1iep.md)); not a docking benchmark |
 | Literature property estimates (ESOL, CNS MPO) | **Available** | Reduced ESOL: RMSE 0.97, R² 0.07 on 45 measured compounds ([report](docs/validation/esol-solubility.md)); CNS MPO is an approximation (cLogP for ClogD, assumed pKa) |
 | Bemis-Murcko generic scaffold splitting | **Available** | Leakage-free split validation tests |
 | PubChem & ChEMBL public data connectors | **Available** | NCBI & EBI REST search with policy-gated access |
@@ -238,9 +238,12 @@ threat model and residual risks are in
 
 ## Known limitations
 
-- **Docking is not benchmarked.** Vina runs and its ligand preparation is
-  checked against Meeko, but no redocking/pose-recovery benchmark has been run.
-  Receptors must be prepared PDBQT files under `<HCS_DATA_DIR>/receptors`.
+- **Docking is checked, not benchmarked.** Ligand preparation is compared with
+  Meeko, and CI redocks imatinib into one holo structure (PDB 1IEP) and requires
+  the top pose within 2.0 Å of the crystal pose. One complex is a regression
+  check, not evidence of accuracy on other targets, cross-docking or affinity
+  ranking. Receptors must be prepared PDBQT files under
+  `<HCS_DATA_DIR>/receptors`.
 - **Property estimates are weak.** Reduced ESOL barely beats a constant
   baseline on independent data; CNS MPO approximates ClogD and pKa. Neither
   reports a calibrated uncertainty. MD, learned ADMET and structure prediction
