@@ -99,6 +99,14 @@ intentional.
   ClogD, and an explicitly reported assumed pKa (9.0 aliphatic amines, 11.0
   amidines/guanidines) only when a basic centre is detected. It reports no
   uncertainty and is not described as a BBB-penetration probability.
+- **Release workflow could publish untested or overwrite releases.** A tag ran
+  only `pytest` before publishing and `--clobber` replaced assets of an existing
+  release. Publication now requires successful CI and CodeQL runs for the exact
+  tagged SHA, refuses existing releases, smoke-tests the installed wheel, and
+  verifies assets in a draft before publishing; only the publish job has write
+  permissions. See `docs/developer-guide/RELEASING.md`.
+- Release candidate tags (`vX.Y.Z-rc.N`) now map to PEP 440 versions
+  (`X.Y.ZrcN`); previously no candidate tag could pass the version check.
 - Docked pose SDF files now carry bonds, rebuilt from `REMARK SMILES` records
   that Vina copies into its output; previously they contained atoms only.
 
