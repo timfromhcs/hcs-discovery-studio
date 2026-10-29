@@ -269,7 +269,7 @@ jobs:
             VENV_BIN="$RUNNER_TEMP/wheel-venv/bin"
           fi
           echo "VENV_BIN=$VENV_BIN" >> "$GITHUB_ENV"
-          uv pip install --python "$VENV_BIN/python" dist/*.whl
+          uv pip install --python "$RUNNER_TEMP/wheel-venv" dist/*.whl
       - name: Smoke test the installed application
         env:
           HCS_DATA_DIR: ${{ runner.temp }}/hcs-wheel-data
