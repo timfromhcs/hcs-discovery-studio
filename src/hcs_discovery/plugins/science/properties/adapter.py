@@ -18,7 +18,7 @@ ADAPTER_ID = "science:property-predict"
 class PropertyPredictorConfig(BaseModel):
     """Configuration for learned property prediction node."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
 
     model_id: str = Field(
         default="esol_solubility",

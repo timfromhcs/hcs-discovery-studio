@@ -42,7 +42,7 @@ SCIENTIFIC_CAVEAT = (
 class VinaConfig(BaseModel):
     """Configuration for AutoDock Vina molecular docking node."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
 
     receptor_path: str = Field(
         ...,
