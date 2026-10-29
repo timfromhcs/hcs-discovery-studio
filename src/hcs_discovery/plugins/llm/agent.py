@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import re
 import uuid
+from datetime import UTC, datetime
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
@@ -66,9 +67,13 @@ class PlanResponse(BaseModel):
     expected_artifacts: list[str] = Field(default_factory=lambda: ["results.csv", "results.json"])
     scientific_limitations: list[str] = Field(default_factory=lambda: [SCIENTIFIC_CAVEAT])
     plan_hash: str = ""
+    # Set once Run mode has executed the plan. Not part of the digest: a plan is
+    # single-use, and a retry needs a new plan and a new approval.
+    executed_at: str | None = None
 
 
 PLAN_ID_PATTERN = r"^plan_[0-9a-f]{12}$"
+PLAN_DIGEST_PATTERN = r"^[0-9a-f]{64}$"
 
 
 def _plan_digest(plan: PlanResponse) -> str:
@@ -100,10 +105,28 @@ class PlanStore:
     def save(self, plan: PlanResponse) -> None:
         self.root.mkdir(parents=True, exist_ok=True)
         plan.plan_hash = _plan_digest(plan)
+        self._write(plan)
+
+    def _write(self, plan: PlanResponse) -> None:
         path = self._path(plan.plan_id)
         tmp = path.with_suffix(".json.tmp")
         tmp.write_text(plan.model_dump_json(indent=2), encoding="utf-8")
         tmp.replace(path)
+
+    def claim_for_execution(self, plan: PlanResponse) -> None:
+        """Mark a plan as executed, atomically, so two concurrent runs cannot both proceed."""
+        executed_at = datetime.now(UTC).isoformat(timespec="seconds")
+        claim = safe_join(self.root, f"{plan.plan_id}.executed")
+        try:
+            with claim.open("x", encoding="utf-8") as handle:
+                handle.write(executed_at)
+        except FileExistsError as exc:
+            raise PolicyError(
+                f"Plan '{plan.plan_id}' was already executed. Generate and approve a new plan to run it again.",
+                details={"plan_id": plan.plan_id},
+            ) from exc
+        plan.executed_at = executed_at
+        self._write(plan)
 
     def load(self, plan_id: str) -> PlanResponse:
         path = self._path(plan_id)
@@ -128,6 +151,9 @@ class AgentRequest(BaseModel):
     project_id: str | None = None
     dataset_id: str | None = None
     plan_id: str | None = Field(default=None, pattern=PLAN_ID_PATTERN)
+    # Run mode approval: the digest of the plan the human reviewed, the exact
+    # step list, or both. Every value supplied must match the stored plan.
+    approved_plan_hash: str | None = Field(default=None, pattern=PLAN_DIGEST_PATTERN)
     approved_tool_calls: list[dict[str, Any]] | None = None
 
 
@@ -171,6 +197,7 @@ class ResearchAgent:
                 session,
                 plan_id=request.plan_id,
                 approved_tool_calls=request.approved_tool_calls or [],
+                approved_plan_hash=request.approved_plan_hash,
                 project_id=request.project_id,
             )
         else:
@@ -424,10 +451,19 @@ class ResearchAgent:
         approved_tool_calls: list[dict[str, Any]],
         project_id: str | None = None,
         plan_id: str | None = None,
+        approved_plan_hash: str | None = None,
     ) -> AgentResponse:
-        """Run mode: execute only the exact steps of a previously approved plan."""
-        if not approved_tool_calls:
-            raise PolicyError("Run mode requires at least one explicitly approved tool call in 'approved_tool_calls'.")
+        """Run mode: execute only the exact steps of a previously approved plan.
+
+        The approval is the plan digest the human reviewed and/or the exact step
+        list; whatever is supplied must match the stored, integrity-checked plan.
+        A plan runs at most once.
+        """
+        if not approved_tool_calls and not approved_plan_hash:
+            raise PolicyError(
+                "Run mode requires an explicit approval: the plan digest in 'approved_plan_hash' "
+                "and/or the exact steps in 'approved_tool_calls'."
+            )
         if not plan_id:
             raise PolicyError(
                 "Run mode requires the 'plan_id' of an approved plan; ad-hoc tool execution is not permitted."
@@ -436,29 +472,46 @@ class ResearchAgent:
         plan = self._plans.load(plan_id)
         if not plan.steps:
             raise PolicyError(f"Plan '{plan_id}' contains no executable steps.")
-
-        expected = [{"tool": step.tool, "arguments": step.arguments} for step in plan.steps]
-        try:
-            provided_steps = [PlanStep.model_validate(item) for item in approved_tool_calls]
-        except PydanticValidationError as exc:
-            raise ValidationError(f"Approved tool call payload is invalid: {exc.errors()}") from exc
-
-        if len(provided_steps) != len(expected):
+        if plan.executed_at is not None:
             raise PolicyError(
-                "Approved tool calls do not match the plan: expected "
-                f"{len(expected)} step(s), received {len(provided_steps)}.",
+                f"Plan '{plan_id}' was already executed at {plan.executed_at}. Generate and approve a new plan "
+                "to run it again.",
+                details={"plan_id": plan_id, "executed_at": plan.executed_at},
+            )
+        if approved_plan_hash is not None and approved_plan_hash != plan.plan_hash:
+            raise PolicyError(
+                "The approved plan digest does not match the stored plan; the plan changed after it was reviewed.",
                 details={"plan_id": plan_id},
             )
-        for index, (provided, wanted) in enumerate(zip(provided_steps, expected, strict=True)):
-            if provided.tool != wanted["tool"] or provided.arguments != wanted["arguments"]:
+
+        expected = [{"tool": step.tool, "arguments": step.arguments} for step in plan.steps]
+        if approved_tool_calls:
+            try:
+                provided_steps = [PlanStep.model_validate(item) for item in approved_tool_calls]
+            except PydanticValidationError as exc:
+                raise ValidationError(f"Approved tool call payload is invalid: {exc.errors()}") from exc
+
+            if len(provided_steps) != len(expected):
                 raise PolicyError(
-                    f"Approved tool call {index + 1} does not match the plan; it was mutated or reordered.",
-                    details={
-                        "plan_id": plan_id,
-                        "expected_tool": wanted["tool"],
-                        "provided_tool": provided.tool,
-                    },
+                    "Approved tool calls do not match the plan: expected "
+                    f"{len(expected)} step(s), received {len(provided_steps)}.",
+                    details={"plan_id": plan_id},
                 )
+            for index, (provided, wanted) in enumerate(zip(provided_steps, expected, strict=True)):
+                if provided.tool != wanted["tool"] or provided.arguments != wanted["arguments"]:
+                    raise PolicyError(
+                        f"Approved tool call {index + 1} does not match the plan; it was mutated or reordered.",
+                        details={
+                            "plan_id": plan_id,
+                            "expected_tool": wanted["tool"],
+                            "provided_tool": provided.tool,
+                        },
+                    )
+        else:
+            provided_steps = list(plan.steps)
+
+        # Consume the plan before any side effect, so a crash mid-run cannot be replayed.
+        self._plans.claim_for_execution(plan)
 
         executed_tools: list[dict[str, Any]] = []
         submitted_run_id: str | None = None

@@ -14,6 +14,7 @@ from typing import Any
 
 import typer
 import uvicorn
+from pydantic import ValidationError as PydanticValidationError
 from sqlalchemy import select
 
 from .. import CREDIT, PRODUCT_NAME, __version__
@@ -1044,33 +1045,31 @@ def agent_plan_cmd(
 def agent_run_cmd(
     ctx: typer.Context,
     prompt: str = typer.Argument(..., help="Execution instructions."),
-    plan_id: str = typer.Option(..., "--plan-id", help="Approved plan id returned by 'agent plan'."),
-    tool: str = typer.Option(..., "--tool", "-t", help="Allowlisted tool name to execute."),
-    args: str = typer.Option("{}", "--args", "-a", help="JSON dictionary of tool arguments."),
-    approve: bool = typer.Option(False, "--approve", help="Explicit human approval confirmation for tool execution."),
+    plan_id: str = typer.Option(..., "--plan-id", help="Plan id returned by 'agent plan'."),
+    plan_digest: str = typer.Option(
+        ..., "--plan-digest", help="Digest of the reviewed plan, as printed by 'agent plan'."
+    ),
+    approve: bool = typer.Option(False, "--approve", help="Explicit human approval to execute every plan step."),
     project_id: str | None = typer.Option(None, "--project-id", "-p", help="Optional project context."),
 ) -> None:
-    """Run mode: execute the exact approved steps of a saved plan."""
+    """Run mode: execute every step of a saved plan, bound to the digest you reviewed."""
     settings = get_settings()
     from ..plugins.llm.agent import AgentRequest, ResearchAgent
 
     if not approve:
         _fail(ValidationError("Execution refused: pass '--approve' to explicitly confirm tool execution."))
 
-    try:
-        parsed_args = json.loads(args)
-    except json.JSONDecodeError as exc:
-        _fail(ValidationError(f"Invalid JSON in --args: {exc}"))
-
-    tool_call = {"tool": tool, "arguments": parsed_args}
     agent = ResearchAgent(settings=settings)
-    req = AgentRequest(
-        mode="run",
-        prompt=prompt,
-        project_id=project_id,
-        plan_id=plan_id,
-        approved_tool_calls=[tool_call],
-    )
+    try:
+        req = AgentRequest(
+            mode="run",
+            prompt=prompt,
+            project_id=project_id,
+            plan_id=plan_id,
+            approved_plan_hash=plan_digest,
+        )
+    except PydanticValidationError as exc:
+        _fail(ValidationError(f"Invalid run request: {exc.errors(include_url=False)}"))
     with get_session_factory(settings)() as session:
         try:
             resp = agent.handle(req, session=session)
