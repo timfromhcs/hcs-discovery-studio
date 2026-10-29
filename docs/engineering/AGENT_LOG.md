@@ -389,6 +389,35 @@ smoke test. Defects found and fixed:
   release that does not exist (and linked to it with a broken relative URL).
   Status now says release candidate; cloud CI and publication are outstanding.
 
+## 2026-10-29 — Phase 10: GEMINI.md P0/P1 work on `release/v2.0.0`
+
+Each item has a commit on the branch with tests that fail without the fix.
+
+- CI on PR timfromhcs/hcs-discovery-studio#4: the ESOL report recorded the hash
+  of a CRLF working copy (fixed by regenerating from the LF bytes); CodeQL
+  py/path-injection on agent plan ids (safe_join now uses realpath + prefix).
+- Cache keys: package fingerprint, detected Vina version and receptor SHA-256.
+  A replaced receptor previously reused stale docking results.
+- Receptor paths confined to `<data_dir>/receptors` unless the operator opts in.
+- Ligand PDBQT had no torsion tree (all atoms in ROOT). New preparation matches
+  Meeko 0.8.0 on 48/51 fixture ligands; 3 differ only by rigid 7+-rings. Root
+  causes found on the way: MMFF setup rewrites RDKit aromaticity flags, and
+  Meeko picks the root before folding terminal atoms.
+- NaN/Infinity rejected in every node config (Vina accepted NaN box centres).
+- CNS MPO used invented ClogD/pKa proxies and a fixed uncertainty; replaced by a
+  labelled approximation with exact Wager functions.
+- Release workflow: exact-SHA CI/CodeQL gate, no release modification, wheel
+  smoke test, draft-then-verify. RC tags now map to PEP 440.
+- Visual QA sweep (170 captures): className override in Input/Select/Textarea,
+  unlabeled Node ID field, 320 px overflow, hidden editor table actions,
+  flex `<td>` misalignment.
+- Agent Ask hid provider failures; responses now state their source.
+- Documentation reconciled with the above.
+
+Open: no Vina redocking benchmark has been run (requires a legally usable
+reference complex and receptor preparation). Stable is blocked on it; an RC can
+be published with the limitation stated.
+
 ## Blockers
 
 - None technical at the time of writing. The `v0.1.0` preview is published and

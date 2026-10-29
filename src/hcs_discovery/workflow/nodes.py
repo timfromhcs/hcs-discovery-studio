@@ -908,7 +908,7 @@ def register_builtin_nodes(registry: NodeRegistry) -> None:
     registry.register(
         NodeDefinition(
             type="predict.property",
-            title="Learned property prediction",
+            title="Property estimate (literature models)",
             category="properties",
             version="1.0.0",
             description="Literature-derived property estimates: reduced ESOL logS and a CNS MPO approximation.",
