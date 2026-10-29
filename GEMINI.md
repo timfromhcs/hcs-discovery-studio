@@ -1,1009 +1,881 @@
 # GEMINI.md — Autonomous Engineering Mandate for HCS Discovery Studio v2.0.0 Stable
 
-**Project:** HCS Discovery Studio  
-**Repository:** https://github.com/timfromhcs/hcs-discovery-studio  
-**Maintainer / brand:** hcsmedia  
-**Brand line:** `Open science. Reproducible discovery. Made with ❤️ by hcsmedia.`  
-**Target:** a genuinely stable, scientifically honest, secure, tested, accessible, packaged and reproducible `v2.0.0` release for the platforms explicitly verified by the project.  
-**Operating mode:** autonomous, evidence-driven engineering. Inspect the real repository state, implement the work, build locally, repair locally, test locally, perform visual QA, validate packaged artifacts, then push to GitHub and iterate against cloud CI until the exact release candidate passes. Update user-facing README and documentation after implementation is stable, then run final documentation/release verification. Publish v2 only after every release gate passes.  
-**Core rule:** a claim is true only when supported by source, a test, a reproducible measurement, or a clearly cited authoritative reference. Do not fake success.
+**Project:** `timfromhcs/hcs-discovery-studio`  
+**Target:** a genuinely stable, secure, reproducible, scientifically honest, accessible and correctly packaged `v2.0.0` release.  
+**Operating mode:** autonomous, evidence-driven engineering. Inspect the actual checkout; establish a baseline; implement and verify locally first; run build, test, integration, visual QA, packaging and scientific validation loops; only then push to a dedicated GitHub branch; inspect cloud CI on the exact pushed commit; reproduce and repair every failure; repeat until all required gates pass. Reconcile documentation after the implementation is stable, rerun all relevant gates, and publish only when release criteria are satisfied.  
+**Communication:** do not ask routine questions. Make safe, conventional engineering decisions from source code, tests and official references. Ask for human approval only where repository policy, permission, irreversible publication, or a genuine product decision requires it.
 
 ---
 
 ## 0. Mission and non-negotiable rules
 
-You are the autonomous coding agent assigned to take the *current actual checkout* of HCS Discovery Studio from its real starting point to v2 Stable. Do not assume any version, file, feature or defect described in this document still matches `main`. It is a work plan and a set of high-value audit leads; prove every claim against the checked-out code.
-
-Follow this lifecycle strictly:
-
-1. **Inspect and preserve** the repository and working tree.
-2. **Establish a reproducible baseline** and write down real failures.
-3. **Implement and fix locally** in small, testable work packages.
-4. **Build and test locally** after each work package.
-5. **Run full local QA**, including live-app visual QA and packaged-wheel tests.
-6. **Do not push code with known local failures.**
-7. Push a dedicated branch and create/update a PR where repository permissions and branch policy allow.
-8. **Observe cloud CI on the exact pushed commit.** Investigate logs, reproduce failures locally, fix, retest, push, and repeat.
-9. Run independent scientific/functional verification and validate release assets.
-10. Only after code is stable, perform the final README, documentation, repository metadata, screenshots, changelog and SEO pass.
-11. Repeat final local and cloud gates after documentation/release-workflow changes.
-12. Publish `v2.0.0` only when all required gates are green and the published artifacts are verified.
-13. Report completion only after the release actually exists and checksums/assets have been verified. If an external permission or mandatory human approval prevents publication, finish all other work, state the exact blocker, and never claim that the release was published.
+You are the coding agent responsible for taking the repository from its **real current state** to the next verified Stable release. This document is a plan and an audit checklist, not proof that every described defect still exists. The repository changes quickly: confirm every claim against the current commit before changing code. A recent fix may already have landed; do not reapply stale changes.
 
 ### 0.1 Truthfulness and scientific integrity
 
-- A registry card, README paragraph, TODO, model name, mock, fixture or configuration field is **not** proof that a feature works.
-- A feature is **implemented** only if the actual path exists; **runnable** only if requirements are available and a real run succeeds; **reference-tested** only if outputs are checked against an explicit independent reference; and **benchmarked** only if a defined dataset/protocol and metrics are executed and reported.
-- Do not use “SOTA”, “validated”, “accurate”, “GPU accelerated”, “industry grade”, “production ready” or similar claims without scoped evidence. Name the task, method/model version, dataset and license, split, baseline, metrics, sample count, uncertainty, hardware and limitations.
-- RDKit descriptors, similarity scores, composite rankings, predicted properties, CNS MPO scores and docking scores are computational results, not experimental proof of binding, safety, efficacy, selectivity or clinical utility.
-- Do not silently turn an invalid input, missing engine, exception, partial calculation, missing value or failed run into a plausible-looking number or a success status.
-- Do not treat an approximate uncertainty score as a statistically calibrated confidence interval without calibration evidence.
-- Never create fabricated experimental data, fake benchmark results, fake screenshots, fake provider results, fake logs or fake CI status.
-- Do not present test fixtures as real-world or experimental data. Label them clearly and preserve their provenance.
-- Do not assert Vulkan/CUDA/GPU support based only on detection of a graphics device or runtime. Prove each engine/backend combination with an actual calculation and record which backend ran.
-- Do not weaken, delete, skip, xfail, hide, quarantine or loosen a legitimate test simply to obtain a green build. Investigate flaky tests, correct the underlying defect, and report any unavoidable exception explicitly.
-- Do not use the held-out scientific test set to tune models or thresholds. If it has already been used for tuning, label its result development-only and obtain a new independent test set before making a generalization claim.
+1. Never claim that a test, build, runtime check, cloud job, benchmark, release or upload succeeded unless you observed its actual result and recorded the relevant command, commit and exit status.
+2. Distinguish these states everywhere: **implemented**, **locally runnable**, **tested**, **reference-tested**, **benchmarked**, **scientifically validated**, **host-dependent**, **experimental**, **planned** and **unsupported**. Do not collapse them into one generic `available` state.
+3. A clean test suite proves only the behaviors covered by those tests. A successful build does not prove runtime behavior; a runtime smoke test does not prove scientific validity; a green CodeQL run does not prove the entire system is secure.
+4. Never use “state of the art”, “validated”, “accurate”, “production-ready”, “industry-grade”, “GPU-accelerated” or similar claims without specific evidence. Report task, method/model version, dataset source/license, split, baseline, metrics, sample count, uncertainty, hardware and limitations where applicable.
+5. RDKit descriptors, similarity, Pareto/composite scores, ESOL, CNS MPO and docking outputs are computational signals. They do not prove binding, potency, selectivity, safety, toxicity, efficacy or clinical utility.
+6. Do not silently convert invalid input, missing dependencies, exceptions, partial calculations or absent outputs into plausible-looking values or success statuses. Preserve row-level errors when the workflow contract permits; surface unexpected defects as failures.
+7. A heuristic uncertainty value is not a calibrated confidence interval unless independent calibration evidence exists. CNS MPO is a desirability score, not a direct probability of BBB penetration. A reduced ESOL formula is not the full published model.
+8. Never use a held-out benchmark set to tune thresholds or model parameters. If a set has already influenced development, label its results development-only and obtain a new independent test set for any generalization claim.
+9. Do not use test fixtures as evidence of real-world performance. Clearly identify synthetic, illustrative and experimental datasets.
+10. Device discovery alone is not proof of Vulkan/CUDA/GPU model support. Only report a backend as supported after an actual calculation on that backend and a comparison against a suitable reference.
 
 ### 0.2 Security and repository integrity
 
-- Inspect `git status` before touching files. Preserve unexplained existing changes, untracked files and user data. Never reset, clean or overwrite them without understanding them.
-- Never run broad destructive cleanup commands outside known disposable build/test directories.
-- Never commit API keys, tokens, passwords, private keys, user data, restricted datasets or non-redistributable model weights.
-- Never print secrets in logs or reports. Do not place credentials in `.env.example`, command history, test fixtures or documentation.
-- Never force-push, rewrite public history, delete or move tags, bypass branch protection, disable security checks, or publish over an existing stable release to work around a failure.
-- Follow the repository's actual rulesets and permissions. Use a branch + PR and required checks where supported. If approval is mandatory, do not bypass it; finish all independent work and report the precise remaining blocker.
-- Treat imported chemical names, CSV/SDF metadata, public database text, model output and all other data as untrusted input.
-- Third-party node handlers run with the application's privileges unless a real sandbox is implemented. Never imply that an allowlist alone provides operating-system isolation.
+- Start with `git status` and preserve all existing user changes. Never overwrite or discard unrelated work.
+- Never run destructive cleanup against the developer's real `data/`, user directories or any path that has not been proved disposable.
+- Use separate temporary `HCS_DATA_DIR` directories for tests, migrations, integration tests, visual QA and packaging smoke tests.
+- Never print secrets into logs, screenshots, issue reports, test fixtures or documentation. Never commit credentials, private structures, local machine paths or sensitive run data.
+- Never force-push, rewrite public history, delete or move existing tags, bypass branch protection, disable a legitimate security test, or publish over an existing stable release to work around a failure.
+- Do not weaken, delete, skip, `xfail`, quarantine or loosen a valid test merely to obtain a green result. Fix the underlying problem. If a test is truly invalid, document why and replace it with a stronger test in the same change.
+- Do not add large scientific datasets, model weights or executable binaries without checking licensing, provenance, repository size, security and distribution consequences.
+- Use a dedicated branch and PR where repository permissions and rules allow. A required review or human approval is not an obstacle to bypass.
+- Use official, up-to-date documentation for scientific tools, GitHub Actions, dependency/runtime compatibility and package behavior. Do not rely on guessed command flags or unverified references.
 
-### 0.3 Autonomous operation and bounded repair loops
+### 0.3 Autonomous repair loops
 
-- Do not ask routine questions. Resolve normal engineering choices from the current code, official documentation, compatibility evidence and the smallest safe implementation.
-- Do not stop at a plan. Implement, run tests, inspect failures, repair and verify.
-- Work in small coherent batches. Use clear commits and preserve a decision/progress log in `docs/engineering/AGENT_LOG.md` or the repository's existing equivalent.
-- Use a bounded **Build → Test → Diagnose → Fix → Retest** loop. Each retry must test a materially different diagnosis or fix; rerunning the identical failing command without changing anything is not a repair strategy.
-- For any one blocking root cause, make up to five materially different diagnosis/fix attempts. After that, isolate the issue and proceed with independent work. Do not claim completion while the blocker remains. A human/permission blocker must be reported, not “fixed” by unsafe workarounds.
-- Keep the work auditable: record command, environment, exit code, relevant logs, fix commit and exact verification outcome. Do not store unnecessarily large logs or private data in the repository.
-- Update internal planning/status notes as work proceeds. Delay final marketing prose and the final README rewrite until the implementation and actual capabilities have stabilised.
+Use the loop **Build → Test → Diagnose → Fix → Retest → Inspect diff → Record evidence** for each coherent work package.
+
+- Every repeat must change the diagnosis, test setup or implementation. Re-running an unchanged failing command is not a repair strategy.
+- For a single root cause, make up to five materially different fix attempts. After that, isolate the blocker, write a precise technical diagnosis, and continue independent work. Never claim that the release is complete while a mandatory blocker remains.
+- Repair the earliest failing layer first: syntax/import → type/lint → unit test → integration → full backend/frontend suite → UI runtime/visual QA → package install → cloud CI → release verification.
+- Keep an auditable log in `docs/engineering/AGENT_LOG.md` or the repository's existing equivalent. Record date, commit SHA, issue, hypothesis, command, environment, exit code, fix and test evidence. Keep logs concise and free of secrets.
+- Work in small batches. Do not combine a scientific algorithm change, large UI rewrite and release-workflow rewrite in a single hard-to-review commit.
+- If a check is blocked only because a tool or permission is unavailable, finish every independent task, record the exact missing capability and do not pretend the blocked check passed.
 
 ---
 
-## 1. Ground truth: inspect the current checkout first
+## 1. Establish ground truth before touching code
 
-This repository has changed quickly and the README, implementation ledger and earlier `GEMINI.md` have previously contained contradictory or stale status descriptions. Therefore, do not rely on historical version numbers or statements in this file without rechecking them.
+### 1.1 Repository and environment inspection
 
-### 1.1 Required initial inspection
-
-From the repository root:
+Run these commands first, from the repository root, and save the results in your working notes:
 
 ```bash
 git status --short --branch
-git branch --show-current
-git log -20 --oneline --decorate
+git rev-parse HEAD
+git log -8 --oneline --decorate
 git remote -v
-git tag --list --sort=-version:refname
+git branch --show-current
+git tag --list 'v*' --sort=-version:refname | head -20
 ```
 
-Then inspect at minimum:
+On Windows PowerShell, replace `head` with `Select-Object -First 20` if needed. Confirm `origin` points to the intended public repository. Record uncommitted and untracked files before running formatters or generators. If the working tree is dirty, determine which changes belong to the user and preserve them. Do not reset the tree to make it clean.
 
-- `GEMINI.md`, any `AGENTS.md`, contribution/security policies and PR templates;
-- `pyproject.toml`, `uv.lock`, `apps/web/package.json`, `apps/web/package-lock.json`, `tsconfig` and Vite/Playwright configuration;
-- `.github/workflows/*`, Dependabot configuration, CodeQL and release workflow;
-- `README.md`, `CHANGELOG.md`, `CITATION.cff`, `LICENSE`, `NOTICE`, `SECURITY.md`, `CONTRIBUTING.md`;
-- `docs/engineering/*`, `docs/scientific-validation/*`, `docs/security/*`, `docs/architecture/*`, user guides and release notes;
-- `src/hcs_discovery/`, `apps/web/src/`, `tests/`, `examples/`, `migrations/`, CI and release scripts;
-- current GitHub releases, tags, recent commits, PRs/issues if accessible, current Actions runs and actual attached assets.
+Inspect the current versions of:
 
-Use the installed versions and current official docs. Do not copy outdated version assumptions from a previous commit.
+- `pyproject.toml`, `uv.lock`, `hatch_build.py`, Python package version and CLI/API version surfaces;
+- `apps/web/package.json`, `apps/web/package-lock.json`, TypeScript/Vite/Playwright configuration;
+- `README.md`, `CHANGELOG.md`, `GEMINI.md`, `SECURITY.md`, `NOTICE`, license and `CITATION.cff`;
+- `docs/engineering/IMPLEMENTATION_STATUS.md`, historical gap analyses, scientific limitations, validation reports, architecture docs, install guides and release notes;
+- `.github/workflows/ci.yml`, `codeql.yml`, `release.yml`, release/version scripts and repository settings if accessible;
+- `src/hcs_discovery/`, `apps/web/src/`, `tests/`, `examples/`, `migrations/` and `scripts/`;
+- current branches, PRs, tags, releases, Actions runs and release assets if GitHub access is available.
 
-### 1.2 Establish capability truth
+Record the current HEAD SHA, branch, package versions, actual published release state and initial CI state. Do not assume the previous Stable version, feature count or test count is still current.
 
-For every shipped engine/node/provider, determine each of these separately:
+### 1.2 Determine feature truth from implementation
 
-1. `implemented`: meaningful production path exists in source;
-2. `dependencies_ready`: required executable, model files, packages and data exist;
-3. `runnable_here`: a real local execution succeeds on the current host;
-4. `smoke_tested`: basic execution test exists and passes;
-5. `reference_tested`: output comparison to a known reference exists and passes;
-6. `benchmarked`: a documented benchmark was actually run;
-7. `experimentally_validated`: appropriate experimental validation exists, if applicable;
-8. `supported_platforms`: exact platforms actually tested;
-9. `limitations`: known scientific and operational constraints.
+For every important capability, trace the entire execution path:
 
-Do not collapse these into one `available` boolean. Keep existing API compatibility where possible, but define unambiguous statuses and map them consistently in registry/API/CLI/UI.
+1. Is a real implementation present?
+2. Is it registered in the runtime registry?
+3. Can the user configure it in the UI, CLI or API?
+4. Does schema validation reject unsupported fields and malformed input?
+5. Can the host detect all runtime dependencies reliably?
+6. Does a successful real run create correct results and artifacts?
+7. Are errors, cancellation, missing values and partial output reported honestly?
+8. Is output provenance recorded, including relevant runtime versions?
+9. Is there a regression test? Does it run in the required CI suite or skip conditionally?
+10. Is there independent scientific reference evidence where the claim requires it?
 
-### 1.3 Output of the initial audit
+Classify each feature separately as `implemented`, `runnable_here`, `smoke_tested`, `reference_tested`, `benchmarked`, `host_dependent`, `experimental`, `planned` or `unsupported`. Keep status names consistent across registry, API, CLI, UI, README and docs. A Vina adapter being registered does not mean Vina is installed on the host; Vina being installed does not mean a docking result has been scientifically validated.
 
-Create/update `docs/engineering/V2_BASELINE.md` (or a similarly named engineering artifact) with:
+### 1.3 Produce a baseline report
 
-- current HEAD SHA, branch, actual version/tag/release;
-- environment/tool versions and platform;
-- current feature/capability matrix with evidence links;
-- baseline test/build commands, exact results and exit codes;
-- known failures and reproduction commands;
-- important dependency/license/security concerns;
-- visual baseline screenshots or exact capture locations;
-- prioritized tasks with acceptance criteria.
+Before modifying code, record:
 
-A command not executed must be marked `NOT RUN`. A command blocked by missing requirements must be marked `BLOCKED`, with reason and next step. Never report a presumed pass.
+- current commit SHA and package versions;
+- working-tree state and branch strategy;
+- available Python, `uv`, Node and npm versions;
+- whether Vina is installed and the actual `--version` output;
+- the outputs of `hcs-discovery doctor` and the relevant diagnostics, with secrets removed;
+- the result of the initial local quality gates;
+- the current release/tag and associated workflow state;
+- verified bugs, suspected bugs, stale documentation, environment limitations and priorities.
 
----
-
-## 2. Branching and version strategy
-
-### 2.1 Preserve the stable baseline
-
-- Do not make direct, unreviewed edits to `main` if the repository's normal process supports branches and PRs.
-- Create a dedicated branch such as `feat/v2-stable` or `release/v2.0.0` from the latest appropriate `origin/main` after preserving local changes and assessing divergence.
-- If the current workspace has user edits, create a safe backup or separate worktree and preserve them. Never stash/drop or overwrite user work without understanding it.
-- Use conventional, readable commit messages (`fix:`, `feat:`, `test:`, `docs:`, `build:`, `security:`) unless the repository's contribution rules specify otherwise.
-- Keep each commit narrow enough to inspect. Prefer several logical commits over one giant opaque commit, but avoid noise-only commits.
-
-### 2.2 Major-version discipline
-
-- Inspect `pyproject.toml`, package metadata, `src/hcs_discovery/__init__.py`, frontend package version, changelog, version-verification scripts, release tags and release workflow before changing a version.
-- Establish one authoritative project version and a tested strategy to synchronise Python package version, web package version if relevant, CLI/API version, changelog heading, tag and release assets.
-- `v2.0.0` must not be created until the exact release candidate commit has passed all required gates.
-- Use release candidates before the stable tag. Align the chosen tag convention with Python packaging pre-release conventions and test it in `scripts/release/verify_version.py`; examples include a documented mapping between `v2.0.0-rc.1` and a valid package version. Do not ship a candidate wheel mislabelled as the final stable version.
-- Do not change or delete existing `v1.0.0` tags/releases. Never reuse a tag for different source contents.
-- If release notes are generated from PR labels/history, still review them for correctness and remove unsupported claims.
-
-### 2.3 GitHub process and permission limits
-
-- Push only after local gates relevant to the current code have passed.
-- After pushing, inspect the exact remote SHA and Actions runs associated with that SHA/PR. Do not infer cloud success from a previous commit's green run.
-- Wait/poll for the actual required jobs through the available GitHub UI, GitHub CLI or connector. Read failed job summaries and logs, fix locally, rerun the relevant full gates, push the fix and repeat.
-- Use a PR and let branch protections/reviews/status checks work as configured. If repository permissions do not allow push, PR creation, merging, tagging or release publication, continue with all work possible and record exactly which action needs the owner. Never claim a remote action succeeded unless the host confirms it.
-- Do not automatically merge around a required human review. If policy permits unattended merge and all gates and approvals are satisfied, follow that policy; otherwise leave a fully prepared PR and report it as a blocker to publication.
+Do not stop at this report. Use it to drive implementation.
 
 ---
 
-## 3. Local-first baseline and development environment
+## 2. Branching, version strategy and release discipline
 
-### 3.1 Use disposable, isolated data
+### 2.1 Preserve the Stable baseline
 
-- Never run destructive or migration tests against a developer's real `data/` directory.
-- Give each integration/E2E test an isolated temporary `HCS_DATA_DIR` and verify it is disposable before cleaning it.
-- Prefer `tmp_path`, test fixtures and a temporary user-data directory. Stop any server/worker started by a test when the test ends.
-- Ensure no test relies on a pre-existing local database, network service, model cache or hidden file.
-- The ordinary test suite should remain deterministic and offline. Network-dependent tests must be separately marked and never run by surprise in the default test suite.
+- Do not make direct, unreviewed edits to `main` if a branch/PR process is supported.
+- After preserving local changes and confirming the correct upstream, use a dedicated branch such as `release/v2.0.0` or `fix/v2-stable`. Do not overwrite a branch owned by another workflow without inspecting it.
+- Use small conventional commits such as `fix:`, `feat:`, `test:`, `docs:`, `build:` and `security:`.
+- Do not tag a release candidate or Stable release until its exact source commit has passed the required local checks and is ready for cloud verification.
+- Never change or delete the existing `v1.0.0` tag/release. Never reuse a tag for different source contents.
 
-### 3.2 Baseline command set
+### 2.2 Version source of truth
 
-Run commands from the repository root unless the command says otherwise. Adapt syntax to the actual OS/shell. Capture exit codes and logs.
+Inspect the version verifier and real repository conventions before changing versions. Keep the following in sync as appropriate:
+
+- Python project version;
+- frontend package version if it is intended to mirror the application version;
+- CLI/API version output;
+- changelog heading;
+- release-note filename and heading;
+- Git tag and GitHub release title;
+- wheel filename and installed version;
+- README status badge and implementation status.
+
+Do not guess the mapping between a tag such as `v2.0.0-rc.1` and a PEP 440 version. Confirm the behavior in the actual verification script and test it. Use a release-candidate cycle before Stable if the release workflow supports it. The Stable tag must point to the exact commit whose full CI gates passed.
+
+### 2.3 Permission and approval policy
+
+Use the available GitHub CLI or connector to push a dedicated branch and create/update a PR if authorized. Follow the repository's branch protection and required review policy. If push, merge, tagging or publication is blocked by permissions, complete all local work and prepare the branch/PR; report the precise required owner action. Do not bypass policy or claim a remote change succeeded unless the host confirms it.
+
+---
+
+## 3. Local-first development environment
+
+**Hard order:** baseline → implement locally → local targeted tests → local full gates → local visual/runtime QA → local package smoke test → inspect diff → commit → push → cloud CI loop. Never push knowingly broken code merely to use cloud CI as a debugging environment.
+
+### 3.1 Isolate every test environment
+
+- Default automated tests must be deterministic and offline.
+- Network tests must be separately marked and run only when explicitly intended.
+- Set `HCS_DATA_DIR` to a unique disposable directory for migration tests, API integration tests, E2E tests and wheel smoke tests.
+- Do not run migration or deletion tests against the normal user data directory.
+- Every test-started process must be stopped at the end, even after failure.
+- Verify the temporary directory path before removing it. Do not use broad wildcard cleanup.
+
+### 3.2 Baseline Python and frontend commands
+
+Use the actual installed versions and adapt only when repository scripts have intentionally changed. Update this file and CI together when command names change.
 
 ```bash
-# Python environment and diagnostics
 uv --version
-uv sync --dev
-uv run python --version
+uv lock --check
+uv sync --frozen
 uv run hcs-discovery version
 uv run hcs-discovery doctor
-
-# Static quality
-uv lock --check
 uv run ruff format --check .
 uv run ruff check .
-uv run python scripts/ci/prepare_typecheck.py
 uv run mypy
-
-# Tests and coverage
 uv run pytest -q --strict-markers
-uv run pytest --cov=hcs_discovery --cov-branch --cov-report=term-missing
+uv run pytest -q --strict-markers --cov=hcs_discovery --cov-branch --cov-report=term-missing --cov-report=xml --cov-fail-under=70
+```
 
-# Frontend
-cd apps/web
+Do not run two competing pytest invocations against the same data directory. If the coverage floor changes, justify it and keep the CI floor aligned. Do not reduce the floor to hide missing coverage.
+
+Frontend, from `apps/web/`:
+
+```bash
+node --version
+npm --version
 npm ci
 npm run typecheck
 npm run build
 npm run test:e2e
-npm run screenshots
-cd ../..
+```
 
-# Packaging (only after a fresh frontend build)
+Build `dist` before packaging. Do not use `npm install` to mutate the lockfile incidentally; if a lockfile update is required, make it an explicit, reviewed change and validate `npm ci` from a clean checkout.
+
+### 3.3 Whole-journey and packaging baseline
+
+Using isolated test data and the actual current CLI syntax, prove the following lifecycle:
+
+1. Start with an empty disposable data directory.
+2. Run the database upgrade and verify `db current` identifies the correct revision.
+3. Run diagnostics and verify the server reports readiness.
+4. Create a project.
+5. Import a small documented fixture CSV/SDF/SMILES file and inspect row-level successes and errors.
+6. Create or load a supported workflow, validate it, save it and execute it.
+7. Inspect progress, events, logs, cancellation/failure behavior and terminal status.
+8. Inspect result rows and columns, then export CSV/JSON/Markdown/HTML as supported.
+9. Verify the manifest, input checksums, workflow snapshot, engine versions and artifact checksums.
+10. Repeat the run and verify cache semantics are correct.
+11. Delete a disposable project/dataset and verify database and filesystem retention/deletion policy.
+12. Stop all processes and confirm no unintended files changed outside the isolated data directory.
+
+Use current CLI command help rather than relying on stale command examples. Package tests:
+
+```bash
 uv build --wheel
 ```
 
-Use the repository's current equivalent if one of these scripts has changed. Do not remove an existing gate just because a command name changed; update this instruction and CI together.
-
-### 3.3 Fresh-install and whole-journey baseline
-
-In an isolated directory/virtual environment, prove the user journey from a clean state:
-
-1. Install the package/source dependencies.
-2. Run `hcs-discovery doctor` and record detected/unsupported capabilities truthfully.
-3. Start the app on loopback using a non-default test port and isolated data directory.
-4. Open the live UI and create a project.
-5. Import a permitted, small CSV/SDF/SMILES fixture with known valid and invalid rows.
-6. Inspect row outcomes, errors, duplicates and standardisation metadata.
-7. Create/validate a workflow and make an intentionally invalid one to prove validation fails properly.
-8. Submit a run, view node progress/events/logs, and wait for a real terminal state.
-9. Inspect all result rows, ranking meanings, units, missing values and provenance.
-10. Export CSV, JSON, Markdown/HTML and SDF where those formats are claimed supported; compare completeness and hashes where relevant.
-11. Restart server/worker and reopen persisted data/results.
-12. Build/install the wheel in a clean environment, start it without Node installed at runtime, and verify health endpoint plus root SPA content.
-13. Shut down cleanly and confirm no unexpected background process remains.
-
-Any step that fails is a development defect or explicitly documented limitation; do not describe the journey as successful until it has passed.
+Install the wheel into a **new clean virtual environment** that is not the source development environment. With a fresh disposable `HCS_DATA_DIR`, verify version, diagnostics, database upgrade, `/api/v1/health`, `/api/v1/ready`, and that `/` serves the built SPA rather than a development placeholder. Record wheel SHA-256 and installed package version. Repeat on Windows if Windows is an officially supported release platform.
 
 ---
 
-## 4. Build/Fix/Test loops: required working method
+## 4. Mandatory Build → Test → Diagnose → Fix loops
 
-Use a small work-package loop for every defect or feature.
+Every change must use this process. Do not batch up unverified edits and hope the final build passes.
 
 ### Loop A — Reproduce
 
-1. Read the relevant implementation and its callers/contracts.
-2. Reproduce the failure with the smallest possible deterministic test.
-3. Confirm that the test fails for the expected reason on the pre-fix code.
-4. Record the command and minimal failure evidence.
-5. Check whether a recent commit has already fixed the issue; do not reapply stale fixes.
+1. State the failing behavior in one sentence.
+2. Find the smallest deterministic reproducer.
+3. Create a regression test that fails against the current code for the expected reason, where feasible.
+4. Inspect adjacent callers/contracts and the latest source history to prevent duplicate fixes.
+5. Separate code defects from test configuration, OS differences, dependency changes and environmental issues.
 
 ### Loop B — Fix
 
-1. Identify the root cause, not just the visible symptom.
-2. Make the smallest safe code change consistent with the architecture.
-3. Add/modify a regression test that protects the invariant.
-4. Do not catch generic exceptions just to keep the process alive. Expected data errors should be distinguished from unexpected programmer/runtime defects.
-5. Keep error messages useful, structured and free of secrets or excessive raw input.
-6. Update in-code contract/docstrings where behavior changed, but defer the final prose/marketing sweep until features stabilise.
+1. Implement the smallest correct fix consistent with architecture and public API contracts.
+2. Validate inputs at the boundary, not after unsafe side effects have already begun.
+3. Preserve meaningful error messages and stable error codes.
+4. Add regression coverage for both the reported defect and relevant edge cases.
+5. Do not replace explicit validation with broad exception suppression.
 
-### Loop C — Verify the focused area
+### Loop C — Focused verification
 
-Run its unit tests, then integration tests for the same contract. Run lint/type checks if affected. Review the full diff for regressions and accidental unrelated edits.
+Run the directly affected unit tests, then adjacent integration tests, type/lint checks and the narrowest relevant runtime test. Inspect the full diff. Confirm the test would fail if the new fix were reverted, or otherwise explain how the test protects the invariant.
 
 ### Loop D — Regression suite
 
-After each coherent work package, rerun all relevant tests and a full build often enough that integration defects are found early. At the phase boundary, run the complete local quality gate from Section 12.
+After each coherent work package, rerun all relevant tests. At each phase boundary, run the complete local gates from Section 12. When shared contracts change, retest all entry points: UI, CLI, HTTP API, imported workflow and agent tool payloads.
 
-### Loop E — Build/Fix loop with a real hypothesis change
+### Loop E — Self-healing repair protocol
 
-If the gate fails:
+For any failed command:
 
-1. Save the first failing command and error summary.
-2. Identify whether the failure is code, test setup, environment, dependency, browser, package, data or tooling.
-3. Change one relevant cause at a time.
+1. Save the command, return code, relevant log and exact commit.
+2. Identify the earliest failing layer and root-cause hypothesis.
+3. Change code or test setup only after a concrete diagnosis.
 4. Re-run the focused test.
 5. Re-run adjacent integration tests.
-6. Re-run the full affected gate.
-7. Repeat until green or until five materially different, evidence-based attempts have failed.
-8. If still blocked, document the blocker and continue independent tasks; do not suppress the error.
+6. Re-run the full relevant gate.
+7. Inspect changed/untracked files and ensure no generated secrets, real data or unintended lockfile changes were added.
+8. Record the successful result or the precise remaining blocker.
 
-A green test suite with a missing required test suite is not a full pass. A successful build does not prove runtime behavior. A successful runtime smoke test does not prove science. Keep those evidence types separate.
+Never disable a required test to get green. A skipped optional Vina live test is not evidence of a successful live Vina calculation. A missing visual QA pass is not replaced by a successful TypeScript build.
 
 ---
 
-## 5. Engineering correctness and architecture hardening
+## 5. Priority P0 — Scientific correctness and cache provenance
 
-Audit these areas against the current code and address all confirmed P0/P1 defects.
+Resolve these before spending time on new feature work. Treat each finding as an audit lead that must be confirmed against the checkout.
 
-### 5.1 Strict scientific workflow schemas
+### 5.1 AutoDock Vina ligand preparation and output validity
 
-- Make every node configuration reject unknown fields unless there is a documented forward-compatibility reason.
-- Use typed contracts and Pydantic validation for every input/configuration path (UI, CLI, HTTP API, imported workflow and agent-generated workflow).
-- Validate finite numeric values; reject unintended `NaN`, positive/negative infinity, negative counts, out-of-range values and invalid combinations.
-- Enforce operator-specific types for filters (`le`, `lt`, `ge`, `gt`, `eq`, `ne`, `between`); check that `between` bounds make sense and are documented; never let invalid types fail only during expensive execution.
-- Validate objective semantics: maximize/minimize, target range, hard constraint and informational-only fields are distinct. Do not confuse a constraint with an objective or let irrelevant fields silently affect a Pareto front.
-- Define missing-value behavior explicitly for filtering, joins, scoring and exports.
-- When configuration is invalid, return a stable error code plus field-level information that the GUI can display next to the affected input.
+Audit `src/hcs_discovery/plugins/science/docking/prep.py`, `src/hcs_discovery/plugins/science/docking/vina.py`, its registration and `tests/scientific/test_vina_adapter.py`.
 
-### 5.2 Workflow graph and table correctness
+The custom `prepare_ligand_pdbqt()` path must not be assumed correct simply because it emits a file containing `ROOT`, atom records and `TORSDOF`. Confirm the PDBQT torsion-tree representation required by the exact supported Vina version. Compare the output against official documentation and a suitable established preparation tool such as Meeko. Check license and packaging requirements before adding or bundling another tool.
 
-- Validate unique node IDs, unique edges, known source/target nodes, cycle absence, valid root/terminal conditions, required input columns and compatible output types.
-- Ensure the topological order is deterministic for a fixed workflow specification.
-- Test fan-out and fan-in/`table.join` behavior with identity keys, not row position. Define duplicate-key behavior for left/inner/outer joins and test it. Do not silently duplicate or discard compounds.
-- Detect output-column name collisions; make suffix behavior deterministic and clear in the UI.
-- Ensure cancellation is checked at sensible intervals inside long loops and immediately before/after expensive node invocations where practical.
-- Preserve stable compound/row identities through branches and exports.
-- Every result column needs a meaning, unit where applicable, method/model, direction where meaningful, and explicit caveat if it is a score rather than a measured endpoint.
+Required audit and tests:
 
-### 5.3 Pareto and composite ranking
+- Correct handling of stereochemistry, aromatic atoms, formal charges, protonation states, tautomerism, salts/multiple fragments and unusual elements.
+- Correct, reference-checked atom typing and partial charges.
+- A valid representation of flexible bonds/torsion branches, not just a torsion count.
+- Correct receptor preparation assumptions: polar hydrogens, atom types, coordinates, receptor integrity and box configuration.
+- Consistent and traceable handling of fragment selection. Never silently drop important components; record the transformation and warnings.
+- Real Vina process return-code checks, recognized version output, executable discovery on Windows/Linux, timeout, cancellation and malformed/missing output handling.
+- Per-ligand status is preserved: preparation failure, engine failure, no pose and successful docking must never be conflated.
+- PDBQT and SDF pose artifacts are parseable, traceable to the compound and linked in the manifest.
+- A known-good reference complex is redocked with a legally usable, reproducibly sourced fixture. Document PDB/source/version, preparation method, coordinates and box, seed, Vina version, settings, RMSD definition, acceptance threshold and observed results. Do not invent a threshold or claim pose recovery without executing the test.
+- Default CI stays offline and deterministic. If the real Vina executable or a licensed/reference fixture is unavailable in a normal runner, use a separately required scientific release gate or a manually/scheduled workflow with recorded evidence; do not mark a skipped test as passed.
 
-- Prove Pareto non-dominated sorting is invariant to input row permutation, including tied/identical points and objective combinations.
-- Test that no item in a later front dominates an item in an earlier front.
-- Ensure filter-failing rows are not accidentally ranked as eligible candidates, while retained rows and reasons remain inspectable.
-- Verify zero weights, missing values, informational fields, constraints and target-range fields do not secretly distort Pareto membership or composite scores.
-- Document that min-max composite scores depend on the comparison dataset and may shift when outliers or candidates are added.
-- Avoid encoding universal “good” directions for metrics unless justified; users must be able to inspect objective semantics and weights.
-- Add property-based tests for plausible random objective arrays where suitable; retain small explicit counterexamples for any previous defect.
+A Vina binary passing `--version` proves that the executable is discoverable and runs. It does not validate ligand preparation or docking science. Report these states separately.
+
+### 5.2 Scientific runtime versions must invalidate cached results
+
+Audit `src/hcs_discovery/workflow/cache.py`, `src/hcs_discovery/workflow/registry.py`, `src/hcs_discovery/workflow/executor.py`, all scientific adapters and model metadata.
+
+Current design uses a node implementation hash, node version, config, input table hash, engine-version dictionary and schema version. Verify that the effective hash changes for **every relevant factor** that can affect output. A handler-only source hash may miss helper functions called transitively. Static adapter version strings may not equal the actual external engine installed on a host.
+
+Requirements:
+
+- Include relevant runtime engine versions in the execution context and cache key: at minimum the actual detected Vina version for docking, RDKit version for chemistry, effective property-model version/coefficients and other dependencies that influence results.
+- Include model weights/coefficients and meaningful preprocessing/method versions in model fingerprints.
+- Include stochastic seeds and every output-relevant parameter.
+- Ensure edits to helper code cannot reuse a previous scientific output. Use a deliberate application/build/source revision fingerprint or a dependency-aware implementation fingerprint; document the trade-off and test it.
+- Do not include irrelevant host-specific values that reduce cache reuse unless they can change scientific results. Record hardware separately where it is provenance-relevant.
+- Verify artifact hashes when reading cache entries and fail closed on missing, altered or incomplete entries.
+- Cache restoration must be atomic or recoverable; a failed restore should produce a real cache miss without partial files being accepted as successful output.
+- Add regression tests that modify each relevant version/fingerprint/input/config dimension and assert the key changes. Test stable inputs produce a cache hit only when all relevant identities match.
+
+### 5.3 Ranking, workflow schemas and scientific semantics
+
+Audit `src/hcs_discovery/workflow/nodes.py`, `schema.py`, `table.py` and tests.
+
+- Validate numeric fields for finite values and clear missing-value semantics. NaN/Infinity must not silently pass through scoring, JSON output or reports.
+- Keep objectives and hard constraints semantically separate. Constraints gate eligibility; they must not distort Pareto fronts or composite scores through accidental weighting.
+- Test `higher`/`lower` versus `maximize`/`minimize` aliases, `target_range`, `constraint`, informational-only objectives, zero weights, equal values, absent values and target boundaries.
+- Use standard non-dominated sorting with permutation-invariance and tie tests. Every front must satisfy the documented dominance invariants.
+- Composite scores based on min-max normalization are dataset-relative. Label and report that limitation; do not compare scores across different datasets without a documented normalization strategy.
+- Test joins by explicit identity keys, not physical row order. Specify and test duplicate keys, missing keys, join cardinality and conflict resolution. Do not silently duplicate or discard compounds.
+- Validate the whole workflow graph before queueing: unknown node types, cycles, invalid references, incompatible output columns, unknown config keys, invalid edges, unsupported graph shapes and resource limits.
+- Keep UI, CLI, API and agent validation on the same service/schema logic.
 
 ### 5.4 Chemistry parsing and standardisation
 
-- Preserve original source values and file checksum. Standardisation must be recorded explicitly and reproducibly.
-- Bound input sizes and molecule complexity; record per-row parse/standardisation failures and reasons without logging sensitive full structures unnecessarily.
-- Check stereochemistry, salt stripping, neutralisation, canonical tautomer options, fragment handling, invalid structures and mixed formats.
-- Do not silently swallow all errors in descriptor calculation or standardisation. Expected molecule-level failures may become row-level error results; unexpected implementation defects must surface as failed tests/runs.
-- Descriptor outputs must be compared against a small fixed, redistributable reference set for the pinned RDKit version and include correct units/directions/method metadata.
-- Test duplicate identity rules and explain the distinction between raw duplicates, canonical SMILES, stereoisomers and InChIKey where used.
+Audit imports, standardization, descriptors, depictions and exports.
 
-### 5.5 Service/API/CLI parity
-
-- Avoid having independent business logic in React, routes, CLI commands and agent handlers. Use shared services and test their contracts.
-- Test error codes and appropriate HTTP/CLI exit codes for invalid input, missing resources, policy blocks, cancellation and runtime failures.
-- Confirm all mutations have clear semantics and that destructive operations require proper confirmation in the CLI/UI.
-- Check settings are resolved from the actual app instance where dependency injection is used; app-factory tests should override environment defaults deliberately and verify those exact values are used.
-- Preserve compatibility of the versioned `/api/v1` API or explicitly document any breaking change. Add schema/API snapshots or contract tests for important responses.
-- Ensure pagination is stable, bounds are enforced, and large results are not loaded into memory or returned unbounded without a reason.
-
-### 5.6 Database/migrations/filesystem lifecycle
-
-- Audit Alembic upgrades from an empty database and from every supported older schema. Do not mark an incomplete schema as migrated merely because one table exists.
-- Test constraints, foreign keys, transactions and deletion behavior with actual data.
-- Use separate temporary data directories for tests. Handle databases locked by concurrent worker/API access without corrupting the database.
-- Define whether deleting projects/datasets means database deletion only, file deletion, soft delete or retention. Expose the choice accurately and safely.
-- Implement a deletion preview/dry-run if file deletion is introduced, including a list/size of affected files. Prevent path traversal and symlink escapes; do not delete paths outside the configured data root.
-- Cache management must use real configurable limits where promised, support status and dry-run, remove orphaned entries, and remain safe when a worker is writing.
-- Cache keys must include every factor that can change scientific outputs: node implementation/version, config, exact input fingerprint, relevant engine/model/weights/preprocessing versions, schema version, stochastic seed, and other parameters that matter. Test invalidation when any factor changes.
-- Use atomic writes for manifests/artifacts where practical. Verify file size/hash after writing and never expose partial artifacts as complete.
-
-### 5.7 Queue, workers and retry semantics
-
-- Explicitly document queue delivery semantics (for example at-least-once) and make node side effects safe under retries where feasible.
-- Test heartbeat/lease expiration, duplicate claims, concurrent workers, process restart, crashes during node execution, cancellation races, retry limits and terminal states.
-- Make “cancel requested”, “cancelled”, “failed”, “succeeded” and “partial” unambiguous. Never mark a cancelled/failed run succeeded because output artifacts happened to exist.
-- Ensure logs/events are ordered consistently enough for UI and CLI consumers; sequence allocation must remain correct under concurrent writes.
-- Avoid long blocking event-loop work in asynchronous API handlers. Heavy scientific work belongs in the worker/executor path.
+- Preserve raw input, standardized structure, transformation options, failure reason and source provenance.
+- Test invalid SMILES/SDF, explicit/implicit hydrogens, stereochemistry, salts, multi-component structures, tautomers, charged species, unusual valences and uncommon elements.
+- Expected molecule-level chemistry errors may become explicit row-level failures. Unexpected implementation errors must be surfaced and tested rather than hidden behind `except Exception`.
+- Verify SVG depiction safety and the correctness of filenames/media types for exports.
+- Make duplicate policy explicit: raw duplicate rows, canonical structures, stereoisomers and source identifiers are not interchangeable concepts.
+- Avoid promising unique-compound identity unless the exact identity method and normalization are documented.
 
 ---
 
-## 6. Scientific adapter validation — no claims without evidence
+## 6. Priority P1 — Property models and connectors
 
-Before v2 release, each adapter must have a clear status and tests appropriate to the scientific claim. Build a small, legal, reproducible fixture suite; do not try to “validate everything” by downloading a giant unrestricted dataset.
+### 6.1 ESOL validation
 
-### 6.1 Common adapter contract
+Audit `src/hcs_discovery/plugins/science/properties/models.py`, `validation.py`, `scripts/science/validate_esol.py`, the challenge fixture and validation report.
 
-Every scientific adapter must document and expose:
+- Keep the model description precise: if the code implements a reduced four-descriptor equation, do not label it as the full published ESOL model.
+- Make the challenge fixture, provenance, DOI/license, checksum, inclusion/exclusion criteria and metrics reproducible from a clean checkout.
+- Keep the held-out challenge set frozen. If development has used it to choose coefficients or thresholds, label the reported result development-only and obtain a distinct independent set for any final generalization claim.
+- Compare RMSE, MAE, R², bias and baseline results. Report sample size and all exclusions; do not select only favorable metrics.
+- The current repository's recorded challenge result is weak (small improvement over a constant baseline, low R²). Keep this result visible. Do not remove or obscure it to make the product look better.
+- Treat distance-based uncertainty as a heuristic unless calibration and coverage tests demonstrate more.
+- Verify unit, label and endpoint semantics: logS/log10(mol/L) is not the same as a generic solubility measure in any unit.
+- Add boundary and out-of-domain tests for molecular weight, heavy atoms, element set, invalid structures and charged molecules.
 
-- task, target endpoint, output units and intended use;
-- input file/schema and preprocessing assumptions;
-- adapter version and upstream engine/model version;
-- exact command/parameters/seeds relevant to reproducibility;
-- dependency/license attribution for code, weights and data separately;
-- resource and platform requirements;
-- known failure modes and scientifically meaningful invalid-input behavior;
-- citations to primary papers and official installation/API documentation;
-- offline deterministic tests where possible;
-- reference/benchmark evidence and its exact scope;
-- a status reflecting what has actually been proven.
+### 6.2 CNS MPO
 
-### 6.2 AutoDock Vina
+Audit the CNS MPO formula and metadata against the cited original method and an authoritative implementation.
 
-Inspect the whole current docking path, including binary discovery/probe, receptor validation, ligand preparation, process arguments, timeout/cancellation, output parsing, pose conversion, errors, artifact hashing and result persistence.
+- Distinguish the published six-parameter desirability score from any approximation.
+- Inspect approximations for CLogD and pKa: a fixed offset from cLogP or a simple count of nitrogen atoms must not be presented as the exact measured/calculated property without evidence.
+- If the complete supported method cannot be implemented robustly, rename/label the output as an approximation or CNS-MPO-inspired heuristic and document the exact deviations.
+- Do not describe a score above a threshold as a probability of BBB penetration, clinical activity or brain exposure.
+- Do not call a fixed numeric field calibrated uncertainty without calibration evidence.
+- Add test vectors that compare function outputs to published/authoritative reference values and test each desirability boundary.
 
-High-value checks:
+### 6.3 PubChem and ChEMBL connectors
 
-- Verify `--version` probe checks process return code and meaningful version output; an executable that exists but fails must not be marked available.
-- Ensure configured executable paths are handled correctly on Windows and Linux. Test executable discovery using fakes and a real optional integration when Vina is installed.
-- Validate receptor coordinates and required atom/type fields. Reject a file with atom records but invalid/non-finite coordinates rather than deriving invalid bounds.
-- Check PDBQT torsion trees and flexible-bond representation. The existing custom preparation code must not be assumed correct simply because it emits `ROOT`, atom lines and `TORSDOF`. Compare against the official Vina requirements and a known-good preparation tool such as Meeko; adopt the established tool if that is safer and properly licensed.
-- Validate stereochemistry, protonation/tautomer assumptions, salts/mixtures, hydrogens, charges, atom types, rotatable bonds, atom naming, coordinate ranges and pose SDF conversion.
-- Do not suppress unexpected failures in MMFF or charge calculation without recording a scientifically meaningful warning/status. If a fallback is used, disclose it in provenance.
-- Use subprocess argument arrays rather than a shell command string. Bound time/resources, terminate cleanly on timeout/cancellation where possible, redact errors and limit raw stderr disclosure.
-- Verify that failed ligands are represented as failed/missing outputs with per-ligand reasons, not a binding score of zero or a misleading success.
-- Provide deterministic parser/adapter tests with fixtures, plus an optional real-engine integration test.
-- Provide a documented redocking benchmark using structures/ligands that can legally be used and redistributed or retrieved reproducibly. Record PDB identifiers/source/version, preparation, coordinates/box, random seed, exhaustiveness, RMSD definition, success threshold with scientific justification, number of targets, failures and results. Do not claim pose-recovery performance without executing it.
-- A widely used RMSD threshold such as 2 Å may be a reference point in some redocking protocols, but it is not a universal guarantee; justify the protocol and limitations.
-- Keep docking score caveats visible in the UI, exported reports and model/adapter metadata.
+Audit `src/hcs_discovery/plugins/connectors/` and the network policy.
 
-### 6.3 Property prediction and scores
+- Local/offline must be the default; external calls require explicit policy opt-in.
+- Test DNS/host allowlists, redirects, hostname normalization, request size, response size, timeout, rate limiting, retries, 404, 429, 5xx, malformed JSON, invalid content types and partial provider responses.
+- Re-check target hostname and policy on every redirect. Do not allow a URL redirect to bypass host policy or reach local/private metadata services.
+- Validate returned identifier/structure relationships and retain source identity, URL, retrieval timestamp, license/attribution, raw or normalized payload hash and cache status.
+- Cached results must be distinguishable from current provider results.
+- Use deterministic mocked transports in ordinary CI. Live network smoke tests must be opt-in/scheduled and cannot make the default offline suite flaky.
 
-- Audit each current model's formula/coefficient provenance, units, training-data citation, domain definition, weight/coefficient hash, missing-value semantics and reported metrics.
-- Distinguish a learned model, a published linear equation, a heuristic descriptor score and an empirical scoring function. Do not label all as “AI prediction”.
-- CNS MPO is a multiparametric desirability score and must not be misrepresented as direct experimental BBB permeability.
-- Check descriptor formulae against the cited original paper or an authoritative implementation. Include tests for molecules on both sides of domain boundaries, uncommon elements, invalid SMILES, charged species, outliers and edge cases.
-- Do not treat a distance-based error proxy as calibrated uncertainty unless coverage/calibration is evaluated on a valid independent set.
-- Define a reproducible benchmark protocol with data source/version, retrieval date, hash, license, endpoint/unit, curation, exclusions, duplicate handling, split strategy, seed, baselines, metrics and results.
-- For regression, report appropriate metrics (for example MAE/RMSE/R²) with sample counts and confidence intervals where appropriate. Use task-appropriate ranking/classification metrics for other endpoints. Report all predefined primary metrics, not only the best result.
-- Avoid data leakage: scaffold split is a sensible default for many molecular property tasks; use time splits when the intended use is prospective and data permits. Explain when a split is inappropriate.
-- Keep the held-out test set untouched during model selection. If it has already guided development, say so and obtain an independent test set for a final claim.
-- Benchmark scripts must emit machine-readable results plus a human-readable report and an exact command/commit record. Default CI should use small offline correctness tests; longer scientific benchmark suites can be scheduled or manually triggered, but the release claim must link to their real result.
+### 6.4 Optional models, LLM and backend claims
 
-### 6.4 PubChem and ChEMBL connectors
-
-- Default local/network policy must block remote access until explicit opt-in. Make outbound calls visible to the user and include source URL, retrieval timestamp, source ID, license/attribution and payload checksum in saved provenance.
-- Test host allowlisting, redirect behavior, timeout, request size, rate limit, retries, 404/429/5xx, malformed JSON, oversized response and offline mode with deterministic mock transports.
-- Ensure redirected requests cannot silently escape the intended allowlist. Validate actual destination hosts on every redirect or disable redirects unless explicitly safe.
-- Respect each provider's usage policies and attribution/licensing rules. Do not bundle restricted external database dumps in the repository.
-- Cache stable responses transparently and distinguish cached data from current provider data.
-
-### 6.5 Other engines and GPU/Vulkan
-
-- Do not include a large model merely to advertise breadth. Add an adapter only when there is a concrete user path, license/weight/data audit, resource estimate, tested version and acceptance suite.
-- Large GPU models (structure prediction, molecular dynamics and ML inference) should be optional extras, not hard dependencies for the base CPU workflow.
-- If Vulkan is a goal, identify the specific model runtime/API that actually supports it, use real test inputs, compare its outputs against a valid reference/tolerance, measure speed and memory, and record device/driver/library versions. Device presence alone is not model support.
-- Keep the core CPU path working on supported Windows/Linux machines without CUDA, Docker, cloud credentials or a runtime model download.
+- Do not add a model or engine only to increase the number of feature cards.
+- An adapter needs a documented task, supported inputs/outputs, license/weights review, resource profile, host capability probe, error paths and suitable acceptance tests.
+- Local LLM support must state whether a provider is local or remote, and must not send private structures/secrets to an LLM unexpectedly.
+- Vulkan device detection is not proof that scientific inference runs through Vulkan. Do not claim Vulkan acceleration unless a named runtime actually uses that backend, a real inference has succeeded and output/performance have been measured.
+- Keep the dependable CPU path working on explicitly supported Windows/Linux environments without CUDA, Docker, cloud credentials or an implicit weight download.
 
 ---
 
-## 7. Research Agent correctness and safety
+## 7. Priority P1 — API, CLI, agent and operational safety
 
-Treat the agent as a controlled interface to existing scientific capabilities, not an autonomous authority.
+### 7.1 Shared service contracts
 
-### 7.1 One source of truth for tool contracts
+- Keep domain/business logic in shared service functions, not duplicated across React, HTTP routes, CLI and agent execution.
+- Check status codes and CLI exit codes for validation errors, missing resources, network policy blocks, cancellation, timeout and internal failures.
+- Ensure every documented UI action has the expected API/CLI behavior only if parity is explicitly promised. If an action cannot be exposed headlessly, document that limitation rather than faking parity.
+- Validate pagination and bounds. Do not return unbounded huge data unnecessarily.
+- Preserve `/api/v1` compatibility unless a documented breaking change is intended.
 
-- Build plans from the real NodeRegistry/model catalog and their JSON schemas rather than hardcoded node-name or model guesses.
-- Reject unknown fields on every agent tool payload.
-- Fix all discrepancies between generated configuration and target schemas. Audit `PropertyPredictorConfig` and all callers: a model selection must use the schema's actual `model_id` field; never assume a field such as `models` works.
-- Ensure requested endpoint and chosen adapter actually match. CNS MPO/ESOL/docking/descriptor tasks must not silently substitute one another.
-- Validate the entire proposed graph and every config before presenting `valid=true` or “PASS”. Preserve the validation issues; do not swallow an exception and only show a boolean without actionable detail.
-- Do not rely on a keyword-only planner if it cannot handle the requested semantics. If the request cannot be mapped safely to a supported workflow, say so and provide a plan with an explicit unsupported step rather than inventing a workflow.
+### 7.2 Research Agent safety
 
-### 7.2 Ask → Plan → Approve → Run → Explain
+Treat the research assistant as a controlled interface to existing scientific functionality, not an autonomous scientific authority.
 
-- Ask mode is read-only and should not mutate database/filesystem state.
-- Plan mode must not queue runs or create persistent objects. It returns a typed, editable plan with real node definitions, required inputs, resources, network access, outputs, limitations and unsupported assumptions.
-- Approval binds to an exact canonical plan (include its content hash and workflow/config hash). Before executing, revalidate the submitted plan and compare the hash. If any field, model, target, path or parameter changed after approval, require a new approval.
-- Run mode executes only allowlisted, typed server-side functions. Never add arbitrary shell, Python eval, unrestricted filesystem access, SQL, network URL fetch or dynamic import tools for convenience.
-- Server-side policy must not trust a client-provided boolean or `approved_tool_calls` field without validating that the user/session is authorised to approve the specific current plan. If the local single-user product has no identity system, explicitly scope this as local-operator authorization and require the strongest feasible confirmation boundary.
-- Mutating/destructive/high-cost operations require explicit confirmation with meaningful details. The plan should show dataset size, external calls, expected runtime/resource estimate when it can be estimated, files/objects created, and cancellation behavior.
-- Treat compound names, dataset contents, external API text and model output as untrusted data. Structured separation is preferable to delimiter-only `<untrusted_data>` wrappers; never assume delimiter tags alone defeat prompt injection.
-- Do not pass secrets to an LLM. Local mode must be truthful about whether the model endpoint is local or remote. Remote use needs explicit policy opt-in.
-- Show actual executed tool names, arguments with sensitive values redacted, result states, failures and run IDs. Never mark a tool as successful because a call was attempted.
-- Add adversarial tests in which an imported compound name or external text instructs the model to ignore rules, reveal secrets or execute unsupported actions. Verify such data cannot grant permissions or bypass the allowlist.
+- Ask mode must be read-only; Plan mode must not create persistent objects or queue work; Run mode must use a concrete validated plan and the allowlisted server tool registry.
+- Validate all LLM output against strict typed schemas; reject extra fields, unsupported tool names, out-of-range arguments and semantically invalid workflow configurations.
+- Bind approval to the actual immutable plan digest and current plan contents. Modifying any step after approval must invalidate the approval.
+- Do not let imported compound names, SDF/CSV text, external web content, logs or model output grant permissions or override system policy. Add prompt-injection tests.
+- Return structured validation issues and unsupported assumptions. Do not convert a planning error into `valid=true` or silently choose an unrelated engine.
+- Test no provider, unreachable provider, malformed response, timeouts, blocked remote policy, invalid plan, approval mismatch, tool error, cancellation and partial execution.
+- Never pass secrets to the LLM. Keep remote provider usage explicit and policy-gated.
+- Bound molecule counts, job duration, retries and resource consumption. Explain limits before expensive work where practical.
 
-### 7.3 Resource estimation and failure containment
+### 7.3 Filesystem, paths, uploads and data lifecycle
 
-- Do not use hardcoded resource/runtime estimates that conflict with dataset size, model, backend or platform. Either provide a defensible estimate/range or label it unknown.
-- Enforce queue/run/resource limits where practical and handle cancellation.
-- A provider outage should produce an explicit error or an accurately labelled deterministic fallback; never silently report an LLM response that was not generated.
-- Test no-provider, unreachable-provider, blocked remote policy, malformed model output, invalid plan, approval mismatch, tool error and partial execution.
-
----
-
-## 8. User experience, accessibility and real visual QA
-
-Visual QA is mandatory and must use the actual application running against the real backend. Do not use generated mockups as proof of UI functionality.
-
-### 8.1 Review every route
-
-Enumerate actual routes from React Router and exercise them. At minimum inspect:
-
-- workspace/dashboard and system/diagnostics state;
-- project list/detail and project creation/edit/delete flows;
-- dataset import, validation, row/error inspection and deletion;
-- compound/library search, detail, structure depiction and copy/export actions;
-- workflow list, create, edit, validate, save, clone/import/export where supported;
-- run monitor, event/log stream, cancellation, failure and completed status;
-- results table, Pareto scatter, filters, sort and report downloads;
-- model/adapter registry, data sources, settings, about and not-found pages;
-- agent Ask/Plan/Run modes if they are included in the final capability contract.
-
-Every visible button/link must perform its advertised action or be clearly disabled with a reason. No dead controls, placeholder handlers, fake progress, mock success states or unhandled browser errors.
-
-### 8.2 Viewports and themes
-
-Use Playwright and screenshots at these viewport widths at minimum:
-
-- 320 px (small mobile),
-- 390 px (mobile baseline),
-- 768 px (tablet),
-- 1024 px (small laptop),
-- 1280 px (desktop),
-- 1440 px (wide desktop).
-
-Review light and dark themes wherever supported. At least 320/390, 768 and 1440 should have screenshot evidence for critical pages. Ensure:
-
-- no horizontal page overflow unless a table has intentional, accessible horizontal scrolling;
-- dialogs fit the viewport and remain scrollable;
-- tables preserve identity and provide sensible small-screen behavior;
-- charts have readable axes, legends and accessible alternative summaries;
-- loading/empty/error/success states are visually distinct;
-- keyboard focus is visible;
-- color is not the only indicator of status;
-- text contrast and controls meet WCAG 2.2 AA where applicable;
-- all interactive controls have accessible names/labels and useful focus order;
-- reduced-motion preferences are respected where animation exists.
-
-### 8.3 Visual QA loop
-
-For each meaningful UI change:
-
-1. Build the frontend from current source.
-2. Start API and worker using a temporary isolated data directory.
-3. Start or serve the actual built SPA (not a stale bundle).
-4. Run Playwright E2E and capture screenshots.
-5. Inspect screenshot files as images. Use a screenshot review tool/viewer and compare the actual pixels/content; do not assume the test passed because the image was saved.
-6. Check console errors, uncaught page errors, failed network requests, clipped content, overlap, layout shifts, missing glyphs/assets and responsive behavior.
-7. Run accessibility scans/tests if available. Add a maintained accessibility test tool if it provides meaningful value and can be installed/licensed safely.
-8. Fix issues and repeat until clean.
-9. Re-capture after the final frontend build and keep only screenshots that correspond to real current UI state.
-
-Do not commit build/test screenshots containing real user data, secrets, local filesystem paths or tokens. Use synthetic, clearly labelled fixtures. Visual snapshots must not pretend optional engines worked if the engines were unavailable.
-
-### 8.4 UI implementation quality
-
-- Reuse common components, style tokens and layout primitives.
-- Keep API error messages and field errors actionable and accessible.
-- Use explicit skeleton/loading states only while work is happening; do not fake progress.
-- Make long-running operations cancellable where supported and show what is being cancelled.
-- Explain scientific terms/units next to results and preserve the limitations disclosure in context.
-- Ensure all data is reachable by keyboard and that charts are not the only means of understanding a result.
-- Keep the HCS brand visually consistent without allowing branding to obscure status, warnings or scientific caveats.
+- Audit all user-supplied filenames, receptor paths, artifact paths, plan IDs, uploads, deletion and export routes.
+- Prevent traversal, symlink escape, sibling-prefix confusion, Windows reserved names and writing/reading outside the configured data root unless a documented local operator explicitly configures access.
+- For HTTP-accessible workflows, do not allow an untrusted client to read arbitrary host files by setting an absolute receptor path. Use workspace/project confinement or an explicit trusted-local configuration.
+- Keep destructive operations confirmed and scoped. If deletion removes files, offer preview/dry-run where useful and report precisely what was deleted.
+- Decide and document whether failed/cancelled runs leave artifacts. Ensure database and filesystem state remain consistent after crashes.
+- Test project/dataset deletion, cache pruning, orphan cleanup, concurrent writes and worker restart with isolated data.
 
 ---
 
-## 9. Security, privacy, dependency and supply-chain gates
+## 8. Priority P1 — CI, dependency and release-workflow integrity
 
-### 9.1 Application-level checks
+Inspect `.github/workflows/ci.yml`, `codeql.yml`, `release.yml`, version verification and repository rules.
 
-- Default host is loopback. Non-loopback binding requires explicit secure configuration, authenticated access and clear documentation that token-only deployment without TLS is not a hardened remote-service configuration.
-- Review CORS, CSP, security headers, API auth, request limits, rate limits and error envelopes against current source and actual browser behavior.
-- Test path traversal, absolute paths, Windows reserved names, symlink escapes where feasible, unsafe artifact names, large uploads, malformed CSV/SDF, huge molecules, timeout/cancellation and malformed provider replies.
-- Validate allowed outbound hosts at connection time and handle redirects safely; use strict timeouts and response-size limits.
-- Ensure logs, run events, reports, diagnostics and agent outputs redact credentials and sensitive values. Prefer not to log raw input data at all.
-- Test policy enforcement with both permitted and forbidden network requests using mocked transports; ordinary tests must not unintentionally hit the internet.
-- Re-review local data handling and deletion lifecycle. Make retention behavior explicit; do not promise secure erasure unless it is implemented and testable.
-- Revisit `docs/security/THREAT_MODEL.md` after any changes to agent tools, plugin loading, external connectors, model weights, remote hosting or filesystem handling.
+### 8.1 Required CI gates
 
-### 9.2 GitHub Actions hardening
+Keep or strengthen these checks:
 
-Inspect every workflow and enforce, where compatible with required behavior:
+- Python lockfile consistency and frozen dependency install;
+- Ruff formatting and linting;
+- mypy/type checks;
+- backend tests with coverage floor;
+- frontend typecheck and production build;
+- Playwright E2E tests;
+- clean DB migration and DB revision verification;
+- wheel build, clean-environment install and runtime/UI smoke test;
+- license policy and dependency vulnerability audit;
+- documentation relative-link check;
+- secret scanning and CodeQL;
+- dependency review on PRs;
+- a single aggregate job that fails if any mandatory job fails or is missing.
 
-- explicit minimum `permissions:` at workflow/job level;
-- third-party actions pinned to reviewed full commit SHAs (the repository already does this in inspected workflows; preserve it and verify any new action);
-- pinned/locked tool versions and consistent dependency setup;
-- `persist-credentials: false` for checkout jobs that do not need authenticated pushes;
-- no secrets or write tokens in untrusted PR code paths;
-- no unsafe `pull_request_target` pattern that checks out/executes fork code with privileged secrets;
-- concurrency settings that cancel obsolete CI runs but do not cancel a release mid-publication;
-- reasonable job timeouts and useful failure artifacts;
-- dependency review, secret scanning, CodeQL and license/SBOM policy;
-- release permissions separated from ordinary CI jobs;
-- no broad write permissions in tests or pull-request workflows;
-- no `continue-on-error` for mandatory release gates.
+Use the current lockfile, pinned major versions and action SHAs as the source of truth. Do not weaken permissions or use `continue-on-error` for mandatory gates.
 
-Do not blindly update GitHub Actions to a new major version without verifying its official docs, full commit SHA, runtime compatibility and change log.
+### 8.2 Tag and cloud-gate race prevention
 
-### 9.3 Dependency and license auditing
+A key release risk is that the normal CI workflow may run on branches/PRs while the separate release workflow is triggered by a tag. The release workflow must not publish an insufficiently tested tagged commit merely because its own smaller subset passes.
 
-- Check Python lockfile, npm lockfile, transitive dependencies, installed optional adapters, bundled assets and model weights.
-- Run the repository's current dependency audit commands; fix known relevant vulnerabilities, prioritising exploitable runtime issues. Document justified exceptions precisely with affected versions, risk, mitigation and expiry/review date.
-- Run license checks for source, dependencies, data, models and weights separately. A repository license for code does not automatically license bundled model weights or a dataset.
-- Generate a current SBOM from the actual release environment and verify that its dependencies match the wheel.
-- Do not commit large/restricted data or model weights. Use a manifest, official source link, license conditions and checksum when redistribution is not permitted.
-- Review generated artifacts to ensure no `.env`, test database, fixture results from private data, cache, API key, debug dump or local absolute path has been packaged.
+Implement a reliable policy that proves the exact tagged commit passed all mandatory release gates. Depending on current repository capabilities, use a reusable required gate workflow, a versioned release-candidate branch/PR, or explicit verification of completed successful checks for that exact SHA. Do not implement a brittle sleep or a check that merely sees a green run for a different SHA.
 
----
+Required invariants:
 
-## 10. Performance and resilience test plan
+1. Every release artifact is built from the immutable tagged commit.
+2. The exact commit has all mandatory checks completed successfully before publication.
+3. A failed, cancelled, skipped mandatory gate blocks release publication.
+4. A release tag is not moved or reused to publish a different source.
+5. Publishing and asset replacement cannot silently overwrite an existing Stable release.
+6. Only the release job gets the write permissions required to publish and attest assets; test/PR jobs remain read-only.
+7. Concurrency prevents competing publication jobs for the same tag, without cancelling a publication halfway through.
 
-Do not invent performance targets before measuring the baseline. Define and report realistic baselines with environment metadata, then set acceptance thresholds that guard against material regression.
+### 8.3 Dependency and license integrity
 
-### 10.1 Representative sizes
-
-For operations where appropriate, test small and medium data sizes (for example 100, 1,000, 10,000 and the configured supported maximum where practical). Do not force an expensive external engine to run at the maximum without checking resource/time expectations first.
-
-Measure:
-
-- import throughput and memory;
-- RDKit standardisation/descriptors/fingerprint similarity throughput;
-- filtering and multi-objective ranking runtime;
-- table joins and result persistence;
-- cache hit/miss/serialization costs;
-- API response latency for list/detail/paged results;
-- SSE/event update behavior under long jobs;
-- cancellation latency;
-- restart recovery after worker/API failure;
-- artifact size, storage growth, cleanup and cache pruning.
-
-Record CPU, RAM, OS, Python/RDKit/runtime versions and seed. Avoid brittle unit tests for wall-clock seconds; use a separate benchmark script/report for performance and a loose regression threshold only where stable enough.
-
-### 10.2 Resilience cases
-
-- Stop a worker while it is running a multi-node workflow, restart it, and verify recovery semantics.
-- Expire a lease and ensure duplicate work/terminal status is handled according to the documented queue contract.
-- Cancel before start, during a cancellable node and during an external process.
-- Fill the cache past its configured limit and prove the policy works with `dry-run`/status output.
-- Corrupt a cache entry or artifact and verify it is rejected and regenerated/failed safely.
-- Simulate read-only directories, disk-full/permission errors where feasible, SQLite lock contention and invalid migration state.
-- Confirm failed runs retain enough diagnostics without exposing secrets or raw private datasets.
+- Run audit tools on locked production dependencies and production npm dependencies.
+- Review advisories and package licenses in context; do not simply suppress high/critical findings.
+- Preserve third-party notices and license attribution.
+- Avoid unpinned/unreviewed downloads in build/test scripts.
+- Verify that the wheel's contents match the intended Python modules, built SPA and Alembic migration scripts.
 
 ---
 
-## 11. Test construction guide: make tests prove the behavior
+## 9. User experience, accessibility and visual QA
 
-Tests are executable specifications. Build tests from observed contracts and invariants, not from assumptions about how the code ought to work.
+**Visual QA is mandatory.** A frontend build, static typecheck or saved screenshot alone is not visual QA.
+
+### 9.1 Test the actual app
+
+Start the real backend with a disposable data directory and the built or dev SPA on loopback. Use Playwright or the installed equivalent against the running application. Do not use generated mockups, placeholder data or a static screenshot as proof of functionality.
+
+Review the real critical journeys:
+
+1. Workspace loads with empty and populated states.
+2. Project create, open, edit and deletion confirmation.
+3. Dataset import, column mapping, invalid rows and completion summary.
+4. Compound library, details and SVG depiction.
+5. Workflow template, node configuration, validation, save and reload.
+6. Run queue, monitor, live events, node errors, cancellation and retry behavior.
+7. Results table, Pareto plot, column meanings, filters/sorts and complete data export.
+8. Model registry with available, unavailable, not configured and planned states.
+9. Data connectors in offline mode and explicit policy-block states.
+10. Agent Ask/Plan/Run when these are part of the release contract.
+11. Settings, diagnostics, not-found routes and API/server failure states.
+
+### 9.2 Required viewport/theme matrix
+
+Test at a minimum of 320, 390, 768, 1280, 1440 pixels (or the closest reproducible browser widths) and in both Light and Dark themes. Include keyboard-only navigation and focus states. Test at 200% zoom where feasible.
+
+Check:
+
+- horizontal overflow and clipped dialogs/tables;
+- empty, loading, partial, success, warning and error states;
+- readable table columns, units and long compound identifiers;
+- graph/chart legibility and responsive behavior;
+- visible focus indicator, labels, semantic heading order and button names;
+- contrast and theme-specific contrast regressions;
+- non-blocking progress states with no fake completion;
+- clear indication when a model or external engine is not locally runnable;
+- destructive confirmations and actionable recovery instructions.
+
+### 9.3 Visual QA loop
+
+For every important visual defect:
+
+1. Capture a screenshot from the real running app and record route, viewport, theme and fixture.
+2. Inspect the image, not just the screenshot path or console output.
+3. Identify the component/CSS cause.
+4. Fix the underlying layout/state/accessibility problem.
+5. Re-capture the same screenshot and compare it visually.
+6. Run related E2E tests and scan browser console/page errors.
+7. Re-run the relevant responsive/theme matrix after changing shared layout or tokens.
+
+Use synthetic fixture data only. Do not commit screenshots with private structures, real user data, tokens, secrets or machine-specific paths. Commit screenshots only when they are intentional project documentation and verified current.
+
+---
+
+## 10. Performance, resilience and data-size behavior
+
+Before claiming performance improvements, measure a baseline and retain the measurement command, hardware, software versions, dataset size and result. Do not invent speedups or select only favorable outcomes.
+
+Use representative fixtures appropriate to the current product: small import, several hundred compounds, and a larger local workflow dataset within reasonable CI constraints. Heavy scientific benchmarks may be separately scheduled/manual, but Stable release claims must link to their actual results.
+
+Test at least:
+
+- import limits, malformed files and oversized payload rejection;
+- worker process crash during a node;
+- lease heartbeat failure, expired lease, duplicate claim and restart recovery;
+- cancellation before, during and after an expensive step;
+- timeout and retry semantics;
+- repeated runs with cache hit and forced invalidation;
+- partial artifact writes and corrupted cache manifests;
+- database contention and concurrent API/worker access;
+- SSE client disconnect/reconnect and non-blocking async behavior;
+- large report/table export, explicit truncation disclosure and full CSV/JSON export;
+- bounded cache pruning, dry-run/status if supported, and safe cleanup during concurrent use;
+- project/dataset deletion with active or completed runs.
+
+SQLite is a single-machine database with serialized writes. Do not advertise distributed multi-worker or high-concurrency scaling without a separately tested architecture. Do not add PostgreSQL/Redis/container infrastructure to this Stable scope unless it is required by the current documented contract; make the local CPU path reliable first.
+
+---
+
+## 11. Test construction standards
+
+A test must prove behavior, not just execution. Prefer deterministic assertions on invariant, state transition, returned schema, error code, output provenance and side effects.
 
 ### 11.1 Unit tests
 
-Use small, deterministic inputs. Cover:
-
-- normal/edge/invalid values;
-- numerical tolerances, units and return types;
-- unknown fields and out-of-range values;
-- duplicate/tie/missing-value cases;
-- exception mapping and error codes;
-- path and network-policy invariants;
-- cache invalidation and stable serialization.
-
-A good regression test must fail if the bug is reintroduced. Avoid assertions so weak that a wrong result still passes (for example “the output is a number” when an exact/tolerance-bound reference is known).
+Use isolated inputs and test success, failure, boundaries, missing fields, invalid values, unexpected exceptions and exact status mapping. Avoid asserting incidental implementation details unless they protect a public contract.
 
 ### 11.2 Property-based tests
 
-Use Hypothesis (already in the development dependency group unless current metadata says otherwise) where it helps explore combinations that humans do not enumerate:
-
-- Pareto sorting invariants under permutations and duplicate points;
-- canonical hashing stability and key sensitivity;
-- joins with missing/duplicate keys;
-- workflow graph generation and cycle detection;
-- safe path joining and filename sanitisation;
-- import parsing and row outcome totals.
-
-Keep seeds/examples reproducible and save reduced minimal counterexamples as explicit regression tests when a property fails.
+Use Hypothesis where it provides value. Good targets include ranking invariants, graph validation, table operations, serialization, cache fingerprints, path confinement and standardization invariants. Retain explicit small counterexamples for previously discovered bugs.
 
 ### 11.3 Integration tests
 
-Test the real contracts across services, database, queue, API and CLI with isolated temporary settings. Check persistent side effects before and after each operation. Assert both success and expected failure codes. Avoid network calls by using mock transports and fake executable scripts where an external binary is optional.
+Test real internal components connected together: service + DB, queue + worker, workflow + artifact store, API + service layer, CLI + service layer, migration + existing database, cache + executor. Use temporary directories and a known explicit DB path.
 
 ### 11.4 Scientific tests
 
-Maintain separate categories:
+Separate these test levels:
 
-- **offline correctness/fixture tests**: part of default CI and expected to be deterministic;
-- **reference tests**: small, legal reference data and known outputs/tolerances;
-- **benchmark suites**: fixed documented datasets/protocols and all primary metrics;
-- **optional integrations**: tests that need Vina, GPU, large model weights or external network access.
+- formula/unit tests;
+- deterministic fixture tests;
+- comparison with an authoritative/reference implementation;
+- real-engine integration tests;
+- independent dataset validation/benchmark;
+- experimental validation (only if actual experimental data/protocol exists).
 
-Clearly label each category in pytest markers and documentation. A passing fixture test must never be reported as an accuracy benchmark.
+Do not call one level by the name of a stronger level. For scientific datasets, record provenance, license, checksum, transformations, exclusions and the exact reproduction command.
 
 ### 11.5 API/CLI contract tests
 
-For every important user action, prove the API and CLI call the same business behavior and persist compatible state. Test JSON output, stable error envelopes, pagination, auth/policy gates and cancellation semantics.
+For each key action, verify UI/API/CLI call the same business service or produce equivalent outcomes. Test invalid config, missing ID, policy block, timeout, cancellation and machine-readable `--json` output.
 
-### 11.6 End-to-end tests
+### 11.6 E2E tests
 
-At minimum prove:
-
-1. fresh install → launch → workspace;
-2. create project → import valid/invalid fixture → inspect errors;
-3. pick/edit/save workflow → intentionally invalid workflow is rejected before queueing;
-4. run → monitor → success/failure → results;
-5. inspect output columns/units/provenance → download complete artifacts;
-6. restart app → history persists;
-7. unavailable optional engine is reported clearly and cannot be submitted as though it were available;
-8. planned/unsupported functions cannot appear to succeed;
-9. agent plan cannot execute without the right approval and cannot execute a mutated approved plan;
-10. an unknown ID displays a genuine error state instead of fabricated data.
-
-Do not use `test.only`, silently skip critical specs, or let a Playwright retry hide a flaky test. If retries are configured for diagnostics, fail the release if a retry was needed or explicitly classify it as flaky and fix the cause before release.
+At minimum, cover happy path and major failure paths. Do not let E2E runs reuse a hidden stale database. Ensure their setup happens before the server begins with the E2E `HCS_DATA_DIR`, following the actual Playwright config. Confirm teardown never deletes user data.
 
 ---
 
-## 12. Mandatory full local gates before the first push
+## 12. Mandatory complete local gates before any push
 
-Before the first push containing implementation changes, all applicable local gates below must pass on the exact working tree. Store a short machine-readable summary with command, exit code, timestamp, environment, and result. Record the git diff/commit associated with the run.
+Do not push code that has known local failures. Run the correct subset after every work package and the full gate before the first push and before creating a candidate/release tag.
 
-### 12.1 Clean/format/type gates
+### 12.1 Clean and inspect
 
-- `uv lock --check`
-- Python format check and Ruff lint
-- Python type check using the current supported strategy; if an RDKit-stubs workaround remains necessary, document why, ensure no application code is skipped, and add an expiry/review condition
-- frontend TypeScript typecheck
-- frontend production build
-- license checks for Python and Node packages
-- dependency audit / secret scan where tools are available
+```bash
+git diff --check
+git status --short
+```
 
-### 12.2 Backend tests
+Inspect the complete staged and unstaged diff. Check that there are no secrets, unintended generated artifacts, real data, unrelated changes, debug statements, stale screenshots or accidental lockfile churn. Run format check, lint, type check and lockfile check.
 
-- complete offline unit/integration/security suite;
-- coverage gate equal to or stronger than current CI (do not lower it to pass); raise it for critical new paths where practical;
-- fresh SQLite migration plus supported upgrade path;
-- queue/worker recovery and concurrency cases;
-- scientific fixture/reference tests;
-- API and CLI parity tests.
+### 12.2 Backend and migrations
 
-### 12.3 Frontend and visual tests
+Run the full backend test suite with coverage using the isolated test environment. Run migration tests against both an empty DB and a copy of the prior supported schema. Verify the correct Alembic revision is recorded; do not accept `create_all` success as proof that migrations are working.
 
-- Playwright E2E against a fresh build and isolated data directory;
-- screenshots at the required viewport widths and themes;
-- inspect screenshots visually, not just by existence;
-- no uncaught browser errors, console errors relevant to the app, failed required network requests or broken assets;
-- no horizontal page overflow, clipped modal content, inaccessible controls or placeholder behavior on critical pages;
-- run accessibility checks and fix high-severity issues.
+### 12.3 Frontend and actual runtime
 
-### 12.4 Package tests
+Run frontend install from lockfile, typecheck, production build and E2E tests. Start the actual built app with isolated data and test health, readiness, root SPA, core journey and error states. Inspect console errors and visual output.
 
-- build wheel from the final frontend bundle;
-- inspect the wheel file list to ensure it contains the correct built SPA and required package assets but no private data, `.env`, tests-only files or cache;
-- install it into a **fresh, isolated environment**;
-- run version/doctor commands;
-- launch server and test health/readiness/root SPA endpoints;
-- perform a minimal real project→import→run→report journey from the wheel;
-- verify that runtime does not need Node or a source checkout;
-- compare package version, CLI version, API version and release metadata;
-- on Windows, verify path handling and wheel launch; use local Windows execution if available and retain Windows cloud CI as a mandatory platform gate.
+### 12.4 Scientific gates
 
-### 12.5 Mandatory stop condition
+Run deterministic science tests. Run the Vina reference/redocking gate and any independent property-model benchmark required by the Stable criteria. If these tests are separated from default CI due cost or dependency/license requirements, run them explicitly before publication and attach their actual evidence to the release notes or CI summary. A skipped optional test does not pass a required gate.
 
-**Do not push implementation code until all mandatory local checks pass.** If a non-available OS or optional GPU cannot be tested locally, clearly mark the local check `NOT AVAILABLE` and ensure an explicit cloud test or scope limitation covers it. Do not claim local proof for a check that was not run.
+### 12.5 Package and fresh install
+
+Build the wheel only after a fresh frontend build. Install it into a new virtual environment. Verify CLI version/doctor, clean database migration, HTTP readiness and the served SPA. Inspect wheel contents for web assets and Alembic scripts. Repeat on each claimed supported OS.
+
+### 12.6 Local release verdict
+
+The first push is allowed only when all locally runnable mandatory gates pass. If a required check cannot run locally due to platform/hardware, record the reason and ensure it has an explicit, required cloud/release gate. A green lint/build combination is never a substitute for missing science, E2E or install verification.
 
 ---
 
-## 13. Push and Cloud CI fix loop
+## 13. GitHub push and Cloud CI repair loop
 
-This phase starts only after Section 12 passes for the exact source tree.
+**Do not push until Section 12's local gate passes.** After pushing, continue this loop until every required cloud job for the exact final source commit is green.
 
-### 13.1 Before pushing
+### 13.1 Pre-push checklist
 
-1. Review `git diff --check`, `git diff --stat`, full diff and `git status`.
-2. Search for secrets, local paths, generated data, `TODO`/`FIXME`, debug prints, `test.only`, skipped tests, accidental version drift and unsupported claims.
-3. Commit logically grouped work.
-4. Re-run all tests affected by the last change; if it is release-ready, run the full mandatory local gate again.
-5. Verify the branch is based on the intended latest main and there are no unexpected deletions/overwrites.
-6. Push the branch and create/update a PR using the repository's templates where possible. Include a factual summary, change rationale, tests actually run, risks, screenshots and links to scientific validation evidence.
+1. Confirm current branch is the intended release/fix branch, not `main` unless repository policy explicitly requires direct work.
+2. Confirm working tree and diff are understood; stage only intended files.
+3. Run relevant tests after the final code change.
+4. Commit with a concise, truthful message.
+5. Record the commit SHA.
+6. Push the branch and verify the remote points to the same SHA.
+7. Create/update the PR if supported and verify required checks are attached to the expected branch/commit.
 
-### 13.2 Cloud loop
+Example commands; adapt to actual repo state and permissions:
 
-After each push:
+```bash
+git status --short --branch
+git diff --check
+git diff --stat
+git diff --cached
+git push -u origin "$(git branch --show-current)"
+git rev-parse HEAD
+git ls-remote origin "refs/heads/$(git branch --show-current)"
+```
 
-1. Read the remote branch head SHA; it must match the intended commit.
-2. Find the CI, CodeQL, security, dependency-review, license, migration, E2E, package/wheel and other required Actions runs for that exact SHA/PR.
-3. Wait/poll for completion using the GitHub UI/CLI/available connector; do not declare success while a run is queued or in progress.
-4. If any mandatory job fails, get the job summary and logs. Identify the first causal failure, not just downstream failures.
-5. Reproduce the issue locally, or document why it is cloud-specific and create a deterministic local reproduction when feasible.
-6. Fix the cause locally; add a regression test; run the focused test, relevant integration tests and all mandatory local gates affected by the change.
-7. Commit/push the fix. Inspect the new remote SHA and repeat from step 2.
-8. Repeat until all mandatory gates are green on the newest commit. Never use a successful run from an earlier SHA as evidence for a later one.
+Never assume push succeeded because the command appeared to start. Check its exit status and remote SHA.
 
-### 13.3 Cloud-specific failure examples
+### 13.2 Cloud polling and diagnosis
 
-- Linux passes but Windows fails: inspect path separators, reserved filenames, subprocess executable suffixes, encoding/locale, line endings, file permissions and shell syntax. Add/adjust a platform-specific test.
-- Local E2E passes but CI E2E fails: inspect trace/screenshots, server readiness, ports, isolated data directory, stale frontend bundle, timing assumptions and browser version. Fix the root cause rather than increasing sleeps blindly.
-- Wheel smoke fails but source tests pass: inspect package build inclusion, asset resolution, migrations, runtime data paths and optional imports. Test the actual wheel in a fresh environment.
-- Dependency audit fails: inspect exact affected package/version/advisory and update compatibly with lockfiles; rerun tests. Do not suppress advisories indiscriminately.
-- CodeQL or security check fails: investigate the finding and add a justified code change/test. Suppress only a demonstrable false positive with a precise explanation and minimal scope.
-- License gate fails: audit whether code/weights/data are compatible and properly attributed. Replace/remove incompatible content if necessary; do not simply edit the scanner allowlist to hide the issue.
+Use `gh run list`, `gh run view`, `gh run watch` or the available GitHub integration. Inspect real run IDs and the commit SHA; do not infer current status from a badge, a previous branch run or an earlier commit.
 
-### 13.4 Merge policy
+Useful CLI examples:
 
-- Do not merge while required status checks fail, are pending or are missing.
-- Follow branch-protection rules, required review and conversation resolution. Do not bypass a human review if the repository requires one.
-- After merge, verify the final `main` commit has its own required cloud checks green. If the merge commit's checks are not green or are absent, fix and verify before tagging.
+```bash
+gh run list --branch "$(git branch --show-current)" --limit 20
+gh run view <RUN_ID> --json name,status,conclusion,headSha,event,workflowName,url
+gh run view <RUN_ID> --log-failed
+```
 
----
+Confirm the exact schema supported by the installed GitHub CLI version before use. If `gh` is unavailable, use the authorized GitHub UI/API connector. Never invent results for unavailable tools.
 
-## 14. Release workflow and publication safety
+For each failed job:
 
-The release pipeline is part of the product. Inspect the current `.github/workflows/release.yml` rather than assuming that a version tag alone proves release readiness.
+1. Open the job summary and failed logs.
+2. Identify the first meaningful failure, not only the final aggregate failure.
+3. Decide whether it is code, platform, dependency resolution, lockfile, path/case sensitivity, newline, environment, test isolation, browser install, packaging, license, network or workflow orchestration.
+4. Reproduce it locally or in a matching container/OS when practical.
+5. Implement a real fix and add a regression test or workflow invariant.
+6. Run focused tests, then the affected full local gate.
+7. Review the diff and commit the fix.
+8. Push again and inspect the new cloud runs on the new SHA.
+9. Repeat until all mandatory jobs on the final commit are green.
 
-### 14.1 Release workflow requirements
+Do not fix a Windows-specific failure only by skipping the Windows job. Do not fix a license issue by disabling the license gate. Do not fix a flaky E2E test by removing assertions on the behavior under test. Correct race conditions and hidden shared state.
 
-The release path must:
+### 13.3 Cloud loop stop conditions
 
-1. Validate tag/package/changelog version agreement and reject an existing tag mapped to different source.
-2. Check out the exact tagged commit and record the full commit SHA.
-3. Run the full mandatory test gates on that source (or verify unambiguously that required successful CI checks exist for that exact SHA plus run any release-specific checks still needed).
-4. Build frontend and Python artifacts from a clean reproducible environment.
-5. Produce a software bill of materials (SBOM), checksums and supported build provenance/attestation.
-6. Verify the wheel can be installed and the app starts/serves its bundled SPA.
-7. Generate release notes from correct user-visible changes and link to validation/known limitations.
-8. Attach all assets before publication where the repository/platform supports draft release preparation.
-9. Verify uploaded asset names and sizes/digests against local build outputs.
-10. Publish only after every release gate passes, then verify the published release/tag/assets/attestation through GitHub itself.
+The cloud loop is complete only if:
 
-### 14.2 Do not let a tag race ahead of tests
+- all mandatory CI jobs on the exact candidate SHA concluded `success`;
+- no required job was skipped, cancelled or silently allowed to fail;
+- CodeQL and secret/dependency/security checks are green;
+- E2E, migration, packaging, docs and scientific release gates have the required evidence;
+- PR status and approvals satisfy the repo's rules;
+- the remote branch/tag SHA is exactly the intended commit.
 
-Review workflow triggers and dependencies. A `push` of a `v*` tag should not publish a Stable release after running only a small subset of the required release tests while other CI workflows can still fail. Either centralise all mandatory gates in the release workflow or implement reliable dependencies on the exact successful commit's gate results.
-
-Prefer a draft-first process: build and verify all files, upload to a draft, verify the complete asset set, then publish. If immutable releases are enabled, respect their behavior and never design a workflow that relies on replacing assets after publication. Do not modify an existing stable release to force a passing result; create a new valid version if an actual post-release fix is required.
-
-### 14.3 RC then Stable
-
-- Build and publish a release candidate first (for example `v2.0.0-rc.1` with the package's corresponding valid pre-release version). The exact naming can differ, but tags, package metadata and release notes must be tested to remain consistent.
-- Test the downloaded RC wheel in a new environment, not only the source tree.
-- Run the same user journey and review the actual release notes, screenshots and known limitations.
-- If a defect is found, fix it locally, run all affected/full local gates, push, await cloud gates, and make a new RC tag. Never mutate an existing tag to reuse its name.
-- Once the RC is accepted with no open release-blocking defects and all gates green on the final commit, update final version/changelog, rerun the complete gates, merge if policy allows, and tag/publish `v2.0.0`.
-- For Stable, ensure package version and release tag truly represent 2.0.0, not an RC version; inspect installed `importlib.metadata`/CLI/API versions.
-
-### 14.4 Release asset verification
-
-After publication:
-
-- Fetch release metadata from GitHub and verify tag, target commit, title, notes and Stable/prerelease flag.
-- Confirm the expected wheel, `SHA256SUMS.txt`, SBOM and provenance/attestation exist.
-- Download each asset to a temporary directory and recompute SHA-256; verify checksums match.
-- Verify build provenance/attestation using the documented official command when available.
-- Install the downloaded public wheel in a fresh environment and repeat version/doctor/health/root-SPA and minimal workflow smoke tests.
-- Verify the GitHub release page links to correct documentation, has no stale v1 text, and does not claim unsupported scientific capabilities.
-- Record exact tag, commit SHA, workflow run URLs, asset hashes and smoke-test results in `docs/releases/v2.0.0.md` or a release verification report.
-
-If GitHub permissions, branch protection or required human approval prevents the final publication, do not bypass it. Leave a fully tested candidate and precise instructions showing exactly what remains.
+If a human approval, owner-only permission or an unavailable external service blocks an action, do not bypass it. Finish all safe independent work and report the blocker by exact workflow, job, PR or permission. Do not call the release complete.
 
 ---
 
-## 15. Final README, docs and GitHub repository polish — do this after implementation stabilises
+## 14. Documentation and repository hygiene — after implementation stabilizes
 
-Do not write promotional final documentation while the feature implementation is still changing. Keep internal engineering notes and tests up to date throughout development; perform the user-facing content pass only when the code and capability contract are stable. Then rerun all relevant final gates because docs, package version and workflow files can themselves introduce release errors.
+Do a final, systematic documentation reconciliation once the code/behavior has stabilized. Fix factual documentation defects earlier if they would mislead development decisions, but avoid rewriting all prose after every code commit.
 
-### 15.1 README requirements
+### 14.1 One consistent feature ledger
 
-Treat the README as a reliable product entry point. It should be concise enough to scan while linking to detailed guides. Include, in a sensible order:
+Use one authoritative status table and ensure these pages tell the same truth:
 
-1. Original HCS Discovery Studio mark/wordmark with alt text and working relative paths.
-2. Accurate product name and one-line description; brand line `Open science. Reproducible discovery. Made with ❤️ by hcsmedia.`
-3. CI/security/license/version/release badges only when each badge target is real and correct.
-4. A short, truthful capability summary distinguishing available, optional, planned and validated features.
-5. A “what it is / what it is not” section, including scientific and non-clinical limitations.
-6. Current genuine screenshots of the real app, with alt text and desktop/mobile representations.
-7. A clean quickstart for the supported OS, exact Python/Node/tool prerequisites, copy-paste commands, first launch URL and a working demo workflow.
-8. A clearly documented release-wheel installation path with the actual current filename/version and checksum/attestation verification.
-9. The typical research workflow and sample CLI/API commands.
-10. A readable architecture overview and links to architecture, node/plugin API, data model and workflow engine docs.
-11. Reproducibility/provenance explanation and a real example artifact/manifest when safe and accurate.
-12. Current CI/test commands and links to actual recent green workflow runs, not stale run IDs.
-13. Security defaults, network-policy behavior, data privacy/telemetry behavior and how to report security issues.
-14. Exact known limitations, supported platform/backend matrix, and unsupported GPU/engine claims.
-15. Links to installation, quickstart, CLI, workflows, model/local-provider, scientific limitations, validation, contribution and troubleshooting docs.
-16. License, citation, conduct, support/contribution and release links.
-
-Use tables only where they improve comparison. Avoid huge walls of prose, empty sections, duplicated feature lists, broken badges, stale version numbers and “perfect/SOTA/industry-grade” marketing without scope-specific proof.
-
-### 15.2 Screenshot and brand assets
-
-- Generate screenshots only by running the actual final application with the final build and synthetic fixtures.
-- Verify every markdown/HTML image path and case sensitivity. Keep assets reasonably sized and compressed without destroying legibility.
-- Ensure SVGs are valid and safe; include accessible alt text for embedded images.
-- Update the 1280×640 Open Graph/social preview only if it accurately reflects the final product. Verify dimensions/file size with a script. Do not make claims in the social card that are stronger than the code/benchmark evidence.
-- GitHub README images should use repository-relative paths where appropriate; release/download links should point to actual releases. Do not use broken local paths or temporary screenshots.
-
-### 15.3 Documentation reconciliation
-
-Audit and correct every current doc against code and test evidence, including:
-
+- `README.md`;
 - `docs/engineering/IMPLEMENTATION_STATUS.md`;
-- historical v1 gap analyses (preserve, mark historical, add a current v2 gap/plan instead of leaving stale content looking authoritative);
-- `docs/developer-guide/TESTING.md`;
-- scientific validation protocol and each actual report;
-- security threat model and residual-risk list;
-- architecture, workflow engine, data model and plugin API docs;
-- Windows/Linux install and quickstart guides;
-- CLI, workflows and local-model docs;
-- component/license audit and dependency audit process;
-- changelog, release notes, citation metadata and contribution guide.
+- `docs/user-guide/SCIENTIFIC_LIMITATIONS.md`;
+- model/adapter registry text and API status;
+- architecture/workflow docs;
+- install guides and troubleshooting;
+- changelog and release notes;
+- repository version/status badges.
 
-Every table of test results must be based on the actual final runs. Historical test counts, CI URLs and package names must be clearly dated or updated. Unsupported or incomplete capability statements must be corrected everywhere, not only in the README.
+Specific audit leads to resolve:
 
-### 15.4 GitHub metadata and open-source hygiene
+- Some historical documentation has described AutoDock Vina, property prediction and data connectors as both available and unimplemented. Reconcile every statement against actual implementation, host probing and evidence.
+- The documentation for linear workflows may be stale now that the engine registers joins/DAG behavior. Verify actual supported branching/fan-in semantics before updating claims.
+- `IMPLEMENTATION_STATUS.md` and earlier gap-analysis documents may conflict on whether v1/v2 are Stable, candidate or pending. Add dates and historical labels; do not present old plans as current release facts.
+- Model metadata may contain measured, heuristic and literature-derived results. Label these distinctly and show current evidence for each.
+- Package metadata, development-status classifier, Python support badge, current release state and feature claims must agree.
+- Do not inflate test counts based on prior commits. Regenerate counts and claims from actual current command outputs.
 
-Inspect repository settings and metadata where permissions allow. Recommend or configure (only where authorised and safe):
+### 14.2 README quality
 
-- short, accurate repository description;
-- relevant non-spammy topics such as cheminformatics, drug-discovery, RDKit, reproducible-workflows, virtual-screening (only if supported);
-- correct website/homepage if there is a real project page;
-- GitHub About text and social-preview card;
-- license, `CITATION.cff`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md` and issue/PR templates;
-- Dependabot alerts/security updates, secret scanning and push protection where available;
-- protected `main`, required CI checks and review/conversation-resolution rules where the owner/account plan permits;
-- current CODEOWNERS entries for critical workflow/release/security files if appropriate;
-- a release procedure that does not allow unreviewed or untested Stable publication.
+The README should let a new user answer quickly and accurately:
 
-Do not assume repository settings were changed merely because files documenting them were committed. If settings cannot be changed through available permissions, document the exact manual step and leave repository code safe by default.
+1. What the software does and does not do.
+2. Which features are genuinely runnable and the requirements for each.
+3. How to install from source and from the released wheel.
+4. How to run one end-to-end example, including expected output and failure handling.
+5. Which operating systems/Python versions are actually supported and tested.
+6. How to verify artefact checksums/provenance.
+7. What the security model and network policy are.
+8. What the scientific caveats and unsupported research claims are.
+9. How to report security issues, bugs and scientific errors.
+10. How to cite and license the project.
 
-### 15.5 SEO without keyword spam
+Use genuine, current screenshots from the working application. Never use mockups as evidence of functionality. Make sure images, logo paths, internal links, release links and badges actually resolve.
 
-- Use the actual project name and specific supported description in the title/head metadata.
-- Ensure `apps/web/index.html` has a truthful title, concise description, correct favicon and social metadata if the deployed UI is shared on the web.
-- Use meaningful headings, stable links, readable installation instructions, project topics and high-quality screenshots.
-- Use relevant terms naturally: computational drug discovery, cheminformatics, RDKit, reproducible workflows, virtual screening and local-first research where accurate.
-- Never keyword-stuff or imply unimplemented integrations, clinical use, benchmark leadership or GPU support to improve search placement.
-- Check the built output and GitHub-rendered relative links rather than assuming metadata works.
+### 14.3 Versioned scientific reports
 
-### 15.6 Link and artifact verification
+For each scientific report, include method/model version, input fixture hash, dataset source and license, exclusions, exact command, code commit, relevant runtime versions, metrics, baseline, sample size and caveats. Do not overwrite historical results without recording why they changed. Do not imply tests were run after the displayed report's commit if they were not.
 
-Run the existing docs-link checker and any frontend link validation. Verify internal anchors, README relative paths, badges, screenshots, releases, user guides, citations and official upstream URLs. Avoid indiscriminate crawling of sites that rate-limit or require credentials; for a failing external link, verify manually and distinguish a transient upstream issue from a genuinely broken target.
+### 14.4 GitHub metadata, SEO and open-source hygiene
+
+- Verify repository description, topics, license, citations and social preview image reflect the actual product.
+- Use accurate, useful headings and searchable terms without keyword spam.
+- Check README image alt text and link accessibility.
+- Verify contribution, code of conduct, security reporting and issue templates.
+- Keep branding credit accurate; do not invent user counts, adoption claims, performance claims or external endorsements.
+- Verify links and assets with the current documentation-link checker and, where appropriate, a manual browser check.
+
+---
+
+## 15. Version-candidate and Stable release procedure
+
+### 15.1 Release-candidate stage
+
+1. Finish implementation and the documentation reconciliation.
+2. Update package/app versions only according to the real version-verification script.
+3. Run the full local gates from Section 12 on a clean working tree.
+4. Commit and push the candidate branch.
+5. Observe cloud CI and scientific release gates on the exact candidate SHA until green.
+6. If a failure appears, return to the local fix loop. Never tag Stable to make the workflow try again.
+7. Verify the candidate wheel in a fresh environment and inspect its contents.
+8. Run the version verifier and validate release notes before publishing a candidate, if candidate releases are part of the chosen workflow.
+
+### 15.2 Stable tag stage
+
+Only after the candidate is fully verified:
+
+1. Choose the final exact source commit and confirm it contains all approved fixes/docs.
+2. Re-run all mandatory local gates if any file changed after the last pass.
+3. Re-run cloud required gates for that exact commit.
+4. Ensure there is no uncommitted or unreviewed state that changes the artifact.
+5. Create/push the Stable tag only after the full exact-SHA gate is green and required approvals exist.
+6. Verify that the release workflow checks the tag, package version, changelog and release notes before packaging.
+7. Do not reuse an existing tag or overwrite an existing Stable release.
+
+### 15.3 Artifact publication and verification
+
+The release workflow should build the wheel from the tagged source, generate the SBOM from the real package environment, produce SHA-256 checksums and build-provenance attestation, and then publish the assets.
+
+After publishing:
+
+- open the real GitHub Release and verify the tag/SHA;
+- list and download the wheel, SBOM and checksum file;
+- compute SHA-256 of downloaded assets and compare with the published checksums;
+- verify the GitHub build-provenance attestation using the official supported command;
+- install the downloaded wheel into a clean environment and run version, diagnostics, migration, API health/readiness and SPA smoke checks;
+- verify the installed version equals the release version;
+- inspect release notes for unsupported or misleading claims.
+
+Report a release as published only when the host confirms it exists and the published assets have been verified. If permissions prevent tag or release publication, report the exact required human action and do not claim success.
 
 ---
 
 ## 16. Full final acceptance checklist
 
-Do not check an item until there is evidence. The checklist should be mirrored in the final engineering report and, if useful, in a release checklist file.
+Do not mark `v2.0.0 Stable` as done until all applicable boxes are supported by evidence in the final report.
 
 ### Repository and implementation
 
-- [ ] Actual v1 baseline and repository permissions inspected; working changes preserved.
-- [ ] All P0 correctness defects fixed or explicitly blocked with evidence (no hidden P0 remains).
-- [ ] Every shipped adapter has accurate capability status and documented requirements.
-- [ ] Unknown node/config fields and invalid values fail early with actionable errors.
-- [ ] API, UI, CLI and agent use the same business contracts.
-- [ ] Queue, cancellation, cache, migrations and filesystem lifecycle are tested.
-- [ ] No known critical security issue remains; residual risks are documented.
-- [ ] No credentials, restricted data or accidental private output committed.
+- [ ] Initial Git state preserved; no unrelated user edits lost.
+- [ ] All intended work is committed on the appropriate branch.
+- [ ] No secrets, private data, temporary logs, unrelated binaries or unintended generated files are committed.
+- [ ] CLI, API and UI agree on supported status and error contracts.
+- [ ] All advertised runnable capabilities have a real implementation and required runtime checks.
+- [ ] `table.join`/DAG semantics are fully validated if advertised.
 
-### Scientific correctness
+### Scientific correctness and provenance
 
-- [ ] Descriptor correctness tests use fixed inputs and justified tolerances.
-- [ ] Ranking/joins pass invariant/property tests.
-- [ ] Docking path, if advertised runnable, has valid preparation/parser/integration tests and a documented evidence level.
-- [ ] Property models/scores have accurate endpoint names, units, formulas/citations and limitations.
-- [ ] Every published benchmark is real, reproducible, licensed, versioned and linked to its report.
-- [ ] No unsupported SOTA/accuracy/experimental/clinical claims remain.
-- [ ] Any unvalidated adapter is labelled accordingly in the UI, CLI, docs and report.
+- [ ] Vina input preparation conforms to the selected format/tool and has an executed reference validation.
+- [ ] A scientific release gate demonstrates actual Vina execution and a documented redocking/reference result.
+- [ ] External engine/model versions, coefficients/weights and relevant helper implementation changes invalidate cache correctly.
+- [ ] Pareto/ranking constraints, missing values, ties and permutation invariance are tested.
+- [ ] ESOL/CNS MPO descriptions, output units, model status and uncertainty claims are accurate.
+- [ ] Scientific fixtures have sources, licenses, checksums, exclusion rules and reproduction commands.
+- [ ] External connectors obey local-first network policy, redirects/allowlists/rate limiting and provenance requirements.
+- [ ] No GPU/Vulkan or model-performance claim exceeds demonstrated evidence.
 
-### Build and tests
+### Build, test and UX
 
-- [ ] Lockfile current and dependency installs clean.
-- [ ] Format, lint, type checks pass.
-- [ ] Full backend/unit/integration/security suite passes.
-- [ ] Scientific reference tests pass; long benchmark status is reported accurately.
-- [ ] All required E2E tests pass without hidden flakiness.
-- [ ] Visual QA screenshots were inspected at mobile/tablet/desktop widths and applicable themes.
-- [ ] Accessibility, error/loading/empty states and core controls are verified.
-- [ ] Wheel builds, installs and runs from an isolated environment.
-- [ ] Supported Windows and Linux CI gates pass on the newest release commit.
-- [ ] No failing/required job was skipped or softened merely to obtain green status.
+- [ ] Lockfile and dependency installation gates pass.
+- [ ] Ruff format/check and mypy pass.
+- [ ] Backend tests pass with coverage floor.
+- [ ] Frontend typecheck and production build pass.
+- [ ] Playwright E2E gates pass on clean isolated data.
+- [ ] Visual QA has been performed on the actual application in both themes and required responsive widths.
+- [ ] Accessibility and keyboard focus issues in critical flows are addressed.
+- [ ] Fresh DB migration and migration-upgrade tests pass.
+- [ ] Fresh wheel install passes on claimed release platforms.
+- [ ] Real core lifecycle from import through workflow, run, results and export passes.
+- [ ] Crash recovery, cancellation, cache integrity and deletion/path safety tests pass.
 
-### Cloud and release
+### Documentation, security and release
 
-- [ ] Exact source SHA has green required CI/security/package checks.
-- [ ] PR/branch protection policies were followed; merge is verified.
-- [ ] Release candidate was built and tested from a tag/commit.
-- [ ] Stable version, tag, changelog and Python package version agree.
-- [ ] README/docs/screenshots reflect final implementation and real final CI data.
-- [ ] SBOM, checksum file and build provenance/attestation exist.
-- [ ] Public assets were downloaded and their hashes independently recomputed.
-- [ ] Public wheel smoke journey passed in a fresh environment.
-- [ ] GitHub Stable release points at the intended final commit and has correct notes/assets.
-- [ ] `v2.0.0` was not published until all the above were true.
+- [ ] README, implementation ledger, scientific limitations, package metadata, changelog, status badges and release notes are consistent.
+- [ ] Relative links and screenshots have been verified.
+- [ ] Dependency/license audits, Secret Scanning, CodeQL and dependency review pass.
+- [ ] Release workflow is blocked unless every mandatory gate passed for the exact tagged SHA.
+- [ ] Candidate and Stable versions are synchronized and the version verifier passes.
+- [ ] Required branch protection and approvals are respected.
+- [ ] Final cloud CI is green on the exact release commit.
+- [ ] Wheel, SBOM, SHA-256 checksums and build attestation are published and verified.
+- [ ] The downloaded release wheel was installed and smoke-tested.
+- [ ] Final report contains actual evidence and accurately identifies any blocker.
 
 ---
 
-## 17. Required final verification report
+## 17. Required final engineering report
 
-Only after all possible work is completed, write/update `docs/releases/v2.0.0.md` and an engineering verification record containing:
+At completion, produce a concise but evidence-rich report with:
 
-- final version/tag and exact full commit SHA;
-- branch/PR/merge link and current `main` SHA;
-- local OS/tool versions;
-- exact local gate commands with passed/failed/not-run results;
-- number of tests only if captured from actual test output;
-- test/coverage/E2E/visual QA evidence links and screenshot paths;
-- scientific benchmark names, dataset/version/licenses, commands, metrics, artifact links and limitations;
-- supported OS/backends and explicitly untested configurations;
-- exact cloud workflow run URLs and conclusions for the final SHA;
-- public release URL and the asset list;
-- wheel/SBOM/checksum hashes and provenance verification result;
-- fresh-install/package smoke-test evidence;
-- known limitations, incomplete non-blocking items and any permissions that remain outside the agent's control.
+1. **Release status:** not started / implementation complete / candidate verified / Stable published. Use only the status actually achieved.
+2. **Source identity:** branch, final commit SHA, tag, package version and GitHub release URL if published.
+3. **Changes made:** grouped into scientific correctness, provenance/cache, backend/DB, UI/UX, security, CI/release and documentation.
+4. **Local gates:** exact commands, OS/runtime versions and pass/fail result. Do not report only “tests passed”.
+5. **Cloud gates:** real Actions run IDs/links, conclusion and exact SHA.
+6. **Scientific gates:** method, reference fixture, version, input checksum, test/benchmark command and measured result. Mark unavailable or skipped checks explicitly.
+7. **Visual QA:** tested routes, viewports, themes, screenshots reviewed and issues fixed.
+8. **Packaging:** wheel filename/version/hash, installation environment and smoke-test results.
+9. **Release artefacts:** links and verified hashes for wheel, SBOM and checksum file; attestation verification result.
+10. **Known limitations:** only real residual limitations, with their user impact and reason they do not block the claimed release, or the explicit blocker that prevents completion.
+11. **Remaining human action:** only if a required permission/approval cannot be completed by the agent. Name the precise action; do not hide it among generic warnings.
 
-Use precise statuses: `PASS`, `FAIL`, `BLOCKED`, `NOT RUN`, `NOT APPLICABLE`. Do not present missing evidence as success. A summary like “everything is perfect” is not acceptable without a traceable evidence set; report the real outcomes.
-
-### Completion message
-
-When v2 Stable is genuinely published and verified, send a concise but complete final message with:
-
-1. `v2.0.0` release URL and final commit SHA;
-2. major improvements delivered;
-3. exact local/cloud test-gate results;
-4. scientific validation links and their scope;
-5. wheel/SBOM/checksum/provenance verification;
-6. remaining limitations or `None identified beyond the documented list` only if that is accurate.
-
-If publication is blocked by required approval, permissions or a repository policy, state that exact blocker, link the ready PR/RC, show that all other work is completed, and provide the minimum owner action needed. Do not claim a Stable release exists unless GitHub confirms it.
+Never report “all done” while a required gate is failing, unrun, skipped without approved exception or attached to a different commit. If a true blocker remains after five distinct repair attempts for its root cause, document it and continue all unrelated work. Do not publish Stable while the blocker affects a mandatory acceptance criterion.
 
 ---
 
 ## 18. Official references to consult during execution
 
-Re-open current official docs when applying these practices; versions and GitHub UI may change.
+Check current official documentation rather than trusting these links without verification:
 
-- GitHub repository best practices: https://docs.github.com/en/repositories/creating-and-managing-repositories/best-practices-for-repositories
-- GitHub secure use of Actions: https://docs.github.com/en/actions/reference/security/secure-use
-- GitHub protected branches: https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches
-- GitHub immutable releases: https://docs.github.com/en/code-security/concepts/supply-chain-security/immutable-releases
-- GitHub pull request standardisation: https://docs.github.com/en/pull-requests/reference/managing-and-standardizing-pull-requests
-- AutoDock Vina documentation: https://autodock-vina.readthedocs.io/
-- Meeko documentation: https://meeko.readthedocs.io/
-- RDKit documentation: https://www.rdkit.org/docs/
-- Chemprop repository/docs: https://github.com/chemprop/chemprop
-- MoleculeNet paper: https://pubs.rsc.org/en/content/articlehtml/2018/sc/c7sc02664a
+- Repository and current releases: <https://github.com/timfromhcs/hcs-discovery-studio>
+- AutoDock Vina documentation: <https://autodock-vina.readthedocs.io/>
+- Meeko documentation: <https://meeko.readthedocs.io/>
+- RDKit documentation: <https://www.rdkit.org/docs/>
+- Alembic migration documentation: <https://alembic.sqlalchemy.org/>
+- FastAPI documentation: <https://fastapi.tiangolo.com/>
+- Pydantic documentation: <https://docs.pydantic.dev/>
+- GitHub Actions security hardening: <https://docs.github.com/en/actions/security-for-github-actions/security-guides/security-hardening-for-github-actions>
+- GitHub artifact attestations: <https://docs.github.com/en/actions/security-for-github-actions/using-artifact-attestations>
+- CycloneDX: <https://cyclonedx.org/>
 
-These references guide engineering decisions but do not substitute for tests against this repository.
+Verify licenses and official method references for any additional tool, dataset, benchmark or model before using it.
 
 ---
 
 ## Final instruction
 
-**Execute the entire lifecycle autonomously, in order, using real evidence. Build and fix locally first; prove the code and live UI locally; only then push. After each push, iterate on actual cloud failures until the newest commit is green. Once the implementation is stable, reconcile the README and all documentation with the actual code, run the final gates again, validate the release candidate, publish v2.0.0, download and verify its assets, and only then report completion.**
-
-Do not stop at planning, do not ask routine questions, do not claim a step was completed when it was merely attempted, and do not bypass a safety, scientific, repository or permission gate to force a one-shot success.
+Proceed autonomously from the actual checkout. First inspect and record ground truth. Then implement the highest-priority correctness and release-gate fixes in small, testable batches. **Complete the local build/test/visual-QA/package loops before the first push.** Push only verified work to the correct branch, inspect Cloud CI on the exact pushed SHA, fix every genuine failure locally, rerun the necessary gates, commit and push again. Continue until all mandatory gates and independent scientific release checks are demonstrably green. Reconcile documentation after implementation stabilizes, rerun the final local and cloud gates after the documentation/release changes, and publish `v2.0.0 Stable` only when all acceptance criteria pass and the exact release artefacts are verified. Preserve honesty, security, user data and repository history at every step.
