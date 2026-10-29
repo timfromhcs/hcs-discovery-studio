@@ -4,6 +4,11 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = fileURLToPath(new URL("../..", import.meta.url));
 
+// The web server starts before globalSetup, so a shared directory cannot be wiped
+// safely once the server holds the database open. Give every invocation a fresh
+// directory instead; workers inherit it through the environment.
+process.env.HCS_E2E_DATA_DIR ??= join(repoRoot, ".e2e-data", `run-${Date.now()}`);
+
 export default defineConfig({
   testDir: "./e2e",
   globalSetup: "./e2e/global-setup.ts",
@@ -26,7 +31,7 @@ export default defineConfig({
     reuseExistingServer: false,
     timeout: 120_000,
     env: {
-      HCS_DATA_DIR: join(repoRoot, ".e2e-data"),
+      HCS_DATA_DIR: process.env.HCS_E2E_DATA_DIR,
       HCS_NETWORK_POLICY: "local",
     },
   },
