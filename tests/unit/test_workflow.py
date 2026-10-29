@@ -5,6 +5,7 @@ from __future__ import annotations
 import copy
 
 import pytest
+from pydantic import ValidationError as PydanticValidationError
 
 from hcs_discovery.core.errors import ValidationError
 from hcs_discovery.workflow.cache import cache_key
@@ -15,7 +16,7 @@ from hcs_discovery.workflow.nodes import (
     _run_filters,
     _run_rank,
 )
-from hcs_discovery.workflow.registry import NodeContext
+from hcs_discovery.workflow.registry import NodeContext, default_registry
 from hcs_discovery.workflow.schema import validate_workflow
 from hcs_discovery.workflow.table import IDENTITY_COLUMNS, Column, Table
 
@@ -411,3 +412,106 @@ def test_rule_config_validation_and_missing_values():
     filtered = _run_filters(table, fconfig, DummyContext())
     assert filtered.rows[0]["filter_pass"] is False
     assert filtered.rows[1]["filter_pass"] is True
+
+
+@pytest.mark.parametrize("node_type", default_registry().types())
+def test_every_registered_node_rejects_unknown_fields(node_type):
+    definition = default_registry().get(node_type)
+    with pytest.raises(PydanticValidationError) as excinfo:
+        definition.config_model.model_validate({"unknown_field_for_contract_test": 1})
+    assert any(error["type"] == "extra_forbidden" for error in excinfo.value.errors())
+
+
+def _join_tables() -> tuple[Table, Table]:
+    left = Table(
+        rows=[{"id": "a", "value": 1.0}, {"id": "b", "value": 2.0}],
+        columns=[Column("id", "ID", "string"), Column("value", "Value", "number")],
+    )
+    right = Table(
+        rows=[{"id": "a", "score": 10.0}, {"id": "b", "score": 20.0}],
+        columns=[Column("id", "ID", "string"), Column("score", "Score", "number")],
+    )
+    return left, right
+
+
+def test_join_preserves_all_left_rows_and_matches_by_key():
+    left, right = _join_tables()
+    joined = left.join(right, key_column="id", how="left")
+    assert [row["id"] for row in joined.rows] == ["a", "b"]
+    assert [row["score"] for row in joined.rows] == [10.0, 20.0]
+
+
+def test_join_rejects_duplicate_right_keys_instead_of_discarding_rows():
+    left, _ = _join_tables()
+    right = Table(
+        rows=[
+            {"id": "a", "score": 10.0},
+            {"id": "a", "score": 11.0},
+            {"id": "b", "score": 20.0},
+        ],
+        columns=[Column("id", "ID", "string"), Column("score", "Score", "number")],
+    )
+    for how in ("inner", "left", "outer"):
+        with pytest.raises(ValidationError) as excinfo:
+            left.join(right, key_column="id", how=how)  # type: ignore[arg-type]
+        assert excinfo.value.details["duplicate_keys"] == ["a"]
+
+
+def test_join_rejects_suffix_collision_instead_of_overwriting_columns():
+    left = Table(
+        rows=[{"id": "a", "value": 1.0, "value_right": 99.0}],
+        columns=[
+            Column("id", "ID", "string"),
+            Column("value", "Value", "number"),
+            Column("value_right", "Existing suffixed value", "number"),
+        ],
+    )
+    right = Table(
+        rows=[{"id": "a", "value": 2.0}],
+        columns=[Column("id", "ID", "string"), Column("value", "Other value", "number")],
+    )
+    with pytest.raises(ValidationError) as excinfo:
+        left.join(right, key_column="id")
+    assert excinfo.value.details["column"] == "value"
+    assert excinfo.value.details["suffix"] == "_right"
+
+
+def test_constraint_objectives_gate_ranking_and_pareto_without_scoring():
+    table = _table()
+    constrained = RankConfig(
+        objectives=[
+            {"column": "mw", "direction": "lower", "weight": 1.0},
+            {"column": "logp", "direction": "constraint", "target_max": 3.0},
+        ]
+    )
+    result = _run_rank(table, constrained, DummyContext())
+    by_id = {row["compound_id"]: row for row in result.rows}
+    assert by_id["c1"]["constraint_pass"] is True
+    assert by_id["c3"]["constraint_pass"] is False
+    assert "logp: 8 > 3" in by_id["c3"]["constraint_reasons"]
+    assert by_id["c3"]["pareto_rank"] is None
+    assert by_id["c3"]["rank"] > by_id["c1"]["rank"]
+    assert result.column("constraint_pass").type == "boolean"
+
+    unconstrained = RankConfig(objectives=[{"column": "mw", "direction": "lower", "weight": 1.0}])
+    baseline = _run_rank(_table(), unconstrained, DummyContext())
+    baseline_by_id = {row["compound_id"]: row for row in baseline.rows}
+    for compound_id, row in by_id.items():
+        assert row["composite_score"] == baseline_by_id[compound_id]["composite_score"]
+
+
+def test_constraint_objective_cannot_be_scored_or_enter_pareto():
+    from hcs_discovery.workflow.nodes import ObjectiveConfig
+
+    with pytest.raises(PydanticValidationError):
+        ObjectiveConfig(column="logp", direction="constraint", target_max=3.0, weight=1.0)
+    with pytest.raises(PydanticValidationError):
+        ObjectiveConfig(
+            column="logp",
+            direction="constraint",
+            target_max=3.0,
+            participates_in_pareto=True,
+        )
+    objective = ObjectiveConfig(column="logp", direction="constraint", target_max=3.0)
+    assert objective.weight == 0.0
+    assert objective.participates_in_pareto is False

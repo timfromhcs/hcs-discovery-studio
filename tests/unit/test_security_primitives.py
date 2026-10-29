@@ -60,6 +60,25 @@ def test_safe_join_rejects_escape(tmp_path: Path):
     assert safe_join(base, "inside", "file.txt").is_relative_to(base.resolve())
 
 
+def test_safe_join_rejects_sibling_with_shared_prefix(tmp_path: Path):
+    base = tmp_path / "data"
+    base.mkdir()
+    (tmp_path / "data-evil").mkdir()
+    with pytest.raises(ValidationError):
+        safe_join(base, "..", "data-evil", "plan.json")
+    assert safe_join(base) == base.resolve()
+
+
+def test_plan_store_rejects_traversal_plan_ids(tmp_path: Path):
+    from hcs_discovery.core.config import Settings
+    from hcs_discovery.plugins.llm.agent import PlanStore
+
+    store = PlanStore(Settings(data_dir=tmp_path / "data"))
+    for plan_id in ("../plan_0123456789ab", "plan_0123456789ab/../../x", "/etc/passwd", "plan_ZZZ"):
+        with pytest.raises(ValidationError):
+            store.load(plan_id)
+
+
 def test_stable_hash_is_key_order_independent():
     assert stable_json_hash({"a": 1, "b": [1, 2]}) == stable_json_hash({"b": [1, 2], "a": 1})
     assert stable_json_hash({"a": 1}) != stable_json_hash({"a": 2})

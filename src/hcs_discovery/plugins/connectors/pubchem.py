@@ -37,7 +37,9 @@ class PubChemConnector(BaseConnector):
             "CanonicalSMILES,IsomericSMILES,InChIKey,MolecularFormula,MolecularWeight,IUPACName/JSON"
         )
 
-        res_json = self.get_json(url)
+        res_json = self.get_json(url, allow_not_found=True)
+        if res_json is None:
+            return []
         props = res_json.get("PropertyTable", {}).get("Properties", [])
         records: list[ConnectorRecord] = []
         retrieval_time = self.now_iso()
@@ -73,7 +75,9 @@ class PubChemConnector(BaseConnector):
             f"{PUBCHEM_BASE_URL}/compound/cid/{cid}/property/"
             "CanonicalSMILES,IsomericSMILES,InChIKey,MolecularFormula,MolecularWeight,IUPACName/JSON"
         )
-        res_json = self.get_json(url)
+        res_json = self.get_json(url, allow_not_found=True)
+        if res_json is None:
+            return None
         props = res_json.get("PropertyTable", {}).get("Properties", [])
         if not props:
             return None

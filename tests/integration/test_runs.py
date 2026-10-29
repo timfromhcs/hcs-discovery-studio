@@ -72,6 +72,61 @@ def test_full_run_persists_results_artifacts_and_manifest(settings, session, pro
     assert page["columns"]
 
 
+def test_results_pagination_sorts_missing_values_last(settings, session, project, dataset, triage_definition):
+    run = create_run(session, project_id=project.id, workflow=triage_definition, dataset_id=dataset.id)
+    assert _execute(settings, run.id) == "succeeded"
+    session.expire_all()
+    stored = session.execute(select(RunResult).where(RunResult.run_id == run.id).order_by(RunResult.id)).scalars().all()
+    stored[0].composite_score = None
+    stored[1].rank = None
+    session.commit()
+
+    for order in ("asc", "desc"):
+        page = results_page(session, run.id, sort="composite_score", order=order, limit=16)
+        scores = [item["composite_score"] for item in page["items"]]
+        assert scores[-1] is None
+        non_null = [score for score in scores if score is not None]
+        assert non_null == sorted(non_null, reverse=(order == "desc"))
+
+        ranks = [item["rank"] for item in results_page(session, run.id, sort="rank", order=order, limit=16)["items"]]
+        assert ranks[-1] is None
+        non_null_ranks = [rank for rank in ranks if rank is not None]
+        assert non_null_ranks == sorted(non_null_ranks, reverse=(order == "desc"))
+
+    full = [item["compound_id"] for item in results_page(session, run.id, limit=16, sort="rank")["items"]]
+    paged: list[str] = []
+    for offset in range(0, len(full), 5):
+        page = results_page(session, run.id, sort="rank", limit=5, offset=offset)
+        paged.extend(item["compound_id"] for item in page["items"])
+    assert paged == full
+    assert len(set(paged)) == len(paged)
+
+    metrics = [
+        item["metrics"]["mw"]
+        for item in results_page(session, run.id, sort="mw", order="desc", limit=16)["items"]
+        if item["metrics"].get("mw") is not None
+    ]
+    assert metrics == sorted(metrics, reverse=True)
+
+
+def test_results_query_and_passing_filters_apply_before_pagination(
+    settings, session, project, dataset, triage_definition
+):
+    run = create_run(session, project_id=project.id, workflow=triage_definition, dataset_id=dataset.id)
+    assert _execute(settings, run.id) == "succeeded"
+    session.expire_all()
+
+    everything = results_page(session, run.id, limit=2000)
+    passing = results_page(session, run.id, only_passing=True, limit=2000)
+    assert passing["total"] <= everything["total"]
+    assert all(not item["rejected"] for item in passing["items"])
+
+    needle = everything["items"][0]["compound_id"]
+    matched = results_page(session, run.id, q=needle, limit=5)
+    assert matched["total"] == 1
+    assert matched["items"][0]["compound_id"] == needle
+
+
 def test_results_columns_fall_back_to_artifact_for_legacy_runs(settings, session, project, dataset, triage_definition):
     run = create_run(session, project_id=project.id, workflow=triage_definition, dataset_id=dataset.id)
     assert _execute(settings, run.id) == "succeeded"

@@ -7,7 +7,7 @@ import math
 from datetime import UTC, datetime
 from typing import Any, Literal, Self
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from rdkit import Chem
 
 from ..chemistry.descriptors import (
@@ -36,6 +36,8 @@ NODE_VERSION = "1.0.0"
 
 # --------------------------------------------------------------------------- descriptors
 class DescriptorConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     descriptors: list[str] = Field(default_factory=lambda: list(DEFAULT_DESCRIPTORS))
 
     @field_validator("descriptors")
@@ -85,6 +87,8 @@ def _run_descriptors(table: Table, config: DescriptorConfig, ctx: NodeContext) -
 
 # --------------------------------------------------------------------------- similarity
 class SimilarityConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     query_smiles: str
     column: str = Field(default="similarity_query", pattern=r"^[a-z][a-z0-9_]{0,47}$")
     radius: int = Field(default=2, ge=1, le=4)
@@ -131,6 +135,8 @@ Operator = Literal["le", "lt", "ge", "gt", "eq", "ne", "between"]
 
 
 class RuleConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     column: str
     op: Operator
     value: float | str | bool
@@ -179,6 +185,8 @@ class RuleConfig(BaseModel):
 
 
 class FilterConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     rules: list[RuleConfig] = Field(min_length=1)
     mode: Literal["flag", "drop"] = "flag"
 
@@ -285,6 +293,8 @@ ObjectiveDirection = Literal[
 
 
 class ObjectiveConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     column: str
     direction: ObjectiveDirection = "higher"
     weight: float = Field(default=1.0, ge=0.0, le=100.0)
@@ -309,6 +319,19 @@ class ObjectiveConfig(BaseModel):
         elif self.direction == "constraint":
             if self.target_min is None and self.target_max is None:
                 raise ValueError(f"Constraint objective on '{self.column}' requires at least target_min or target_max.")
+            if "weight" in self.model_fields_set and self.weight != 0:
+                raise ValueError(
+                    f"Constraint objective on '{self.column}' is an eligibility gate, not a scored objective; "
+                    "remove the weight or set it to 0."
+                )
+            if self.participates_in_pareto:
+                raise ValueError(
+                    f"Constraint objective on '{self.column}' cannot participate in a Pareto front; "
+                    "constraints gate eligibility instead."
+                )
+            self.weight = 0.0
+            if self.participates_in_pareto is None:
+                self.participates_in_pareto = False
         elif self.direction == "informational":
             self.weight = 0.0
             if self.participates_in_pareto is None:
@@ -317,6 +340,8 @@ class ObjectiveConfig(BaseModel):
 
 
 class RankConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     objectives: list[ObjectiveConfig] = Field(min_length=1)
     pareto_front_limit: int = Field(default=10, ge=1, le=50)
 
@@ -418,6 +443,24 @@ def _run_rank(table: Table, config: RankConfig, ctx: NodeContext) -> Table:
     raw = {objective.column: table.numeric(objective.column) for objective in config.objectives}
     total_rows = len(table.rows)
 
+    constraint_objectives = [obj for obj in config.objectives if obj.direction == "constraint"]
+    constraint_ok: list[bool] = [True] * total_rows
+    constraint_reasons: list[str | None] = [None] * total_rows
+    if constraint_objectives:
+        for index in range(total_rows):
+            reasons: list[str] = []
+            for objective in constraint_objectives:
+                value = raw[objective.column][index]
+                if value is None:
+                    reasons.append(f"{objective.column}: missing value")
+                    continue
+                if objective.target_min is not None and value < objective.target_min:
+                    reasons.append(f"{objective.column}: {value:.6g} < {objective.target_min:.6g}")
+                if objective.target_max is not None and value > objective.target_max:
+                    reasons.append(f"{objective.column}: {value:.6g} > {objective.target_max:.6g}")
+            constraint_ok[index] = not reasons
+            constraint_reasons[index] = "; ".join(reasons) if reasons else None
+
     normalized: dict[str, list[float | None]] = {}
     for objective in config.objectives:
         values = [value for value in raw[objective.column] if value is not None]
@@ -464,7 +507,9 @@ def _run_rank(table: Table, config: RankConfig, ctx: NodeContext) -> Table:
                 series.append(0.0)
         normalized[objective.column] = series
 
-    scoring_objectives = [obj for obj in config.objectives if obj.weight > 0 and obj.direction != "informational"]
+    scoring_objectives = [
+        obj for obj in config.objectives if obj.weight > 0 and obj.direction not in {"informational", "constraint"}
+    ]
     total_weight = sum(obj.weight for obj in scoring_objectives)
     scores: list[float | None] = []
     for index in range(total_rows):
@@ -487,8 +532,8 @@ def _run_rank(table: Table, config: RankConfig, ctx: NodeContext) -> Table:
     pareto_objectives = [
         obj
         for obj in config.objectives
-        if (obj.participates_in_pareto is True)
-        or (obj.participates_in_pareto is None and obj.weight > 0 and obj.direction != "informational")
+        if obj.direction not in {"informational", "constraint"}
+        and ((obj.participates_in_pareto is True) or (obj.participates_in_pareto is None and obj.weight > 0))
     ]
     vectors: list[list[float] | None] = []
     for index in range(total_rows):
@@ -518,6 +563,7 @@ def _run_rank(table: Table, config: RankConfig, ctx: NodeContext) -> Table:
         range(total_rows),
         key=lambda i: (
             not bool(table.rows[i].get("filter_pass", True)),
+            not constraint_ok[i],
             scores[i] is None,
             -float(scores[i] or 0.0),
             i,
@@ -525,7 +571,9 @@ def _run_rank(table: Table, config: RankConfig, ctx: NodeContext) -> Table:
     )
 
     candidates = [
-        index for index in order if vectors[index] is not None and bool(table.rows[index].get("filter_pass", True))
+        index
+        for index in order
+        if vectors[index] is not None and constraint_ok[index] and bool(table.rows[index].get("filter_pass", True))
     ]
     candidate_vectors: list[list[float]] = [v for idx in candidates if (v := vectors[idx]) is not None]
     fronts = fast_nondominated_sort(candidates, candidate_vectors, max_fronts=config.pareto_front_limit)
@@ -536,7 +584,14 @@ def _run_rank(table: Table, config: RankConfig, ctx: NodeContext) -> Table:
 
     skipped = total_rows - len(candidates)
     if skipped:
-        ctx.log(f"Excluded {skipped} filter-failing or incomplete record(s) from Pareto fronts.")
+        ctx.log(f"Excluded {skipped} filter-failing, constraint-failing or incomplete record(s) from Pareto fronts.")
+    if constraint_objectives:
+        failed = sum(1 for ok in constraint_ok if not ok)
+        ctx.log(
+            f"Evaluated {len(constraint_objectives)} hard constraint(s); {failed} record(s) failed and are ranked "
+            "after eligible records.",
+            level="warning" if failed else "info",
+        )
     ctx.log(
         f"Ranking {total_rows} record(s) on {len(config.objectives)} objective(s); "
         "composite scores use normalized objectives with the configured weights.",
@@ -563,10 +618,33 @@ def _run_rank(table: Table, config: RankConfig, ctx: NodeContext) -> Table:
             unit="front",
             direction="lower",
             method="Non-dominated sorting",
-            description="1 = non-dominated front among filter-passing records. Filtered records are not ranked.",
+            description=(
+                "1 = non-dominated front among filter- and constraint-passing records. "
+                "Filtered or constraint-failing records are not ranked."
+            ),
         ),
         pareto_rank,
     )
+    if constraint_objectives:
+        result.add_values(
+            Column(
+                "constraint_pass",
+                "Passes hard constraints",
+                "boolean",
+                method="Configured constraint objective bounds",
+                description="False when a constraint value is missing or outside its configured bounds.",
+            ),
+            constraint_ok,
+        )
+        result.add_values(
+            Column(
+                "constraint_reasons",
+                "Constraint reasons",
+                "string",
+                description="Semicolon-separated reasons for a failed hard constraint.",
+            ),
+            constraint_reasons,
+        )
     rank_by_row = {row_index: position + 1 for position, row_index in enumerate(order)}
     result.add_values(
         Column(
@@ -575,8 +653,8 @@ def _run_rank(table: Table, config: RankConfig, ctx: NodeContext) -> Table:
             "number",
             unit="position",
             direction="lower",
-            method="Filter status, then composite score",
-            description="Composite ranking. Rows failing filters are ranked after passing rows.",
+            method="Filter status, then hard constraints, then composite score",
+            description="Composite ranking. Rows failing filters or hard constraints are ranked after eligible rows.",
         ),
         [rank_by_row[index] for index in range(total_rows)],
     )
@@ -585,6 +663,8 @@ def _run_rank(table: Table, config: RankConfig, ctx: NodeContext) -> Table:
 
 # --------------------------------------------------------------------------- summary report
 class SummaryConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     title: str = "Run summary"
     top_n: int = Field(default=10, ge=1, le=100)
 
@@ -665,6 +745,8 @@ def _run_summary(table: Table, config: SummaryConfig, ctx: NodeContext) -> Table
 
 # --------------------------------------------------------------------------- table.join
 class JoinConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     key_column: str = Field(default="id", description="Common column to align rows on.")
     how: Literal["inner", "left", "outer"] = Field(
         default="left", description="Join type: 'left' (retain all left rows), 'inner', or 'outer'."

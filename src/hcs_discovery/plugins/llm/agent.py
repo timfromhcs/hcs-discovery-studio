@@ -13,14 +13,18 @@ Adheres strictly to the engineering contract (GEMINI.md Phase 5):
 from __future__ import annotations
 
 import json
+import re
 import uuid
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
+from pydantic import ValidationError as PydanticValidationError
 from sqlalchemy.orm import Session
 
 from ...core.config import Settings
-from ...core.errors import PolicyError, ValidationError
+from ...core.errors import NotFoundError, PolicyError, ValidationError
+from ...core.hashing import stable_json_hash
+from ...core.paths import safe_join
 from ...core.redaction import redact_text
 from ...workflow.schema import validate_workflow
 from .openai_compat import OpenAICompatibleProvider, build_provider
@@ -46,8 +50,8 @@ SECURITY & SAFETY RULES:
 
 class PlanStep(BaseModel):
     tool: str
-    arguments: dict[str, Any]
-    rationale: str
+    arguments: dict[str, Any] = Field(default_factory=dict)
+    rationale: str = ""
     requires_approval: bool = True
     high_impact: bool = False
 
@@ -57,10 +61,65 @@ class PlanResponse(BaseModel):
     goal: str
     proposed_workflow: dict[str, Any] | None = None
     steps: list[PlanStep] = Field(default_factory=list)
-    estimated_resources: str = "CPU only, <512MB RAM, <10s estimated"
+    estimated_resources: str = "CPU only; runtime and memory have not been benchmarked for this plan."
     external_access_needs: str = "None (100% local-first computation)"
     expected_artifacts: list[str] = Field(default_factory=lambda: ["results.csv", "results.json"])
     scientific_limitations: list[str] = Field(default_factory=lambda: [SCIENTIFIC_CAVEAT])
+    plan_hash: str = ""
+
+
+PLAN_ID_PATTERN = r"^plan_[0-9a-f]{12}$"
+
+
+def _plan_digest(plan: PlanResponse) -> str:
+    """Hash the execution-relevant content of a plan.
+
+    Volatile presentation fields (resource text, caveats) are excluded so that the
+    digest binds exactly what a run is authorised to do.
+    """
+    return stable_json_hash(
+        {
+            "goal": plan.goal,
+            "proposed_workflow": plan.proposed_workflow,
+            "steps": [{"tool": step.tool, "arguments": step.arguments} for step in plan.steps],
+        }
+    )
+
+
+class PlanStore:
+    """Persisted plans so an approval refers to a specific, immutable step list."""
+
+    def __init__(self, settings: Settings) -> None:
+        self.root = settings.data_dir / "agent_plans"
+
+    def _path(self, plan_id: str):
+        if not re.fullmatch(PLAN_ID_PATTERN, plan_id):
+            raise ValidationError(f"Invalid plan id '{plan_id}'.", details={"pattern": PLAN_ID_PATTERN})
+        return safe_join(self.root, f"{plan_id}.json")
+
+    def save(self, plan: PlanResponse) -> None:
+        self.root.mkdir(parents=True, exist_ok=True)
+        plan.plan_hash = _plan_digest(plan)
+        path = self._path(plan.plan_id)
+        tmp = path.with_suffix(".json.tmp")
+        tmp.write_text(plan.model_dump_json(indent=2), encoding="utf-8")
+        tmp.replace(path)
+
+    def load(self, plan_id: str) -> PlanResponse:
+        path = self._path(plan_id)
+        if not path.is_file():
+            raise NotFoundError(f"Plan '{plan_id}' was not found. Generate a plan before running it.")
+        try:
+            plan = PlanResponse.model_validate_json(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            raise ValidationError(f"Stored plan '{plan_id}' could not be read.") from exc
+        if plan.plan_id != plan_id or plan.plan_hash != _plan_digest(plan):
+            raise PolicyError(
+                "Plan integrity check failed: the stored plan no longer matches its approved digest. "
+                "Generate a new plan and approve it again.",
+                details={"plan_id": plan_id},
+            )
+        return plan
 
 
 class AgentRequest(BaseModel):
@@ -68,7 +127,7 @@ class AgentRequest(BaseModel):
     prompt: str = Field(min_length=1, max_length=4000)
     project_id: str | None = None
     dataset_id: str | None = None
-    plan_id: str | None = None
+    plan_id: str | None = Field(default=None, pattern=PLAN_ID_PATTERN)
     approved_tool_calls: list[dict[str, Any]] | None = None
 
 
@@ -94,6 +153,7 @@ class ResearchAgent:
     def __init__(self, settings: Settings, provider: OpenAICompatibleProvider | None = None) -> None:
         self.settings = settings
         self.provider = provider or build_provider(settings)
+        self._plans = PlanStore(settings)
 
     def handle(self, request: AgentRequest, session: Session) -> AgentResponse:
         """Route request according to mode."""
@@ -105,6 +165,7 @@ class ResearchAgent:
             return self.run(
                 request.prompt,
                 session,
+                plan_id=request.plan_id,
                 approved_tool_calls=request.approved_tool_calls or [],
                 project_id=request.project_id,
             )
@@ -195,24 +256,35 @@ class ResearchAgent:
         plan_id = f"plan_{uuid.uuid4().hex[:12]}"
         prompt_lower = prompt.lower()
 
-        # Build appropriate DAG workflow based on intent
+        # Build an appropriate DAG workflow based on intent.
         # 1. Base descriptors
         nodes: list[dict[str, Any]] = [{"id": "desc", "type": "chem.descriptors", "config": {}}]
         edges: list[dict[str, str]] = []
 
-        # 2. Add property prediction if requested or standard screening
-        has_prop = any(k in prompt_lower for k in ["solubility", "logs", "esol", "cns", "mpo", "property"])
+        # 2. Add the property model(s) the prompt actually asks for. The node accepts
+        # one model per node, so CNS MPO and ESOL requests must not be conflated.
+        wants_cns = any(key in prompt_lower for key in ["cns", "mpo", "bbb", "brain", "blood-brain"])
+        wants_esol = any(key in prompt_lower for key in ["solubility", "logs", "esol", "aqueous"])
+        if not wants_cns and not wants_esol and "property" in prompt_lower:
+            wants_esol = True
+
+        property_nodes: list[tuple[str, str]] = []
+        if wants_esol:
+            property_nodes.append(("esol_solubility", "props_esol"))
+        if wants_cns:
+            property_nodes.append(("cns_mpo_bbb", "props_cns"))
+
         last_node_id = "desc"
-        if has_prop:
+        for model_id, node_id in property_nodes:
             nodes.append(
                 {
-                    "id": "props",
+                    "id": node_id,
                     "type": "predict.property",
-                    "config": {"models": ["esol_solubility"]},
+                    "config": {"model_id": model_id},
                 }
             )
-            edges.append({"source": last_node_id, "target": "props"})
-            last_node_id = "props"
+            edges.append({"source": last_node_id, "target": node_id})
+            last_node_id = node_id
 
         # 3. Add filtering if requested
         rules: list[dict[str, Any]] = []
@@ -220,7 +292,7 @@ class ResearchAgent:
             rules.append({"column": "mw", "op": "le", "value": 500.0})
         if "logp" in prompt_lower:
             rules.append({"column": "logp", "op": "le", "value": 5.0})
-        if "solubility" in prompt_lower or "logs" in prompt_lower:
+        if wants_esol:
             rules.append({"column": "esol_solubility_pred", "op": "ge", "value": -4.0})
 
         if not rules:
@@ -257,15 +329,15 @@ class ResearchAgent:
             "nodes": nodes,
             "edges": edges,
         }
-        # Validate workflow definition mathematically
+        # Validate the workflow definition before offering any executable step.
         try:
             validate_workflow(workflow_def)
             validation_valid = True
-        except Exception:
+        except ValidationError:
             validation_valid = False
 
         steps: list[PlanStep] = []
-        if project_id:
+        if validation_valid and project_id:
             steps.append(
                 PlanStep(
                     tool="create_workflow",
@@ -274,40 +346,58 @@ class ResearchAgent:
                     requires_approval=True,
                 )
             )
-            if dataset_id:
-                steps.append(
-                    PlanStep(
-                        tool="submit_run",
-                        arguments={
-                            "project_id": project_id,
-                            "dataset_id": dataset_id,
-                            "workflow": workflow_def,
-                            "seed": 42,
-                        },
-                        rationale="Queue execution of the workflow across all dataset compounds.",
-                        requires_approval=True,
-                        high_impact=True,
-                    )
+        if validation_valid and project_id and dataset_id:
+            steps.append(
+                PlanStep(
+                    tool="submit_run",
+                    arguments={
+                        "project_id": project_id,
+                        "dataset_id": dataset_id,
+                        "workflow": workflow_def,
+                        "seed": 42,
+                    },
+                    rationale="Queue execution of the workflow across all dataset compounds.",
+                    requires_approval=True,
+                    high_impact=True,
                 )
+            )
+
+        has_submit = any(step.tool == "submit_run" for step in steps)
+        if has_submit:
+            estimated_resources = (
+                "CPU only. Runtime, peak memory and artifact size depend on dataset size, the selected "
+                "engines and docking settings; no benchmark has been measured for this plan."
+            )
+            expected_artifacts = ["results.csv", "results.json", "manifest.json"]
+        elif steps:
+            estimated_resources = (
+                "CPU only. The planned workflow-definition step is lightweight; no benchmark has been measured."
+            )
+            expected_artifacts = ["saved workflow definition"]
+        else:
+            estimated_resources = "No executable steps are planned."
+            expected_artifacts = []
 
         plan = PlanResponse(
             plan_id=plan_id,
             goal=prompt,
             proposed_workflow=workflow_def if validation_valid else None,
             steps=steps,
-            estimated_resources="CPU only, ~150MB RAM, execution time dependent on dataset size.",
+            estimated_resources=estimated_resources,
             external_access_needs="None (100% local CPU processing).",
-            expected_artifacts=["results.csv", "results.json"],
+            expected_artifacts=expected_artifacts,
             scientific_limitations=[
                 SCIENTIFIC_CAVEAT,
                 "Filters discard non-compliant compounds; ranking ranks surviving candidates.",
             ],
         )
+        self._plans.save(plan)
 
         text = (
             f"Formulated research plan `{plan_id}` for goal: '{prompt}'.\n"
             f"Designed {len(nodes)}-node workflow with schema validation: {'PASS' if validation_valid else 'FAIL'}.\n"
-            f"Requires {len(steps)} step(s) to execute. Explicit human approval is required before running."
+            f"Requires {len(steps)} step(s) to execute. Explicit human approval is required before running.\n"
+            f"Plan digest: {plan.plan_hash}"
         )
 
         return AgentResponse(mode="plan", text=text, plan=plan)
@@ -318,23 +408,50 @@ class ResearchAgent:
         session: Session,
         approved_tool_calls: list[dict[str, Any]],
         project_id: str | None = None,
+        plan_id: str | None = None,
     ) -> AgentResponse:
-        """Run mode: executes only approved typed tools from allowlist."""
+        """Run mode: execute only the exact steps of a previously approved plan."""
         if not approved_tool_calls:
             raise PolicyError("Run mode requires at least one explicitly approved tool call in 'approved_tool_calls'.")
+        if not plan_id:
+            raise PolicyError(
+                "Run mode requires the 'plan_id' of an approved plan; ad-hoc tool execution is not permitted."
+            )
+
+        plan = self._plans.load(plan_id)
+        if not plan.steps:
+            raise PolicyError(f"Plan '{plan_id}' contains no executable steps.")
+
+        expected = [{"tool": step.tool, "arguments": step.arguments} for step in plan.steps]
+        try:
+            provided_steps = [PlanStep.model_validate(item) for item in approved_tool_calls]
+        except PydanticValidationError as exc:
+            raise ValidationError(f"Approved tool call payload is invalid: {exc.errors()}") from exc
+
+        if len(provided_steps) != len(expected):
+            raise PolicyError(
+                "Approved tool calls do not match the plan: expected "
+                f"{len(expected)} step(s), received {len(provided_steps)}.",
+                details={"plan_id": plan_id},
+            )
+        for index, (provided, wanted) in enumerate(zip(provided_steps, expected, strict=True)):
+            if provided.tool != wanted["tool"] or provided.arguments != wanted["arguments"]:
+                raise PolicyError(
+                    f"Approved tool call {index + 1} does not match the plan; it was mutated or reordered.",
+                    details={
+                        "plan_id": plan_id,
+                        "expected_tool": wanted["tool"],
+                        "provided_tool": provided.tool,
+                    },
+                )
 
         executed_tools: list[dict[str, Any]] = []
         submitted_run_id: str | None = None
 
-        for item in approved_tool_calls:
-            tool_name = item.get("tool") or item.get("name")
-            if not tool_name or not isinstance(tool_name, str):
-                raise ValidationError("Each approved tool call must contain a string 'tool' or 'name'.")
-            arguments = item.get("arguments", {})
-            if not isinstance(arguments, dict):
-                raise ValidationError(f"Arguments for tool '{tool_name}' must be a dictionary.")
+        for step in provided_steps:
+            tool_name = step.tool
+            arguments = step.arguments
 
-            # Execute tool safely
             try:
                 result = execute_tool(
                     name=tool_name,
@@ -351,7 +468,7 @@ class ResearchAgent:
                     {
                         "tool": tool_name,
                         "status": "failed",
-                        "error": str(exc),
+                        "error": redact_text(str(exc))[:1000],
                         "remediation": f"Verify parameters for tool '{tool_name}' before retrying.",
                     }
                 )

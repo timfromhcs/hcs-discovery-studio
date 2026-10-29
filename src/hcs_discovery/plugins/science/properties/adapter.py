@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from rdkit import Chem
 
 from ....core.config import Settings
@@ -17,6 +17,8 @@ ADAPTER_ID = "science:property-predict"
 
 class PropertyPredictorConfig(BaseModel):
     """Configuration for learned property prediction node."""
+
+    model_config = ConfigDict(extra="forbid")
 
     model_id: str = Field(
         default="esol_solubility",
@@ -54,7 +56,10 @@ def probe_property_predictor(settings: Settings | None = None) -> dict[str, Any]
         "available": True,
         "backend": "cpu",
         "models": models_info,
-        "detail": f"{len(AVAILABLE_MODELS)} validated CPU property prediction model(s) operational.",
+        "detail": (
+            f"{len(AVAILABLE_MODELS)} literature-derived CPU property prediction model(s) operational; "
+            "measured accuracy is documented under docs/validation."
+        ),
     }
 
 
@@ -87,8 +92,11 @@ def property_prediction_columns(
                 "number",
                 unit=f"±{meta.unit}",
                 direction="lower",
-                method="Prediction standard error estimate",
-                description="Estimated prediction standard error based on distance to training domain.",
+                method="Heuristic descriptor-distance error scale",
+                description=(
+                    "Heuristic error scale based on descriptor distance; not a calibrated "
+                    "confidence interval or prediction interval."
+                ),
             )
         )
     if check_domain:

@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from ..core.config import get_settings
@@ -190,12 +190,49 @@ def results_page(
     offset: int = 0,
     q: str | None = None,
 ) -> dict[str, Any]:
+    if order not in {"asc", "desc"}:
+        raise ValidationError("Result order must be 'asc' or 'desc'.")
     run = get_run(session, run_id)
-    rows = session.execute(
+
+    filters = [RunResult.run_id == run.id]
+    if only_passing:
+        filters.append(RunResult.rejected.is_(False))
+    if q:
+        needle = f"%{q.lower()}%"
+        filters.append(
+            or_(
+                func.lower(Compound.name).like(needle),
+                func.lower(Compound.isomeric_smiles).like(needle),
+                func.lower(RunResult.compound_id).like(needle),
+            )
+        )
+
+    join_on = Compound.id == RunResult.compound_id
+    total = session.execute(
+        select(func.count()).select_from(RunResult).outerjoin(Compound, join_on).where(*filters)
+    ).scalar_one()
+
+    sortable = {
+        "rank": RunResult.rank,
+        "composite_score": RunResult.composite_score,
+        "pareto_front": RunResult.pareto_front,
+    }
+    sort_column = sortable.get(sort)
+    if sort_column is None:
+        # Metric values live in the JSON payload; cast keeps numeric ordering while
+        # still allowing NULLs to sort last on both directions.
+        sort_column = RunResult.metrics[sort].as_float()
+
+    direction = sort_column.asc() if order == "asc" else sort_column.desc()
+    statement = (
         select(RunResult, Compound)
-        .join(Compound, Compound.id == RunResult.compound_id, isouter=True)
-        .where(RunResult.run_id == run.id)
-    ).all()
+        .outerjoin(Compound, join_on)
+        .where(*filters)
+        .order_by(direction.nulls_last(), RunResult.id.asc())
+        .offset(offset)
+        .limit(max(1, min(limit, 2000)))
+    )
+    rows = session.execute(statement).all()
     items: list[dict[str, Any]] = [
         {
             "compound_id": result.compound_id,
@@ -210,31 +247,6 @@ def results_page(
         }
         for result, compound in rows
     ]
-    if q:
-        needle = q.lower()
-        items = [
-            item
-            for item in items
-            if needle in (item["name"] or "").lower()
-            or needle in (item["smiles"] or "").lower()
-            or needle in item["compound_id"].lower()
-        ]
-    if only_passing:
-        items = [item for item in items if not item["rejected"]]
-
-    def sort_key(item: dict[str, Any]) -> tuple[int, float]:
-        value = item.get(sort)
-        if sort not in {"rank", "composite_score", "pareto_front"}:
-            value = item["metrics"].get(sort)
-        missing = value is None
-        number = -float("inf") if value is None else float(value)
-        if sort in {"rank", "pareto_front"}:
-            number = float("inf") if missing else number
-        return (1 if missing else 0, number)
-
-    items.sort(key=sort_key, reverse=(order == "desc"))
-    total = len(items)
-    window = items[offset : offset + max(1, min(limit, 2000))]
     columns = _result_columns(run)
     return {
         "run": run_summary(run),
@@ -244,5 +256,5 @@ def results_page(
         "sort": sort,
         "order": order,
         "columns": columns,
-        "items": window,
+        "items": items,
     }

@@ -11,7 +11,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from pydantic import ValidationError as PydanticValidationError
 from sqlalchemy.orm import Session
 
@@ -26,32 +26,38 @@ from ...workflow.schema import validate_workflow
 # ---------------------------------------------------------------------------
 
 
-class ListProjectsParams(BaseModel):
+class ToolParams(BaseModel):
+    """Base class for tool payloads: unknown fields are rejected, never ignored."""
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class ListProjectsParams(ToolParams):
     limit: int = Field(default=50, ge=1, le=200)
 
 
-class ListDatasetsParams(BaseModel):
+class ListDatasetsParams(ToolParams):
     project_id: str = Field(min_length=1, max_length=128)
 
 
-class GetDatasetSummaryParams(BaseModel):
+class GetDatasetSummaryParams(ToolParams):
     dataset_id: str = Field(min_length=1, max_length=128)
 
 
-class ListEnginesParams(BaseModel):
+class ListEnginesParams(ToolParams):
     pass
 
 
-class ValidateWorkflowSpecParams(BaseModel):
+class ValidateWorkflowSpecParams(ToolParams):
     definition: dict[str, Any] = Field(description="DAG workflow dictionary specification")
 
 
-class CreateWorkflowParams(BaseModel):
+class CreateWorkflowParams(ToolParams):
     project_id: str = Field(min_length=1, max_length=128)
     definition: dict[str, Any] = Field(description="DAG workflow dictionary specification")
 
 
-class SubmitRunParams(BaseModel):
+class SubmitRunParams(ToolParams):
     project_id: str = Field(min_length=1, max_length=128)
     dataset_id: str = Field(min_length=1, max_length=128)
     workflow_id: str | None = Field(default=None, max_length=128)
@@ -59,16 +65,16 @@ class SubmitRunParams(BaseModel):
     seed: int | None = Field(default=None, ge=0)
 
 
-class GetRunStatusParams(BaseModel):
+class GetRunStatusParams(ToolParams):
     run_id: str = Field(min_length=1, max_length=128)
 
 
-class GetRunResultsParams(BaseModel):
+class GetRunResultsParams(ToolParams):
     run_id: str = Field(min_length=1, max_length=128)
     limit: int = Field(default=50, ge=1, le=500)
 
 
-class ExportReportParams(BaseModel):
+class ExportReportParams(ToolParams):
     run_id: str = Field(min_length=1, max_length=128)
     format: Literal["markdown", "html", "json", "csv", "sdf"] = Field(default="markdown")
 

@@ -65,8 +65,20 @@ class BaseConnector:
             time.sleep(self.rate_limit_delay - elapsed)
         self._last_request_time = time.monotonic()
 
-    def get_json(self, url: str, *, params: dict[str, Any] | None = None) -> dict[str, Any]:
-        """Perform a policy-checked HTTP GET request and parse JSON."""
+    def get_json(
+        self,
+        url: str,
+        *,
+        params: dict[str, Any] | None = None,
+        allow_not_found: bool = False,
+    ) -> dict[str, Any] | None:
+        """Perform a policy-checked HTTP GET request and parse a JSON object.
+
+        Redirects are never followed automatically: a 3xx response is reported as an
+        explicit failure so an allowlisted host cannot silently bounce the request to
+        an unvetted destination. A 404 is only treated as "no result" when the caller
+        opts in with ``allow_not_found``; otherwise it is a visible error.
+        """
         # 1. Enforce network policy unless mock transport is active
         parsed = httpx.URL(url)
         if self.mock_transport is None:
@@ -76,6 +88,7 @@ class BaseConnector:
 
         client_kwargs: dict[str, Any] = {
             "timeout": self.timeout,
+            "follow_redirects": False,
             "headers": {"User-Agent": "HCS-Discovery-Studio/1.0 (+https://github.com/timfromhcs/hcs-discovery-studio)"},
         }
         if self.mock_transport is not None:
@@ -89,7 +102,19 @@ class BaseConnector:
                 try:
                     response = client.get(url, params=params)
                     if response.status_code == 404:
-                        return {}
+                        if allow_not_found:
+                            return None
+                        raise ValidationError(
+                            f"Connector resource was not found (HTTP 404) at {parsed.host}: {response.text[:200]}",
+                            details={"status": 404, "host": parsed.host},
+                        )
+                    if 300 <= response.status_code < 400:
+                        location = response.headers.get("location", "")
+                        raise ValidationError(
+                            f"Connector redirect blocked (HTTP {response.status_code}) from {parsed.host} "
+                            f"to '{location[:200]}'. Redirects are not followed by policy.",
+                            details={"status": response.status_code, "location": location[:500]},
+                        )
                     if response.status_code in (429, 503) and attempt < attempts:
                         time.sleep(1.0 * attempt)
                         continue
@@ -102,7 +127,19 @@ class BaseConnector:
                             f"exceeds ceiling ({MAX_PAYLOAD_BYTES} bytes)."
                         )
 
-                    return response.json()
+                    try:
+                        payload = response.json()
+                    except ValueError as exc:
+                        raise ValidationError(
+                            f"Connector returned malformed JSON from {parsed.host}: {exc}",
+                            details={"host": parsed.host, "content_type": response.headers.get("content-type")},
+                        ) from exc
+                    if not isinstance(payload, dict):
+                        raise ValidationError(
+                            f"Connector expected a JSON object from {parsed.host}, received {type(payload).__name__}.",
+                            details={"host": parsed.host},
+                        )
+                    return payload
                 except httpx.HTTPStatusError as exc:
                     last_exc = exc
                     if exc.response.status_code in (429, 502, 503, 504) and attempt < attempts:

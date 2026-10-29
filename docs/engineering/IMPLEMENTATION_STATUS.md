@@ -1,6 +1,6 @@
 # Implementation status
 
-Last updated: 2026-10-28. Version: `1.0.0` Stable.
+Last updated: 2026-10-29. Version: `2.0.0` Stable.
 
 This document is the honest feature ledger. It distinguishes what has been
 exercised end-to-end from what is scaffolded, planned or deliberately absent.
@@ -15,17 +15,17 @@ test or a recorded manual check; it does not mean validated science.
 | Repo skeleton and tooling | Done | `pyproject.toml`, lockfiles, Ruff, mypy, pytest, Vite, Playwright |
 | Domain model and migrations | Done | SQLAlchemy models, Alembic revision, migration tests |
 | Persistent queue | Done | Lease claim, heartbeat, recovery, cancellation, retry tests |
-| RDKit import/standardise | Done | CSV/SDF/SMILES, row outcomes, duplicates, descriptor tests |
+| RDKit import/standardise | Done | CSV/SDF/SMILES, row outcomes, descriptor tests |
 | Workflow engine | Done | Validation, execution, cache, events, manifest tests |
-| CPU scientific slice | Done | Descriptors → filters → Pareto/composite → summary |
+| CPU scientific slice | Done | Descriptors → filters → Pareto/composite → summary with integrity checks |
 | React UI | Done for shipped features | 13 routes, light/dark/narrow screenshots |
 | CLI/API parity | Done for shipped actions | Shared services; CLI tests |
 | Local LLM provider / Safe Research Agent | Done | Ask, Plan, Run modes with strict allowlisted tools |
 | Real scientific engines | Done | AutoDock Vina CPU docking, Delaney ESOL, CNS MPO, PubChem, ChEMBL |
-| DAG Workflows | Done | Multi-branch DAGs, Kahn topological sort, and table.join |
-| GitHub CI | Pass | All required jobs green on Linux and Windows; CodeQL green |
-| Public release | Done | Stable release [`v1.0.0`](https://github.com/timfromhcs/hcs-discovery-studio/releases/tag/v1.0.0); assets verified |
-| v1.0.0 Stable | Met | All release gates pass with reproducible test evidence |
+| DAG Workflows | Done | Multi-branch DAGs, Kahn topological sort, and table.join with strict-key checks |
+| GitHub CI | Pending | v1.0.0 commit green; v2.0.0 candidate must pass CI on its own SHA |
+| Public release | Pending | [`v1.0.0`](https://github.com/timfromhcs/hcs-discovery-studio/releases/tag/v1.0.0) published; `v2.0.0` not yet tagged or published |
+| v2.0.0 Stable | In progress | Local gates pass; cloud CI, E2E on CI and release publication outstanding |
 
 ## Working now
 

@@ -14,7 +14,7 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from ....core.config import Settings, get_settings
 from ....core.errors import ValidationError
@@ -30,7 +30,6 @@ from .prep import (
 )
 
 ADAPTER_ID = "science:autodock-vina"
-ENGINE_VERSION = "1.2.5"
 SCIENTIFIC_CAVEAT = (
     "AutoDock Vina docking scores are computational approximations of binding free energy. "
     "They are prioritisation and hypothesis-generation signals, not experimental proof of "
@@ -40,6 +39,8 @@ SCIENTIFIC_CAVEAT = (
 
 class VinaConfig(BaseModel):
     """Configuration for AutoDock Vina molecular docking node."""
+
+    model_config = ConfigDict(extra="forbid")
 
     receptor_path: str = Field(
         ...,
@@ -154,9 +155,14 @@ def resolve_vina_binary(settings: Settings | None = None) -> Path | None:
     return None
 
 
-def probe_vina(settings: Settings | None = None) -> dict[str, Any]:
-    """Probe host for AutoDock Vina executable and report verified capability."""
-    binary = resolve_vina_binary(settings)
+def probe_vina(settings: Settings | None = None, *, binary: Path | None = None) -> dict[str, Any]:
+    """Probe the host for an AutoDock Vina executable and report verified capability.
+
+    A binary is only reported as available when it executes successfully *and*
+    prints a recognisable AutoDock Vina version. File presence alone is not treated
+    as proof that docking can run.
+    """
+    binary = binary or resolve_vina_binary(settings)
     if binary is None:
         return {
             "id": ADAPTER_ID,
@@ -180,21 +186,7 @@ def probe_vina(settings: Settings | None = None) -> dict[str, Any]:
             timeout=10.0,
             check=False,
         )
-        output = f"{proc.stdout}\n{proc.stderr}".strip()
-        version_match = re.search(r"AutoDock\s+Vina\s+v?([\d.]+)", output, re.IGNORECASE)
-        detected_version = version_match.group(1) if version_match else ENGINE_VERSION
-
-        return {
-            "id": ADAPTER_ID,
-            "status": "available",
-            "available": True,
-            "version": detected_version,
-            "binary_path": str(binary),
-            "detail": f"AutoDock Vina executable operational at {binary}",
-            "backend": "cpu",
-            "caveat": SCIENTIFIC_CAVEAT,
-        }
-    except Exception as exc:
+    except (OSError, subprocess.SubprocessError) as exc:
         return {
             "id": ADAPTER_ID,
             "status": "unavailable",
@@ -207,6 +199,48 @@ def probe_vina(settings: Settings | None = None) -> dict[str, Any]:
             "caveat": SCIENTIFIC_CAVEAT,
         }
 
+    output = f"{proc.stdout}\n{proc.stderr}".strip()
+    if proc.returncode != 0:
+        return {
+            "id": ADAPTER_ID,
+            "status": "unavailable",
+            "available": False,
+            "version": None,
+            "binary_path": str(binary),
+            "detail": f"Version probe exited with code {proc.returncode}: {output[:300]}",
+            "remediation": "Verify the executable is an unmodified official AutoDock Vina build.",
+            "backend": "cpu",
+            "caveat": SCIENTIFIC_CAVEAT,
+        }
+
+    version_match = re.search(r"AutoDock\s+Vina\s+v?([\d.]+)", output, re.IGNORECASE)
+    if version_match is None:
+        return {
+            "id": ADAPTER_ID,
+            "status": "unavailable",
+            "available": False,
+            "version": None,
+            "binary_path": str(binary),
+            "detail": (
+                "Binary executed but did not report an AutoDock Vina version; "
+                f"refusing to claim availability. Output: {output[:300]}"
+            ),
+            "remediation": "Install an official AutoDock Vina 1.2.x build.",
+            "backend": "cpu",
+            "caveat": SCIENTIFIC_CAVEAT,
+        }
+
+    return {
+        "id": ADAPTER_ID,
+        "status": "available",
+        "available": True,
+        "version": version_match.group(1),
+        "binary_path": str(binary),
+        "detail": f"AutoDock Vina {version_match.group(1)} verified at {binary}",
+        "backend": "cpu",
+        "caveat": SCIENTIFIC_CAVEAT,
+    }
+
 
 class VinaAdapter:
     """Scientific adapter encapsulating AutoDock Vina CPU execution."""
@@ -215,7 +249,9 @@ class VinaAdapter:
         self.binary_path = binary_path or resolve_vina_binary()
 
     def is_available(self) -> bool:
-        return self.binary_path is not None and self.binary_path.is_file()
+        if self.binary_path is None:
+            return False
+        return bool(probe_vina(binary=self.binary_path).get("available"))
 
     def dock_single(
         self,
@@ -290,7 +326,7 @@ class VinaAdapter:
             raise ValidationError(f"AutoDock Vina returned exit code {proc.returncode}: {err_msg[:400]}")
 
         if not out_file.is_file():
-            return (None, None, None, None, None)
+            raise ValidationError(f"AutoDock Vina produced no output file for {ligand_id}.")
 
         out_content = out_file.read_text(encoding="utf-8", errors="replace")
         poses = parse_vina_poses(out_content)
@@ -336,6 +372,19 @@ def vina_docking_columns(prefix: str = "docking") -> list[Column]:
             "string",
             method="AutoDock Vina pose PDBQT/SDF",
             description="Relative path to docked 3D pose artifact.",
+        ),
+        Column(
+            f"{prefix}_status",
+            "Docking status",
+            "string",
+            method="Per-ligand execution outcome",
+            description="docked, no_pose, invalid_input, ligand_preparation_failed or docking_failed.",
+        ),
+        Column(
+            f"{prefix}_error",
+            "Docking error",
+            "string",
+            description="Reason a ligand was not docked; empty when docking succeeded.",
         ),
     ]
 
@@ -383,10 +432,13 @@ def run_vina_docking(table: Table, config: VinaConfig, ctx: NodeContext) -> Tabl
     rmsds_lb: list[float | None] = []
     rmsds_ub: list[float | None] = []
     artifact_paths: list[str | None] = []
+    statuses: list[str] = []
+    errors: list[str | None] = []
 
     total = len(table.rows)
     prep_failures = 0
     dock_failures = 0
+    no_pose = 0
 
     with tempfile.TemporaryDirectory(prefix="vina_run_") as temp_dir:
         temp_path = Path(temp_dir)
@@ -402,6 +454,8 @@ def run_vina_docking(table: Table, config: VinaConfig, ctx: NodeContext) -> Tabl
                 rmsds_lb.append(None)
                 rmsds_ub.append(None)
                 artifact_paths.append(None)
+                statuses.append("invalid_input")
+                errors.append("Missing or non-string SMILES")
                 continue
 
             # 1. Ligand preparation
@@ -414,6 +468,8 @@ def run_vina_docking(table: Table, config: VinaConfig, ctx: NodeContext) -> Tabl
                 rmsds_lb.append(None)
                 rmsds_ub.append(None)
                 artifact_paths.append(None)
+                statuses.append("ligand_preparation_failed")
+                errors.append(exc.message)
                 continue
 
             # 2. Docking execution
@@ -444,13 +500,24 @@ def run_vina_docking(table: Table, config: VinaConfig, ctx: NodeContext) -> Tabl
                         )
                 else:
                     artifact_paths.append(None)
-            except Exception as exc:
+
+                if aff is None:
+                    no_pose += 1
+                    statuses.append("no_pose")
+                    errors.append("AutoDock Vina output contained no parseable pose.")
+                else:
+                    statuses.append("docked")
+                    errors.append(None)
+            except (ValidationError, OSError) as exc:
                 dock_failures += 1
-                ctx.log(f"Row {idx} ({row_id}) docking failed: {exc}", level="warning")
+                message = exc.message if isinstance(exc, ValidationError) else str(exc)
+                ctx.log(f"Row {idx} ({row_id}) docking failed: {message}", level="warning")
                 affinities.append(None)
                 rmsds_lb.append(None)
                 rmsds_ub.append(None)
                 artifact_paths.append(None)
+                statuses.append("docking_failed")
+                errors.append(message)
 
             if idx % 10 == 0 or idx == total:
                 ctx.report_progress(idx / total if total else None)
@@ -460,10 +527,13 @@ def run_vina_docking(table: Table, config: VinaConfig, ctx: NodeContext) -> Tabl
     result.add_values(columns[1], rmsds_lb)
     result.add_values(columns[2], rmsds_ub)
     result.add_values(columns[3], artifact_paths)
+    result.add_values(columns[4], statuses)
+    result.add_values(columns[5], errors)
 
-    if prep_failures or dock_failures:
+    if prep_failures or dock_failures or no_pose:
         ctx.log(
-            f"Docking completed with {prep_failures} ligand prep error(s) and {dock_failures} engine error(s).",
+            f"Docking completed with {prep_failures} ligand prep error(s), {dock_failures} engine error(s) "
+            f"and {no_pose} output(s) without a parseable pose.",
             level="warning",
         )
     else:

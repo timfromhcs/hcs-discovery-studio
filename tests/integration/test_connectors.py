@@ -7,8 +7,9 @@ import pytest
 from starlette.testclient import TestClient
 
 from hcs_discovery.core.config import Settings
+from hcs_discovery.core.errors import ValidationError
 from hcs_discovery.plugins.connectors.chembl import ChEMBLConnector
-from hcs_discovery.plugins.connectors.policy import NetworkPolicyViolationError
+from hcs_discovery.plugins.connectors.policy import NetworkPolicyViolationError, check_network_allowed
 from hcs_discovery.plugins.connectors.pubchem import PubChemConnector
 
 MOCK_PUBCHEM_ASPIRIN_RESPONSE = {
@@ -178,3 +179,55 @@ def test_cli_fetch_blocked_by_local_policy() -> None:
     result = runner.invoke(app, ["fetch", "pubchem", "aspirin"])
     assert result.exit_code != 0
     assert "blocked by policy" in (result.stdout + result.stderr).lower()
+
+
+def test_connector_rejects_redirects_instead_of_following_them() -> None:
+    requested: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requested.append(str(request.url))
+        return httpx.Response(302, headers={"location": "https://evil.example/steal"})
+
+    connector = PubChemConnector(mock_transport=httpx.MockTransport(handler))
+    with pytest.raises(ValidationError, match="redirect blocked") as excinfo:
+        connector.search_compound_by_name("aspirin")
+    assert excinfo.value.details["status"] == 302
+    assert len(requested) == 1
+
+
+def test_connector_reports_malformed_json_instead_of_raising_raw_error() -> None:
+    transport = httpx.MockTransport(
+        lambda _request: httpx.Response(200, content=b"{not-json", headers={"content-type": "application/json"})
+    )
+    connector = ChEMBLConnector(mock_transport=transport)
+    with pytest.raises(ValidationError, match="malformed JSON"):
+        connector.search_targets("EGFR")
+
+
+def test_connector_404_is_explicit_unless_caller_opts_into_absence() -> None:
+    transport = httpx.MockTransport(lambda _request: httpx.Response(404, text="not found"))
+    connector = ChEMBLConnector(mock_transport=transport)
+    with pytest.raises(ValidationError, match="not found") as excinfo:
+        connector.search_targets("EGFR")
+    assert excinfo.value.details["status"] == 404
+
+    pubchem = PubChemConnector(mock_transport=_not_found_transport())
+    assert pubchem.search_compound_by_name("aspirin") == []
+    assert pubchem.search_compound_by_cid(999999) is None
+
+
+def _not_found_transport() -> httpx.MockTransport:
+    return httpx.MockTransport(lambda _request: httpx.Response(404, text="not found"))
+
+
+def test_allowlist_host_normalisation_rejects_lookalikes(settings: Settings) -> None:
+    remote = settings.model_copy(update={"network_policy": "remote"})
+    check_network_allowed("PubChem.NCBI.NLM.NIH.gov.", settings=remote)
+    check_network_allowed("www.ebi.ac.uk:443", settings=remote)
+
+    with pytest.raises(NetworkPolicyViolationError):
+        check_network_allowed("pubchem.ncbi.nlm.nih.gov.evil.example", settings=remote)
+    with pytest.raises(NetworkPolicyViolationError):
+        check_network_allowed("pubch\u0435m.ncbi.nlm.nih.gov", settings=remote)
+    with pytest.raises(NetworkPolicyViolationError):
+        check_network_allowed("", settings=remote)

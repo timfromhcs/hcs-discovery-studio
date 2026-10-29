@@ -101,6 +101,16 @@ def test_execute_tool_validates_parameters(agent_env: tuple[Settings, Any]) -> N
                 approved=True,
             )
 
+        # unknown payload fields are rejected rather than silently ignored
+        with pytest.raises(ValidationError, match="Invalid arguments"):
+            execute_tool(
+                "list_projects",
+                {"limit": 5, "unexpected": "value"},
+                session=session,
+                settings=settings,
+                approved=True,
+            )
+
 
 def test_agent_ask_mode_offline(agent_env: tuple[Settings, Any]) -> None:
     settings, factory = agent_env
@@ -154,6 +164,7 @@ def test_agent_run_mode_with_approved_tools(agent_env: tuple[Settings, Any]) -> 
         run_req = AgentRequest(
             mode="run",
             prompt="Execute planned workflow creation",
+            plan_id=plan_resp.plan.plan_id,
             approved_tool_calls=[approved_step],
         )
         run_resp = agent.handle(run_req, session=session)
@@ -161,6 +172,114 @@ def test_agent_run_mode_with_approved_tools(agent_env: tuple[Settings, Any]) -> 
         assert len(run_resp.executed_tools) == 1
         assert run_resp.executed_tools[0]["status"] == "succeeded"
         assert run_resp.executed_tools[0]["result"]["name"]
+
+
+def test_agent_run_requires_plan_id(agent_env: tuple[Settings, Any]) -> None:
+    settings, factory = agent_env
+    agent = ResearchAgent(settings=settings)
+    with factory() as session:
+        req = AgentRequest(
+            mode="run",
+            prompt="Execute without a plan",
+            approved_tool_calls=[{"tool": "create_workflow", "arguments": {}}],
+        )
+        with pytest.raises(PolicyError, match="requires the 'plan_id'"):
+            agent.handle(req, session=session)
+
+
+def test_agent_run_rejects_mutated_approved_arguments(agent_env: tuple[Settings, Any]) -> None:
+    settings, factory = agent_env
+    agent = ResearchAgent(settings=settings)
+    with factory() as session:
+        project = create_project(session, name="Mutated Plan Project")
+        plan_resp = agent.handle(
+            AgentRequest(mode="plan", prompt="Screen compounds with MW <= 500", project_id=project.id),
+            session=session,
+        )
+        assert plan_resp.plan is not None
+        mutated = plan_resp.plan.steps[0].model_dump()
+        mutated["arguments"]["definition"]["name"] = "Tampered workflow"
+
+        with pytest.raises(PolicyError, match="mutated or reordered"):
+            agent.handle(
+                AgentRequest(
+                    mode="run",
+                    prompt="Run mutated plan",
+                    plan_id=plan_resp.plan.plan_id,
+                    approved_tool_calls=[mutated],
+                ),
+                session=session,
+            )
+
+
+def test_agent_rejects_tampered_stored_plan(agent_env: tuple[Settings, Any]) -> None:
+    settings, factory = agent_env
+    agent = ResearchAgent(settings=settings)
+    with factory() as session:
+        project = create_project(session, name="Tamper Project")
+        plan_resp = agent.handle(
+            AgentRequest(mode="plan", prompt="Screen compounds with MW <= 500", project_id=project.id),
+            session=session,
+        )
+        assert plan_resp.plan is not None
+        path = settings.data_dir / "agent_plans" / f"{plan_resp.plan.plan_id}.json"
+        payload = path.read_text(encoding="utf-8")
+        path.write_text(payload.replace("MW <= 500", "MW <= 9000", 1), encoding="utf-8")
+
+        with pytest.raises(PolicyError, match="integrity check failed"):
+            agent.handle(
+                AgentRequest(
+                    mode="run",
+                    prompt="Run tampered plan",
+                    plan_id=plan_resp.plan.plan_id,
+                    approved_tool_calls=[plan_resp.plan.steps[0].model_dump()],
+                ),
+                session=session,
+            )
+
+
+def test_agent_plan_selects_requested_property_model(agent_env: tuple[Settings, Any]) -> None:
+    settings, factory = agent_env
+    agent = ResearchAgent(settings=settings)
+    with factory() as session:
+        cns = agent.handle(AgentRequest(mode="plan", prompt="Score CNS MPO and BBB penetration"), session=session)
+        assert cns.plan is not None
+        cns_nodes = [n for n in cns.plan.proposed_workflow["nodes"] if n["type"] == "predict.property"]
+        assert [n["config"] for n in cns_nodes] == [{"model_id": "cns_mpo_bbb"}]
+        assert all("models" not in n["config"] for n in cns_nodes)
+
+        esol = agent.handle(AgentRequest(mode="plan", prompt="Predict aqueous solubility"), session=session)
+        assert esol.plan is not None
+        esol_nodes = [n for n in esol.plan.proposed_workflow["nodes"] if n["type"] == "predict.property"]
+        assert [n["config"] for n in esol_nodes] == [{"model_id": "esol_solubility"}]
+
+
+def test_agent_run_redacts_tool_errors(agent_env: tuple[Settings, Any], monkeypatch: pytest.MonkeyPatch) -> None:
+    settings, factory = agent_env
+    agent = ResearchAgent(settings=settings)
+    with factory() as session:
+        project = create_project(session, name="Redaction Project")
+        plan_resp = agent.handle(
+            AgentRequest(mode="plan", prompt="Screen compounds with MW <= 500", project_id=project.id),
+            session=session,
+        )
+        assert plan_resp.plan is not None
+
+        def failing_tool(**_kwargs: Any) -> dict[str, Any]:
+            raise RuntimeError("request failed with api_key=sk-super-secret-value")
+
+        monkeypatch.setattr("hcs_discovery.plugins.llm.agent.execute_tool", failing_tool)
+        response = agent.handle(
+            AgentRequest(
+                mode="run",
+                prompt="Run approved plan",
+                plan_id=plan_resp.plan.plan_id,
+                approved_tool_calls=[plan_resp.plan.steps[0].model_dump()],
+            ),
+            session=session,
+        )
+        assert response.executed_tools[0]["status"] == "failed"
+        assert "sk-super-secret-value" not in response.executed_tools[0]["error"]
 
 
 def test_agent_run_mode_refuses_without_approved_tools(agent_env: tuple[Settings, Any]) -> None:

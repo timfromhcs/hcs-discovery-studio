@@ -62,7 +62,7 @@ test("workspace to import, workflow, run and results", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Column meanings" })).toBeVisible();
   await expect(page.locator(".data-table").first().locator("tbody tr")).toHaveCount(6);
   await expect(page.locator(".scatter-legend")).toContainText("Pareto front 1");
-  await expect(page.getByText(/1 = non-dominated front among filter-passing records/)).toBeVisible();
+  await expect(page.getByText(/1 = non-dominated front among filter- and constraint-passing records/)).toBeVisible();
 
   expect(pageErrors).toEqual([]);
 });
