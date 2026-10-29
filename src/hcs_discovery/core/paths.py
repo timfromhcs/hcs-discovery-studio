@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
 
@@ -36,17 +37,18 @@ def safe_filename(name: str, *, fallback: str = "file", max_length: int = 120) -
 
 def safe_join(base: Path, *parts: str) -> Path:
     """Join ``parts`` under ``base``, rejecting traversal and absolute segments."""
-    base_resolved = base.resolve()
-    target = base_resolved
     for part in parts:
         piece = Path(part)
         if piece.is_absolute() or piece.drive:
             raise ValidationError("Absolute paths are not allowed here.", details={"part": part})
-        target = target / piece
-    target = target.resolve()
-    if target != base_resolved and base_resolved not in target.parents:
-        raise ValidationError("Path escapes the allowed directory.", details={"part": str(target)})
-    return target
+    # realpath + prefix check (rather than Path.parents) is the containment idiom
+    # that static analysers such as CodeQL recognise as a path-injection guard.
+    base_resolved = os.path.realpath(base)
+    target = os.path.realpath(os.path.join(base_resolved, *parts))
+    prefix = base_resolved.rstrip(os.sep) + os.sep
+    if target != base_resolved and not target.startswith(prefix):
+        raise ValidationError("Path escapes the allowed directory.", details={"part": target})
+    return Path(target)
 
 
 def relative_artifact_path(run_dir: Path, file_path: Path) -> str:
