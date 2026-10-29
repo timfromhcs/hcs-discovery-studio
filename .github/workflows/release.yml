@@ -1,19 +1,21 @@
 name: Release
 
+# Publishes a release only for a tag whose exact commit already passed the full
+# CI and CodeQL workflows. Tags never re-run a reduced test subset in place of
+# those gates, existing releases are never modified, and assets are uploaded to
+# a draft and verified before the release becomes public.
+
 on:
   push:
     tags: ["v*"]
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing annotated tag to publish (for example v0.1.0)
+        description: Existing tag to publish (vX.Y.Z or vX.Y.Z-rc.N)
         required: true
         type: string
 
-permissions:
-  contents: write
-  id-token: write
-  attestations: write
+permissions: {}
 
 concurrency:
   group: release-${{ inputs.tag || github.ref_name }}
@@ -26,17 +28,90 @@ env:
   RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
 
 jobs:
-  publish:
-    name: Build, attest and publish
+  verify:
+    name: Verify tag and required gates for the exact commit
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      sha: ${{ steps.resolve.outputs.sha }}
+      prerelease: ${{ steps.resolve.outputs.prerelease }}
     steps:
       - name: Check out the tagged commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ inputs.tag || github.ref }}
+          ref: refs/tags/${{ env.RELEASE_TAG }}
           fetch-depth: 0
           persist-credentials: false
+      - name: Resolve the tagged commit
+        id: resolve
+        run: |
+          set -euo pipefail
+          sha="$(git rev-parse "refs/tags/${RELEASE_TAG}^{commit}")"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          if [[ "$RELEASE_TAG" == *-rc.* ]]; then echo "prerelease=true" >> "$GITHUB_OUTPUT"; else echo "prerelease=false" >> "$GITHUB_OUTPUT"; fi
+          echo "Tag $RELEASE_TAG -> $sha"
+      - name: Install uv
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Verify tag, package version and changelog agree
+        run: uv run --no-project python scripts/release/verify_version.py "$RELEASE_TAG"
+      - name: Require successful CI and CodeQL runs for this exact commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ steps.resolve.outputs.sha }}
+        run: |
+          set -euo pipefail
+          for workflow in ci.yml codeql.yml; do
+            latest="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/${workflow}/runs?head_sha=${SHA}&status=completed&per_page=100" \
+              --jq '[.workflow_runs[] | select(.event != "schedule")] | sort_by(.created_at) | last | (.conclusion // "none") + " " + (.html_url // "")')"
+            conclusion="${latest%% *}"
+            echo "$workflow for $SHA: $latest"
+            if [ "$conclusion" != "success" ]; then
+              echo "::error::$workflow has no successful completed run for $SHA (latest: ${conclusion}). Push the commit and wait for its gates before tagging."
+              exit 1
+            fi
+          done
+      - name: Refuse to touch an existing release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::A release (or draft) for $RELEASE_TAG already exists. Releases are never modified; delete a failed draft manually or publish a new version."
+            exit 1
+          fi
+
+  publish:
+    name: Build, smoke-test, attest and publish
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    env:
+      SHA: ${{ needs.verify.outputs.sha }}
+    steps:
+      - name: Check out the verified commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.verify.outputs.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Confirm the tag still points at the verified commit
+        run: |
+          set -euo pipefail
+          git fetch --force origin "refs/tags/${RELEASE_TAG}:refs/tags/${RELEASE_TAG}"
+          actual="$(git rev-parse "refs/tags/${RELEASE_TAG}^{commit}")"
+          if [ "$actual" != "$SHA" ]; then
+            echo "::error::Tag $RELEASE_TAG moved from $SHA to $actual during the release."
+            exit 1
+          fi
       - name: Install uv
         uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
@@ -49,12 +124,6 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: apps/web/package-lock.json
-      - name: Verify tag, package version and changelog agree
-        run: uv run --no-project python scripts/release/verify_version.py "$RELEASE_TAG"
-      - name: Install test dependencies
-        run: uv sync --frozen
-      - name: Run the release test gate
-        run: uv run pytest -q
       - name: Build the frontend
         working-directory: apps/web
         run: |
@@ -64,6 +133,36 @@ jobs:
         run: uv sync --frozen --no-dev
       - name: Build the wheel
         run: uv build --wheel
+      - name: Smoke-test the wheel in a clean environment
+        env:
+          HCS_DATA_DIR: ${{ runner.temp }}/release-smoke-data
+        run: |
+          set -euo pipefail
+          uv venv "$RUNNER_TEMP/release-venv"
+          uv pip install --python "$RUNNER_TEMP/release-venv/bin/python" dist/*.whl
+          BIN="$RUNNER_TEMP/release-venv/bin/hcs-discovery"
+          expected="$(python3 -c 'import tomllib; print(tomllib.load(open("pyproject.toml","rb"))["project"]["version"])')"
+          installed="$("$RUNNER_TEMP/release-venv/bin/python" -c 'import importlib.metadata as m; print(m.version("hcs-discovery-studio"))')"
+          if [ "$installed" != "$expected" ]; then
+            echo "::error::installed version $installed != project version $expected"
+            exit 1
+          fi
+          "$BIN" version
+          "$BIN" db upgrade
+          revision="$("$BIN" db current)"
+          echo "$revision"
+          case "$revision" in *"not initialised"*) echo "::error::wheel did not record a migration revision"; exit 1;; esac
+          "$BIN" doctor
+          "$BIN" serve --port 8795 > "$RUNNER_TEMP/release-server.log" 2>&1 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+          for _ in $(seq 1 60); do
+            curl -fsS http://127.0.0.1:8795/api/v1/health >/dev/null 2>&1 && break
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:8795/api/v1/health | grep -q "\"version\":\"$expected\""
+          curl -fsS http://127.0.0.1:8795/api/v1/ready
+          curl -fsS http://127.0.0.1:8795/ | grep -q 'id="root"'
       - name: Generate a CycloneDX SBOM
         run: |
           export SOURCE_DATE_EPOCH="$(git log -1 --format=%ct)"
@@ -81,43 +180,51 @@ jobs:
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: dist/*.whl
-      - name: Publish the GitHub release
+      - name: Upload assets to a draft release
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+          PRERELEASE: ${{ needs.verify.outputs.prerelease }}
         run: |
           set -euo pipefail
           EXTRA_ARGS=()
           TITLE="HCS Discovery Studio ${RELEASE_TAG#v} (Stable)"
-          if [[ "$RELEASE_TAG" == *"-rc"* || "$RELEASE_TAG" == *"-preview"* ]]; then
+          if [ "$PRERELEASE" = "true" ]; then
             EXTRA_ARGS+=(--prerelease)
             TITLE="HCS Discovery Studio ${RELEASE_TAG#v} (Release Candidate)"
           fi
-
-          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
-            echo "release $RELEASE_TAG already exists; replacing assets"
-            gh release upload "$RELEASE_TAG" dist/*.whl dist/sbom.cdx.json dist/SHA256SUMS.txt --clobber
-            if [ -f "docs/releases/${RELEASE_TAG}.md" ]; then
-              gh release edit "$RELEASE_TAG" --notes-file "docs/releases/${RELEASE_TAG}.md" "${EXTRA_ARGS[@]}"
-            fi
+          if [ -f "docs/releases/${RELEASE_TAG}.md" ]; then
+            NOTES=(--notes-file "docs/releases/${RELEASE_TAG}.md")
           else
-            if [ -f "docs/releases/${RELEASE_TAG}.md" ]; then
-              NOTES=(--notes-file "docs/releases/${RELEASE_TAG}.md")
-            else
-              NOTES=(--generate-notes)
-            fi
-            gh release create "$RELEASE_TAG" \
-              dist/*.whl dist/sbom.cdx.json dist/SHA256SUMS.txt \
-              --title "$TITLE" \
-              --verify-tag \
-              "${EXTRA_ARGS[@]}" \
-              "${NOTES[@]}"
+            NOTES=(--generate-notes)
           fi
+          gh release create "$RELEASE_TAG" \
+            dist/*.whl dist/sbom.cdx.json dist/SHA256SUMS.txt \
+            --repo "$GITHUB_REPOSITORY" \
+            --draft \
+            --verify-tag \
+            --target "$SHA" \
+            --title "$TITLE" \
+            "${EXTRA_ARGS[@]}" \
+            "${NOTES[@]}"
+      - name: Verify the uploaded assets against local checksums
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/downloaded"
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --dir "$RUNNER_TEMP/downloaded"
+          cmp dist/SHA256SUMS.txt "$RUNNER_TEMP/downloaded/SHA256SUMS.txt"
+          (cd "$RUNNER_TEMP/downloaded" && sha256sum -c SHA256SUMS.txt)
+      - name: Publish the verified draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false
       - name: Summarize published assets
         run: |
           {
             echo "## Release ${RELEASE_TAG}"
             echo
-            echo "Assets: wheel, CycloneDX SBOM and SHA-256 checksums."
+            echo "Commit: \`${SHA}\` (CI and CodeQL verified for this exact SHA)."
             echo
             echo '```'
             cat dist/SHA256SUMS.txt
