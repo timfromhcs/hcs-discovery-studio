@@ -2,13 +2,19 @@
 /**
  * Visual and accessibility QA sweep against a running local installation.
  *
- * Opens every route at 320, 390, 768, 1280 and 1440 px in light and dark themes,
- * saves a full-page screenshot of each and checks automatically for:
+ * Opens every route at 320, 390, 640, 768, 1280 and 1440 px in light and dark
+ * themes (640 px is a 1280 px window at 200% browser zoom), saves a full-page
+ * screenshot of each and checks automatically for:
  *   - horizontal page overflow and elements extending past the viewport
  *     (content inside an element that scrolls horizontally on purpose is allowed)
  *   - console errors, uncaught page errors and failed same-origin requests
  *   - buttons, links and form controls without an accessible name
  *   - images without alt text
+ *   - text below WCAG 2.2 AA contrast (4.5:1, or 3:1 for large text) against its
+ *     nearest opaque background; text over images or gradients is not judged
+ *   - a missing or repeated h1 and skipped heading levels
+ * At 1280 px it also tabs through the page with the keyboard and fails when a
+ * focused element is invisible or shows no focus indicator.
  *
  * Start the app with synthetic data first, then run from the repository root:
  *
@@ -28,7 +34,9 @@ import { fileURLToPath } from "node:url";
 const webRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const baseURL = process.env.HCS_BASE_URL ?? "http://127.0.0.1:8787";
 const outputDir = process.argv[2] ?? join(webRoot, "test-results", "visual-qa");
-const WIDTHS = [320, 390, 768, 1280, 1440];
+const WIDTHS = [320, 390, 640, 768, 1280, 1440];
+const KEYBOARD_WIDTH = 1280;
+const MAX_TABS = 40;
 const THEMES = ["light", "dark"];
 
 async function getJson(path) {
@@ -117,7 +125,90 @@ function inspectPage() {
   if (unnamed.length) issues.push(`controls without accessible name: ${unnamed.slice(0, 5).join(", ")}`);
   const noAlt = [...document.querySelectorAll("img")].filter((img) => visible(img) && !img.hasAttribute("alt"));
   if (noAlt.length) issues.push(`images without alt: ${noAlt.length}`);
+
+  // Headings: exactly one h1, and no level skipped on the way down.
+  const headings = [...document.querySelectorAll("h1, h2, h3, h4, h5, h6")].filter(visible);
+  const h1s = headings.filter((h) => h.tagName === "H1").length;
+  if (h1s !== 1) issues.push(`expected one h1, found ${h1s}`);
+  let previous = 0;
+  for (const heading of headings) {
+    const level = Number(heading.tagName[1]);
+    if (previous && level > previous + 1) {
+      issues.push(`heading level skipped: h${previous} -> h${level} ("${heading.textContent.trim().slice(0, 40)}")`);
+      break;
+    }
+    previous = level;
+  }
+
+  // Contrast of text against the nearest opaque background (WCAG relative luminance).
+  const parse = (value) => {
+    const m = value.match(/rgba?\(([^)]+)\)/);
+    if (!m) return null;
+    const [r, g, b, a = 1] = m[1].split(/[ ,/]+/).filter(Boolean).map(Number);
+    return { r, g, b, a };
+  };
+  const luminance = ({ r, g, b }) => {
+    const lin = (c) => ((c /= 255) <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+    return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+  };
+  const background = (el) => {
+    for (let node = el; node; node = node.parentElement) {
+      const style = getComputedStyle(node);
+      if (style.backgroundImage !== "none") return null;
+      const color = parse(style.backgroundColor);
+      if (color && color.a >= 0.99) return color;
+    }
+    return parse(getComputedStyle(document.documentElement).backgroundColor) ?? { r: 255, g: 255, b: 255, a: 1 };
+  };
+  const lowContrast = [];
+  for (const el of document.body.querySelectorAll("*")) {
+    const ownText = [...el.childNodes].some((n) => n.nodeType === Node.TEXT_NODE && n.textContent.trim());
+    if (!ownText || !visible(el) || el.closest("svg")) continue;
+    const style = getComputedStyle(el);
+    if (Number(style.opacity) < 1 || el.closest("[disabled], [aria-disabled=true]")) continue;
+    const fg = parse(style.color);
+    const bg = background(el);
+    if (!fg || !bg || fg.a < 0.99) continue;
+    const [hi, lo] = [luminance(fg), luminance(bg)].sort((a, b) => b - a);
+    const ratio = (hi + 0.05) / (lo + 0.05);
+    const size = parseFloat(style.fontSize);
+    const large = size >= 24 || (size >= 18.66 && Number(style.fontWeight) >= 700);
+    if (ratio < (large ? 3 : 4.5)) lowContrast.push(`${describe(el)} ${ratio.toFixed(2)}:1 "${el.textContent.trim().slice(0, 30)}"`);
+  }
+  if (lowContrast.length) issues.push(`low text contrast: ${lowContrast.slice(0, 4).join(", ")}${lowContrast.length > 4 ? ` (+${lowContrast.length - 4})` : ""}`);
   return issues;
+}
+
+/** Tab through the page; every focus stop must be visible and show a focus indicator. */
+async function keyboardIssues(page) {
+  const issues = [];
+  await page.locator("body").click({ position: { x: 1, y: 1 } }).catch(() => {});
+  const seen = new Set();
+  for (let i = 0; i < MAX_TABS; i += 1) {
+    await page.keyboard.press("Tab");
+    const stop = await page.evaluate(() => {
+      const el = document.activeElement;
+      if (!el || el === document.body) return null;
+      const rect = el.getBoundingClientRect();
+      // Compare the element and its two nearest ancestors (for :focus-within
+      // wrappers) while focused and after blur; any visual change is an indicator.
+      const nodes = [el, el.parentElement, el.parentElement?.parentElement].filter(Boolean);
+      const props = ["outlineStyle", "outlineWidth", "outlineColor", "boxShadow", "borderColor", "stroke", "strokeWidth", "backgroundColor"];
+      const snapshot = () => nodes.map((n) => props.map((p) => getComputedStyle(n)[p]).join("|")).join("||");
+      const focused = snapshot();
+      el.blur();
+      const blurred = snapshot();
+      el.focus({ preventScroll: true });
+      const label = `${el.tagName.toLowerCase()}${el.id ? `#${el.id}` : ""} "${(el.getAttribute("aria-label") || el.textContent || "").trim().slice(0, 30)}"`;
+      return { label, visible: rect.width > 0 && rect.height > 0, indicator: focused !== blurred, key: label + rect.x + rect.y };
+    });
+    if (!stop || seen.has(stop.key)) break;
+    seen.add(stop.key);
+    if (!stop.visible) issues.push(`keyboard focus on invisible element ${stop.label}`);
+    else if (!stop.indicator) issues.push(`no visible focus indicator on ${stop.label}`);
+  }
+  if (!seen.size) issues.push("no element receives keyboard focus");
+  return issues.slice(0, 5);
 }
 
 async function main() {
@@ -155,6 +246,8 @@ async function main() {
         problems.push(...(await page.evaluate(inspectPage)));
         const file = `${routeName}-${theme}-${width}.png`;
         await page.screenshot({ path: join(outputDir, file), fullPage: true, animations: "disabled" });
+        // After the screenshot, so the capture shows the page as loaded rather than mid-tab.
+        if (width === KEYBOARD_WIDTH) problems.push(...(await keyboardIssues(page)));
         report.push({ route: routeName, path, theme, width, screenshot: file, problems });
         if (problems.length) {
           failures += 1;
