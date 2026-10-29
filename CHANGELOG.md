@@ -91,6 +91,14 @@ intentional.
   charges and unsupported elements are per-ligand errors; skipped optimisation,
   random-coordinate embedding, salt stripping and rigid macrocycles are reported
   in the new `{prefix}_prep_notes` column.
+- **CNS MPO used invented inputs.** ClogD was cLogP − 0.5 and the "pKa" was
+  7 + 1.5 × (nitrogens bearing H), which counted amides and anilines as basic
+  and ignored tertiary amines; a fixed 0.25 "standard error" was reported and
+  invented lower penalties were applied to cLogP and MW. The model (now v2.0.0,
+  "CNS MPO approximation") uses Wager's six functions exactly, cLogP in place of
+  ClogD, and an explicitly reported assumed pKa (9.0 aliphatic amines, 11.0
+  amidines/guanidines) only when a basic centre is detected. It reports no
+  uncertainty and is not described as a BBB-penetration probability.
 - Docked pose SDF files now carry bonds, rebuilt from `REMARK SMILES` records
   that Vina copies into its output; previously they contained atoms only.
 
@@ -110,6 +118,7 @@ intentional.
 - Connector 3xx responses are errors; 404s raise unless explicitly tolerated.
 - Constraint objectives no longer contribute to composite scores or Pareto
   ranking; they gate eligibility instead.
+- `cns_mpo_bbb` scores change (see Fixed) and its uncertainty column is empty.
 - `dock.vina` reads receptors only from `<HCS_DATA_DIR>/receptors` (relative
   names resolve there). Absolute paths elsewhere, and resolution against the
   server's working directory, are refused unless

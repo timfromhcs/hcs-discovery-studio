@@ -8,6 +8,7 @@ from typing import Any
 
 import pytest
 from rdkit import Chem
+from rdkit.Chem import Crippen, Descriptors, Lipinski, rdMolDescriptors
 
 from hcs_discovery.core.errors import ValidationError
 from hcs_discovery.plugins.science.properties.adapter import (
@@ -146,9 +147,75 @@ def test_cns_mpo_bbb_scoring() -> None:
     mol_diaz = Chem.MolFromSmiles("CN1C(=O)CN=C(c2ccccc2)c3cc(Cl)ccc13")
     score_d, unc_d, in_dom_d, _ = model.predict(mol_diaz)
     assert score_d is not None
-    assert score_d >= 4.0  # Favorable CNS penetration score
+    assert score_d >= 4.0  # Favorable CNS desirability score
     assert in_dom_d is True
-    assert unc_d == 0.25
+    assert unc_d is None  # no calibrated uncertainty exists for this score
+    assert model.metadata.validation["status"] == "approximation"
+
+
+@pytest.mark.parametrize(
+    ("value", "full", "zero", "expected"),
+    [
+        # Wager et al. (2010) monotonic functions: cLogP 3->5, ClogD 2->4, MW 360->500,
+        # HBD 0.5->3.5, pKa 8->10. No lower penalty exists for any of them.
+        (-12.0, 3.0, 5.0, 1.0),
+        (3.0, 3.0, 5.0, 1.0),
+        (4.0, 3.0, 5.0, 0.5),
+        (5.0, 3.0, 5.0, 0.0),
+        (30.0, 360.0, 500.0, 1.0),
+        (430.0, 360.0, 500.0, 0.5),
+        (2.0, 0.5, 3.5, 0.5),
+        (9.0, 8.0, 10.0, 0.5),
+    ],
+)
+def test_cns_mpo_monotonic_desirability_matches_wager(value: float, full: float, zero: float, expected: float) -> None:
+    assert CNSMPOModel._decreasing(value, full, zero) == pytest.approx(expected)
+
+
+@pytest.mark.parametrize(
+    ("tpsa", "expected"),
+    [(10.0, 0.0), (20.0, 0.0), (30.0, 0.5), (40.0, 1.0), (90.0, 1.0), (105.0, 0.5), (120.0, 0.0), (150.0, 0.0)],
+)
+def test_cns_mpo_tpsa_hump_matches_wager(tpsa: float, expected: float) -> None:
+    assert CNSMPOModel._tpsa_hump(tpsa) == pytest.approx(expected)
+
+
+@pytest.mark.parametrize(
+    ("smiles", "centre"),
+    [
+        ("CNCCC(Oc1ccc(cc1)C(F)(F)F)c1ccccc1", "aliphatic_amine"),  # fluoxetine
+        ("CN(C)CCCN1c2ccccc2CCc2ccccc21", "aliphatic_amine"),  # imipramine
+        ("NC(=N)c1ccccc1", "amidine_or_guanidine"),
+        ("Nc1ccccc1", None),  # aniline is not a basic centre at pH 7.4
+        ("CC(=O)Nc1ccc(O)cc1", None),  # amide
+        ("CS(=O)(=O)NC", None),  # sulfonamide
+        ("CC(=O)N1CCOCC1", None),  # tertiary amide
+    ],
+)
+def test_cns_mpo_basic_centre_detection(smiles: str, centre: str | None) -> None:
+    model = CNSMPOModel()
+    mol = Chem.MolFromSmiles(smiles)
+    assert model.basic_centre(mol) == centre
+    _score, _unc, _dom, note = model.predict(mol)
+    if centre is None:
+        assert note is None
+    else:
+        assert note is not None and "pKa not computed; assumed" in note
+
+
+def test_cns_mpo_score_is_sum_of_components() -> None:
+    model = CNSMPOModel()
+    mol = Chem.MolFromSmiles("C1CCNCC1")  # piperidine: assumed pKa 9.0 -> 0.5
+    clogp = Crippen.MolLogP(mol)
+    expected = (
+        model._decreasing(clogp, 3.0, 5.0)
+        + model._decreasing(clogp, 2.0, 4.0)
+        + model._decreasing(Descriptors.MolWt(mol), 360.0, 500.0)
+        + model._tpsa_hump(rdMolDescriptors.CalcTPSA(mol))
+        + model._decreasing(float(Lipinski.NumHDonors(mol)), 0.5, 3.5)
+        + 0.5
+    )
+    assert model.predict(mol)[0] == pytest.approx(round(expected, 2))
 
 
 def test_probe_property_predictor() -> None:

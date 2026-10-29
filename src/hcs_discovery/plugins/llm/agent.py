@@ -232,8 +232,9 @@ class ResearchAgent:
             )
         elif "cns" in p_lower or "mpo" in p_lower:
             reply = (
-                "CNS MPO (Wager et al., 2010) computes a 0-6 score assessing blood-brain barrier penetration "
-                "alignment based on LogP, LogD, MW, TPSA, HBD, and pKa."
+                "The CNS MPO approximation uses the six Wager et al. (2010) desirability functions on a 0-6 "
+                "scale, with cLogP in place of ClogD and an assumed pKa for detected basic centres. It is a "
+                "physicochemical desirability score, not a probability of blood-brain barrier penetration."
             )
         else:
             reply = (
