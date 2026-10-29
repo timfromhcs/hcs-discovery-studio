@@ -13,15 +13,24 @@ from .base import get_engine
 from .models import Base
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
+# Wheels ship the migration scripts inside the package (see pyproject force-include).
+PACKAGED_SCRIPTS = Path(__file__).resolve().parents[1] / "_alembic"
 
 
 def alembic_config(settings: Settings) -> Config | None:
-    """Return an Alembic config for a source checkout, or ``None`` in a wheel."""
+    """Return an Alembic config for a source checkout or an installed wheel.
+
+    Returns ``None`` only when no migration scripts can be found at all.
+    """
     ini = PROJECT_ROOT / "alembic.ini"
-    if not ini.exists():
+    if ini.exists():
+        config = Config(str(ini))
+        config.set_main_option("script_location", str(PROJECT_ROOT / "migrations"))
+    elif (PACKAGED_SCRIPTS / "env.py").exists():
+        config = Config()
+        config.set_main_option("script_location", str(PACKAGED_SCRIPTS))
+    else:
         return None
-    config = Config(str(ini))
-    config.set_main_option("script_location", str(PROJECT_ROOT / "migrations"))
     config.set_main_option("sqlalchemy.url", settings.database_url)
     return config
 
@@ -34,7 +43,7 @@ def upgrade_database(settings: Settings) -> str:
     ``"create_all"`` so callers can report which path was used.
     """
     config = alembic_config(settings)
-    if config is None:  # pragma: no cover - installed wheel without migration assets
+    if config is None:  # pragma: no cover - package installed without migration assets
         Base.metadata.create_all(get_engine(settings))
         return "create_all"
 
