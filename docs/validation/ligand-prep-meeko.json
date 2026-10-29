@@ -1,0 +1,845 @@
+{
+  "generated_at": "2026-10-29T16:11:27+00:00",
+  "hcs_method": "hcs-pdbqt-1",
+  "reference": {
+    "tool": "Meeko",
+    "version": "0.8.0",
+    "license": "LGPL-2.1"
+  },
+  "environment": {
+    "python": "3.12.13",
+    "rdkit": "2026.09.1"
+  },
+  "counts": {
+    "known_deviation_rigid_macrocycle": 3,
+    "match": 48
+  },
+  "ligands": [
+    {
+      "name": "Aspirin",
+      "smiles": "CC(=O)Oc1ccccc1C(=O)O",
+      "status": "match",
+      "mismatches": [],
+      "hcs": {
+        "torsdof": 4,
+        "atoms": 14,
+        "root_atoms": 6
+      },
+      "meeko": {
+        "torsdof": 4,
+        "atoms": 14,
+        "root_atoms": 6
+      }
+    },
+    {
+      "name": "Ibuprofen",
+      "smiles": "CC(C)Cc1ccc(cc1)C(C)C(=O)O",
+      "status": "match",
+      "mismatches": [],
+      "hcs": {
+        "torsdof": 5,
+        "atoms": 16,
+        "root_atoms": 6
+      },
+      "meeko": {
+        "torsdof": 5,
+        "atoms": 16,
+        "root_atoms": 6
+      }
+    },
+    {
+      "name": "Naproxen",
+      "smiles": "COc1ccc2cc(ccc2c1)[C@@H](C)C(=O)O",
+      "status": "match",
+      "mismatches": [],
+      "hcs": {
+        "torsdof": 4,
+        "atoms": 18,
+        "root_atoms": 2
+      },
+      "meeko": {
+        "torsdof": 4,
+        "atoms": 18,
+        "root_atoms": 2
+      }
+    },
+    {
+      "name": "Paracetamol",
+      "smiles": "CC(=O)Nc1ccc(O)cc1",
+      "status": "match",
+      "mismatches": [],
+      "hcs": {
+        "torsdof": 2,
+        "atoms": 13,
+        "root_atoms": 6
+      },
+      "meeko": {
+        "torsdof": 2,
+        "atoms": 13,
+        "root_atoms": 6
+      }
+    },
+    {
+      "name": "Caffeine",
+      "smiles": "Cn1cnc2c1c(=O)n(C)c(=O)n2C",
+      "status": "match",
+      "mismatches": [],
+      "hcs": {
+        "torsdof": 0,
+        "atoms": 14,
+        "root_atoms": 14
+      },
+      "meeko": {
+        "torsdof": 0,
+        "atoms": 14,
+        "root_atoms": 14
+      }
+    },
+    {
+      "name": "Warfarin",
+      "smiles": "CC(=O)CC(c1ccccc1)c1c(O)c2ccccc2oc1=O",
+      "status": "match",
+      "mismatches": [],
+      "hcs": {
+        "torsdof": 5,
+        "atoms": 24,
+        "root_atoms": 1
+      },
+      "meeko": {
+        "torsdof": 5,
+        "atoms": 24,
+        "root_atoms": 1
+      }
+    },
+    {
+      "name": "2_amino_5_bromobenzoic_acid",
+      "smiles": "Brc1cc(C(O)=O)c(N)cc1",
+      "status": "match",
+      "mismatches": [],
+      "hcs": {
+        "torsdof": 3,
+        "atoms": 14,
+        "root_atoms": 7
+      },
+      "meeko": {
+        "torsdof": 3,
+        "atoms": 14,
+        "root_atoms": 7
+      }
+    },
+    {
+      "name": "5_bromo_2_4_dihydroxybenzoic_acid",
+      "smiles": "Oc1c(Br)cc(C(O)=O)c(O)c1",
+      "status": "match",
+      "mismatches": [],
+      "hcs": {
+        "torsdof": 4,
+        "atoms": 15,
+        "root_atoms": 7
+      },
+      "meeko": {
+        "torsdof": 4,
+        "atoms": 15,
+        "root_atoms": 7
+      }
+    },
+    {
+      "name": "acetazolamide",
+      "smiles": "S(=O)(=O)(N)c1sc(NC(=O)C)nn1",
+      "status": "match",
+      "mismatches": [],
+      "hcs": {
+        "torsdof": 3,
+        "atoms": 16,
+        "root_atoms": 5
+      },
+      "meeko": {
+        "torsdof": 3,
+        "atoms": 16,
+        "root_atoms": 5
+      }
+    },
+    {
+      "name": "amitryptyline",
+      "smiles": "CN(C)CC\\C=C1\\c2ccccc2CCc2ccccc12",
+      "status": "known_deviation_rigid_macrocycle",
+      "mismatches": [
+        "atoms",
+        "types_charges"
+      ],
+      "hcs": {
+        "torsdof": 3,
+        "atoms": 21,
+        "root_atoms": 1
+      },
+      "meeko": {
+        "torsdof": 3,
+        "atoms": 23,
+        "root_atoms": 1
+      }
+    },
+    {
+      "name": "amodiaquine",
+      "smiles": "c1(c(CN(CC)CC)cc(cc1)Nc1ccnc2c1ccc(c2)Cl)O",
+      "status": "match",
+      "mismatches": [],
+      "hcs": {
+        "torsdof": 7,
+        "atoms": 27,
+        "root_atoms": 6
+      },
+      "meeko": {
+        "torsdof": 7,
+        "atoms": 27,
+        "root_atoms": 6
+      }
+    },
+    {
+      "name": "atropine",
+      "smiles": "CN1[C@H]2CC[C@@H]1C[C@@H](C2)OC(=O)C(CO)C1=CC=CC=C1",
+      "status": "match",
+      "mismatches": [],
+      "hcs": {
+        "torsdof": 6,
+        "atoms": 22,
+        "root_atoms": 2
+      },
+      "meeko": {
+        "torsdof": 6,
+        "atoms": 22,
+        "root_atoms": 2
+      }
+    },
+    {
+      "name": "benzylimidazole",
+      "smiles": "n1(Cc2ccccc2)cncc1",
+      "status": "match",
+      "mismatches": [],
+      "hcs": {
+        "torsdof": 2,
+        "atoms": 12,
+        "root_atoms": 1
+      },
+      "meeko": {
+        "torsdof": 2,
+        "atoms": 12,
+        "root_atoms": 1
+      }
+    },
+    {
+      "name": "bromogramine",
+      "smiles": "Brc1cc2c(CN(C)C)c[nH]c2cc1",
+      "status": "match",
+      "mismatches": [],
+      "hcs": {
+        "torsdof": 2,
+        "atoms": 15,
+        "root_atoms": 1
+      },
+      "meeko": {
+        "torsdof": 2,
+        "atoms": 15,
+        "root_atoms": 1
+      }
+    },
+    {
+      "name": "carvedilol",
+      "smiles": "COc1ccccc1OCCNCC(O)COc1cccc2[nH]c3ccccc3c12",
+      "status": "match",
+      "mismatches": [],
+      "hcs": {
+        "torsdof": 11,
+        "atoms": 33,
+        "root_atoms": 2
+      },
+      "meeko": {
+        "torsdof": 11,
+        "atoms": 33,
+        "root_atoms": 2
+      }
+    },
+    {
+      "name": "cephalothin",
+      "smiles": "C1(=C(COC(C)=O)CS[C@@H]2[C@H](NC(=O)Cc3cccs3)C(N12)=O)C(O)=O",
+      "status": "match",
+      "mismatches": [],
+      "hcs": {
+        "torsdof": 8,
+        "atoms": 28,
+        "root_atoms": 9
+      },
+      "meeko": {
+        "torsdof": 8,
+        "atoms": 28,
+        "root_atoms": 9
+      }
+    },
+    {
+      "name": "chlorpheniramine",
+      "smiles": "C([C@H](c1ccccn1)c1ccc(cc1)Cl)CN(C)C",
+      "status": "match",
+      "mismatches": [],
+      "hcs": {
+        "torsdof": 5,
+        "atoms": 19,
+        "root_atoms": 1
+      },
+      "meeko": {
+        "torsdof": 5,
+        "atoms": 19,
+        "root_atoms": 1
+      }
+    },
+    {
+      "name": "chlorpromazine",
+      "smiles": "c1c(Cl)ccc2Sc3ccccc3N(CCCN(C)C)c12",
+      "status": "match",
+      "mismatches": [],
+      "hcs": {
+        "torsdof": 4,
+        "atoms": 21,
+        "root_atoms": 1
+      },
+      "meeko": {
+        "torsdof": 4,
+        "atoms": 21,
+        "root_atoms": 1
+      }
+    },
+    {
+      "name": "chlorpropamide",
+      "smiles": "Clc1ccc(S(=O)(NC(=O)NCCC)=O)cc1",
+      "status": "match",
+      "mismatches": [],
+      "hcs": {
+        "torsdof": 4,
+        "atoms": 19,
+        "root_atoms": 6
+      },
+      "meeko": {
+        "torsdof": 4,
+        "atoms": 19,
+        "root_atoms": 6
+      }
+    },
+    {
+      "name": "chlorzoxazone",
+      "smiles": "c1cc2c(cc1Cl)[nH]c(=O)o2",
+      "status": "match",
+      "mismatches": [],
+      "hcs": {
+        "torsdof": 0,
+        "atoms": 12,
+        "root_atoms": 12
+      },
+      "meeko": {
+        "torsdof": 0,
+        "atoms": 12,
+        "root_atoms": 12
+      }
+    },
+    {
+      "name": "ciprofloxacin",
+      "smiles": "O=C(c1cn(C2CC2)c2c(cc(F)c(N3CCNCC3)c2)c1=O)O",
+      "status": "match",
+      "mismatches": [],
+      "hcs": {
+        "torsdof": 4,
+        "atoms": 26,
+        "root_atoms": 12
+      },
+      "meeko": {
+        "torsdof": 4,
+        "atoms": 26,
+        "root_atoms": 12
+      }
+    },
+    {
+      "name": "danofloxacin",
+      "smiles": "C[N@]1C[C@@H]2C[C@H]1CN2c1c(cc2c(n(cc(C(=O)O)c2=O)C2CC2)c1)F",
+      "status": "match",
+      "mismatches": [],
+      "hcs": {
+        "torsdof": 4,
+        "atoms": 27,
+        "root_atoms": 12
+      },
+      "meeko": {
+        "torsdof": 4,
+        "atoms": 27,
+        "root_atoms": 12
+      }
+    },
+    {
+      "name": "deprenyl",
+      "smiles": "C[C@H](CC1=CC=CC=C1)N(C)CC#C",
+      "status": "match",
+      "mismatches": [],
+      "hcs": {
+        "torsdof": 4,
+        "atoms": 14,
+        "root_atoms": 2
+      },
+      "meeko": {
+        "torsdof": 4,
+        "atoms": 14,
+        "root_atoms": 2
+      }
+    },
+    {
+      "name": "diltiazem",
+      "smiles": "O=C1[C@H](OC(C)=O)[C@H](c2ccc(OC)cc2)Sc2ccccc2N1CCN(C)C",
+      "status": "known_deviation_rigid_macrocycle",
+      "mismatches": [
+        "atoms",
+        "root_atoms",
+        "types_charges"
+      ],
+      "hcs": {
+        "torsdof": 7,
+        "atoms": 29,
+        "root_atoms": 12
+      },
+      "meeko": {
+        "torsdof": 7,
+        "atoms": 31,
+        "root_atoms": 6
+      }
+    },
+    {
+      "name": "diphenydramine",
+      "smiles": "CN(C)CCOC(c1ccccc1)c1ccccc1",
+      "status": "match",
+      "mismatches": [],
+      "hcs": {
+        "torsdof": 6,
+        "atoms": 19,
+        "root_atoms": 1
+      },
+      "meeko": {
+        "torsdof": 6,
+        "atoms": 19,
+        "root_atoms": 1
+      }
+    },
+    {
+      "name": "famotidine",
+      "smiles": "N\\C(CCSCc1csc(\\N=C(\\N)N)n1)=N\\S(=O)(N)=O",
+      "status": "match",
+      "mismatches": [],
+      "hcs": {
+        "torsdof": 8,
+        "atoms": 28,
+        "root_atoms": 1
+      },
+      "meeko": {
+        "torsdof": 8,
+        "atoms": 28,
+        "root_atoms": 1
+      }
+    },
+    {
+      "name": "fenoprofen",
+      "smiles": "CC(C(O)=O)c1cccc(Oc2ccccc2)c1",
+      "status": "match",
+      "mismatches": [],
+      "hcs": {
+        "torsdof": 5,
+        "atoms": 19,
+        "root_atoms": 2
+      },
+      "meeko": {
+        "torsdof": 5,
+        "atoms": 19,
+        "root_atoms": 2
+      }
+    },
+    {
+      "name": "glipizide",
+      "smiles": "O=C(NC1CCCCC1)NS(=O)(c1ccc(CCNC(c2cnc(cn2)C)=O)cc1)=O",
+      "status": "match",
+      "mismatches": [],
+      "hcs": {
+        "torsdof": 7,
+        "atoms": 34,
+        "root_atoms": 1
+      },
+      "meeko": {
+        "torsdof": 7,
+        "atoms": 34,
+        "root_atoms": 1
+      }
+    },
+    {
+      "name": "guanine",
+      "smiles": "[nH]1cnc2nc(N)[nH]c(=O)c12",
+      "status": "match",
+      "mismatches": [],
+      "hcs": {
+        "torsdof": 1,
+        "atoms": 15,
+        "root_atoms": 12
+      },
+      "meeko": {
+        "torsdof": 1,
+        "atoms": 15,
+        "root_atoms": 12
+      }
+    },
+    {
+      "name": "hydroflumethiazide",
+      "smiles": "S1(=O)(=O)NCNc2c1cc(S(=O)(N)=O)c(c2)C(F)(F)F",
+      "status": "match",
+      "mismatches": [],
+      "hcs": {
+        "torsdof": 3,
+        "atoms": 24,
+        "root_atoms": 14
+      },
+      "meeko": {
+        "torsdof": 3,
+        "atoms": 24,
+        "root_atoms": 14
+      }
+    },
+    {
+      "name": "nalidixic_acid",
+      "smiles": "CCn1cc(c(=O)c2ccc(nc12)C)C(=O)O",
+      "status": "match",
+      "mismatches": [],
+      "hcs": {
+        "torsdof": 3,
+        "atoms": 18,
+        "root_atoms": 12
+      },
+      "meeko": {
+        "torsdof": 3,
+        "atoms": 18,
+        "root_atoms": 12
+      }
+    },
+    {
+      "name": "naloxone",
+      "smiles": "O[C@]1([C@H](N(CC=C)CC2)C3)[C@@]42C5=C3C=CC(O)=C5O[C@H]4C(CC1)=O",
+      "status": "match",
+      "mismatches": [],
+      "hcs": {
+        "torsdof": 4,
+        "atoms": 26,
+        "root_atoms": 19
+      },
+      "meeko": {
+        "torsdof": 4,
+        "atoms": 26,
+        "root_atoms": 19
+      }
+    },
+    {
+      "name": "naproxen",
+      "smiles": "O=C(O)[C@@H](C)c1ccc2cc(ccc2c1)OC",
+      "status": "match",
+      "mismatches": [],
+      "hcs": {
+        "torsdof": 4,
+        "atoms": 18,
+        "root_atoms": 2
+      },
+      "meeko": {
+        "torsdof": 4,
+        "atoms": 18,
+        "root_atoms": 2
+      }
+    },
+    {
+      "name": "nortriptiline",
+      "smiles": "N(CC\\C=C1\\c2c(CCc3c1cccc3)cccc2)C",
+      "status": "known_deviation_rigid_macrocycle",
+      "mismatches": [
+        "atoms",
+        "types_charges"
+      ],
+      "hcs": {
+        "torsdof": 3,
+        "atoms": 21,
+        "root_atoms": 1
+      },
+      "meeko": {
+        "torsdof": 3,
+        "atoms": 23,
+        "root_atoms": 1
+      }
+    },
+    {
+      "name": "oxytetracycline",
+      "smiles": "OC1=C(C(O)=C(C([C@@](C(C(C(N)=O)=C(O)[C@H]2N(C)C)=O)(O)[C@@]2([H])[C@H]3O)=O)[C@@]3([H])[C@@]4(O)C)C4=CC=C1",
+      "status": "match",
+      "mismatches": [],
+      "hcs": {
+        "torsdof": 8,
+        "atoms": 41,
+        "root_atoms": 21
+      },
+      "meeko": {
+        "torsdof": 8,
+        "atoms": 41,
+        "root_atoms": 21
+      }
+    },
+    {
+      "name": "papaverine",
+      "smiles": "c1(nccc2cc(c(OC)cc12)OC)Cc1cc(c(cc1)OC)OC",
+      "status": "match",
+      "mismatches": [],
+      "hcs": {
+        "torsdof": 6,
+        "atoms": 25,
+        "root_atoms": 1
+      },
+      "meeko": {
+        "torsdof": 6,
+        "atoms": 25,
+        "root_atoms": 1
+      }
+    },
+    {
+      "name": "phenazopyridine",
+      "smiles": "c1ccc(cc1)\\N=N\\c1c(nc(cc1)N)N",
+      "status": "match",
+      "mismatches": [],
+      "hcs": {
+        "torsdof": 4,
+        "atoms": 20,
+        "root_atoms": 6
+      },
+      "meeko": {
+        "torsdof": 4,
+        "atoms": 20,
+        "root_atoms": 6
+      }
+    },
+    {
+      "name": "phenobarbital",
+      "smiles": "C1(NC(C(c2ccccc2)(C(=O)N1)CC)=O)=O",
+      "status": "match",
+      "mismatches": [],
+      "hcs": {
+        "torsdof": 2,
+        "atoms": 19,
+        "root_atoms": 11
+      },
+      "meeko": {
+        "torsdof": 2,
+        "atoms": 19,
+        "root_atoms": 11
+      }
+    },
+    {
+      "name": "pindolol",
+      "smiles": "CC(C)NCC(O)COc1cccc2[nH]ccc12",
+      "status": "match",
+      "mismatches": [],
+      "hcs": {
+        "torsdof": 7,
+        "atoms": 21,
+        "root_atoms": 1
+      },
+      "meeko": {
+        "torsdof": 7,
+        "atoms": 21,
+        "root_atoms": 1
+      }
+    },
+    {
+      "name": "procaine",
+      "smiles": "Nc1ccc(C(OCCN(CC)CC)=O)cc1",
+      "status": "match",
+      "mismatches": [],
+      "hcs": {
+        "torsdof": 8,
+        "atoms": 19,
+        "root_atoms": 1
+      },
+      "meeko": {
+        "torsdof": 8,
+        "atoms": 19,
+        "root_atoms": 1
+      }
+    },
+    {
+      "name": "quinine",
+      "smiles": "[H]C1(CN2CCC1C[C@@]2([H])[C@H](O)C1=CC=NC2=C1C=C(OC)C=C2)C=C",
+      "status": "match",
+      "mismatches": [],
+      "hcs": {
+        "torsdof": 5,
+        "atoms": 25,
+        "root_atoms": 10
+      },
+      "meeko": {
+        "torsdof": 5,
+        "atoms": 25,
+        "root_atoms": 10
+      }
+    },
+    {
+      "name": "sarafloxacin",
+      "smiles": "C1CN(CCN1)c1c(cc2c(n(cc(C(=O)O)c2=O)c2ccc(cc2)F)c1)F",
+      "status": "match",
+      "mismatches": [],
+      "hcs": {
+        "torsdof": 4,
+        "atoms": 30,
+        "root_atoms": 12
+      },
+      "meeko": {
+        "torsdof": 4,
+        "atoms": 30,
+        "root_atoms": 12
+      }
+    },
+    {
+      "name": "sparfloxacin",
+      "smiles": "C[C@H]1CN(C[C@@H](C)N1)C1=C(F)C2=C(C(=O)C(=CN2C2CC2)C(O)=O)C(N)=C1F",
+      "status": "match",
+      "mismatches": [],
+      "hcs": {
+        "torsdof": 5,
+        "atoms": 32,
+        "root_atoms": 13
+      },
+      "meeko": {
+        "torsdof": 5,
+        "atoms": 32,
+        "root_atoms": 13
+      }
+    },
+    {
+      "name": "sulfamethazine",
+      "smiles": "S(=O)(=O)(Nc1nc(C)cc(n1)C)c1ccc(N)cc1",
+      "status": "match",
+      "mismatches": [],
+      "hcs": {
+        "torsdof": 4,
+        "atoms": 22,
+        "root_atoms": 3
+      },
+      "meeko": {
+        "torsdof": 4,
+        "atoms": 22,
+        "root_atoms": 3
+      }
+    },
+    {
+      "name": "sulfasalazine",
+      "smiles": "C(=O)(O)c1cc(ccc1O)\\N=N\\c1ccc(cc1)S(=O)(Nc1ccccn1)=O",
+      "status": "match",
+      "mismatches": [],
+      "hcs": {
+        "torsdof": 8,
+        "atoms": 31,
+        "root_atoms": 2
+      },
+      "meeko": {
+        "torsdof": 8,
+        "atoms": 31,
+        "root_atoms": 2
+      }
+    },
+    {
+      "name": "sulindac_form_II",
+      "smiles": "CC1=C(CC(O)=O)c2cc(F)ccc2C\\1=C\\c1ccc(cc1)S(C)=O",
+      "status": "match",
+      "mismatches": [],
+      "hcs": {
+        "torsdof": 5,
+        "atoms": 26,
+        "root_atoms": 12
+      },
+      "meeko": {
+        "torsdof": 5,
+        "atoms": 26,
+        "root_atoms": 12
+      }
+    },
+    {
+      "name": "tetracaine",
+      "smiles": "C(c1ccc(cc1)NCCCC)(=O)OCCN(C)C",
+      "status": "match",
+      "mismatches": [],
+      "hcs": {
+        "torsdof": 9,
+        "atoms": 20,
+        "root_atoms": 6
+      },
+      "meeko": {
+        "torsdof": 9,
+        "atoms": 20,
+        "root_atoms": 6
+      }
+    },
+    {
+      "name": "tetracycline",
+      "smiles": "OC1=C(C(C2=C(O)[C@@](C(C(C(N)=O)=C(O)[C@H]3N(C)C)=O)(O)[C@@]3([H])C[C@]2([H])[C@@]4(O)C)=O)C4=CC=C1",
+      "status": "match",
+      "mismatches": [],
+      "hcs": {
+        "torsdof": 7,
+        "atoms": 39,
+        "root_atoms": 21
+      },
+      "meeko": {
+        "torsdof": 7,
+        "atoms": 39,
+        "root_atoms": 21
+      }
+    },
+    {
+      "name": "thymol",
+      "smiles": "c1(cc(ccc1C(C)C)C)O",
+      "status": "match",
+      "mismatches": [],
+      "hcs": {
+        "torsdof": 2,
+        "atoms": 12,
+        "root_atoms": 7
+      },
+      "meeko": {
+        "torsdof": 2,
+        "atoms": 12,
+        "root_atoms": 7
+      }
+    },
+    {
+      "name": "verapamil",
+      "smiles": "COc1ccc(CCN(C)CCCC(C#N)(C(C)C)c2ccc(OC)c(OC)c2)cc1OC",
+      "status": "match",
+      "mismatches": [],
+      "hcs": {
+        "torsdof": 13,
+        "atoms": 33,
+        "root_atoms": 1
+      },
+      "meeko": {
+        "torsdof": 13,
+        "atoms": 33,
+        "root_atoms": 1
+      }
+    },
+    {
+      "name": "warfarin",
+      "smiles": "CC(=O)CC(c1ccccc1)c1c(O)c2ccccc2oc1=O",
+      "status": "match",
+      "mismatches": [],
+      "hcs": {
+        "torsdof": 5,
+        "atoms": 24,
+        "root_atoms": 1
+      },
+      "meeko": {
+        "torsdof": 5,
+        "atoms": 24,
+        "root_atoms": 1
+      }
+    }
+  ]
+}

@@ -23,10 +23,11 @@ from ....core.paths import safe_join
 from ....workflow.registry import NodeContext
 from ....workflow.table import Column, Table
 from .prep import (
+    PREPARATION_METHOD,
     LigandPreparationError,
     parse_vina_poses,
     pose_pdbqt_to_sdf,
-    prepare_ligand_pdbqt,
+    prepare_ligand,
     validate_receptor_pdbqt,
 )
 
@@ -437,6 +438,16 @@ def vina_docking_columns(prefix: str = "docking") -> list[Column]:
             "string",
             description="Reason a ligand was not docked; empty when docking succeeded.",
         ),
+        Column(
+            f"{prefix}_prep_notes",
+            "Ligand preparation notes",
+            "string",
+            method=f"Ligand preparation {PREPARATION_METHOD}",
+            description=(
+                "Transformations that changed the docked species or geometry, such as keeping only the "
+                "largest fragment or skipping MMFF94 optimisation; empty when none applied."
+            ),
+        ),
     ]
 
 
@@ -467,6 +478,11 @@ def run_vina_docking(table: Table, config: VinaConfig, ctx: NodeContext) -> Tabl
         ctx.log(f"Receptor caveat: {warning}", level="warning")
 
     ctx.log(SCIENTIFIC_CAVEAT, level="info")
+    ctx.log(
+        f"Ligands prepared with {PREPARATION_METHOD}: ETKDGv3 + MMFF94 geometry, Gasteiger charges, "
+        "AutoDock 4 atom types, non-polar hydrogens merged, rigid rings and amides.",
+        level="info",
+    )
 
     columns = vina_docking_columns(config.output_prefix)
     affinities: list[float | None] = []
@@ -475,6 +491,7 @@ def run_vina_docking(table: Table, config: VinaConfig, ctx: NodeContext) -> Tabl
     artifact_paths: list[str | None] = []
     statuses: list[str] = []
     errors: list[str | None] = []
+    notes: list[str | None] = []
 
     total = len(table.rows)
     prep_failures = 0
@@ -497,11 +514,12 @@ def run_vina_docking(table: Table, config: VinaConfig, ctx: NodeContext) -> Tabl
                 artifact_paths.append(None)
                 statuses.append("invalid_input")
                 errors.append("Missing or non-string SMILES")
+                notes.append(None)
                 continue
 
             # 1. Ligand preparation
             try:
-                ligand_pdbqt = prepare_ligand_pdbqt(smiles, seed=config.seed + idx)
+                prepared = prepare_ligand(smiles, seed=config.seed + idx)
             except LigandPreparationError as exc:
                 prep_failures += 1
                 ctx.log(f"Row {idx} ({row_id}) prep failed: {exc.message}", level="warning")
@@ -511,7 +529,12 @@ def run_vina_docking(table: Table, config: VinaConfig, ctx: NodeContext) -> Tabl
                 artifact_paths.append(None)
                 statuses.append("ligand_preparation_failed")
                 errors.append(exc.message)
+                notes.append(None)
                 continue
+            ligand_pdbqt = prepared.pdbqt
+            notes.append("; ".join(prepared.warnings) or None)
+            for warning in prepared.warnings:
+                ctx.log(f"Row {idx} ({row_id}) preparation: {warning}", level="warning")
 
             # 2. Docking execution
             try:
@@ -570,6 +593,7 @@ def run_vina_docking(table: Table, config: VinaConfig, ctx: NodeContext) -> Tabl
     result.add_values(columns[3], artifact_paths)
     result.add_values(columns[4], statuses)
     result.add_values(columns[5], errors)
+    result.add_values(columns[6], notes)
 
     if prep_failures or dock_failures or no_pose:
         ctx.log(

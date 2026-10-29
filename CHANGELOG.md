@@ -79,6 +79,20 @@ intentional.
   docking receptor. Previously a replaced receptor file reused stale poses.
 - Installed wheels ship their Alembic migrations and record a revision instead
   of falling back to `create_all`.
+- **Docking ligands were rigid.** Ligand PDBQT files put every atom in `ROOT`
+  with no `BRANCH` records, so Vina never sampled torsions despite the
+  `TORSDOF` line. Preparation (`hcs-pdbqt-1`) now builds a real torsion tree
+  with Meeko's default conventions: non-polar hydrogens merged, AutoDock 4 atom
+  types on the original aromaticity, rigid rings and amides, graph-centre root.
+  On the 51 fixture ligands it matches Meeko 0.8.0 for torsion count, atom count,
+  root size, atom types and charges in 48 cases; the other 3 contain 7+-membered
+  rings that are kept rigid here (see `docs/validation/ligand-prep-meeko.md`).
+- Ligand preparation no longer swallows MMFF94 or Gasteiger failures. Undefined
+  charges and unsupported elements are per-ligand errors; skipped optimisation,
+  random-coordinate embedding, salt stripping and rigid macrocycles are reported
+  in the new `{prefix}_prep_notes` column.
+- Docked pose SDF files now carry bonds, rebuilt from `REMARK SMILES` records
+  that Vina copies into its output; previously they contained atoms only.
 
 ### Validation
 
