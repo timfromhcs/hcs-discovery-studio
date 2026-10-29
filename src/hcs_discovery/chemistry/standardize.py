@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from rdkit import Chem, RDLogger
+from rdkit.Chem import rdMolDescriptors
 from rdkit.Chem.MolStandardize import rdMolStandardize
 
 from ..core.errors import ValidationError
@@ -25,6 +26,14 @@ MAX_SMILES_LENGTH = 4000
 
 class MoleculeError(ValidationError):
     code = "invalid_molecule"
+
+
+_RDKIT_ERRORS = (ValueError, RuntimeError)
+
+
+def _describe(exc: Exception) -> str:
+    message = str(exc).strip().splitlines()[0] if str(exc).strip() else ""
+    return f"{type(exc).__name__}: {message[:200]}" if message else type(exc).__name__
 
 
 @dataclass(frozen=True)
@@ -96,6 +105,9 @@ def standardize(smiles: str, options: StandardizeOptions | None = None) -> Stand
             details={"atoms": mol.GetNumAtoms(), "limit": options.max_atoms},
         )
 
+    # RDKit reports per-molecule chemistry failures as ValueError (including
+    # sanitisation errors) or RuntimeError. Those become recorded warnings; any
+    # other exception is a defect and propagates.
     if options.strip_salts:
         try:
             components = Chem.GetMolFrags(mol)
@@ -106,40 +118,41 @@ def standardize(smiles: str, options: StandardizeOptions | None = None) -> Stand
                     f"Salt/solvent counter-ions removed ({len(components)} components -> 1); "
                     "the original record is preserved."
                 )
-        except Exception as exc:
-            warnings.append(f"Salt stripping skipped: {type(exc).__name__}")
+        except _RDKIT_ERRORS as exc:
+            warnings.append(f"Salt stripping skipped: {_describe(exc)}")
 
     if options.neutralize:
         try:
+            before = Chem.MolToSmiles(mol)
             mol = rdMolStandardize.Uncharger().uncharge(mol)
-            warnings.append("Formal charges neutralised where chemically valid.")
-        except Exception as exc:
-            warnings.append(f"Neutralisation skipped: {type(exc).__name__}")
+            if Chem.MolToSmiles(mol) != before:
+                warnings.append("Formal charges neutralised where chemically valid.")
+        except _RDKIT_ERRORS as exc:
+            warnings.append(f"Neutralisation skipped: {_describe(exc)}")
 
     if options.canonical_tautomer:
         try:
+            before = Chem.MolToSmiles(mol)
             mol = rdMolStandardize.TautomerEnumerator().Canonicalize(mol)
-            warnings.append("Canonical tautomer applied.")
-        except Exception as exc:
-            warnings.append(f"Tautomer canonicalisation skipped: {type(exc).__name__}")
+            if Chem.MolToSmiles(mol) != before:
+                warnings.append("Canonical tautomer applied.")
+        except _RDKIT_ERRORS as exc:
+            warnings.append(f"Tautomer canonicalisation skipped: {_describe(exc)}")
 
     isomeric = Chem.MolToSmiles(mol, isomericSmiles=True, canonical=True)
     canonical = Chem.MolToSmiles(mol, isomericSmiles=False, canonical=True)
 
     inchi = inchikey = None
     try:
-        inchi = Chem.MolToInchi(mol)
-        inchikey = Chem.MolToInchiKey(mol)
-    except Exception as exc:
-        warnings.append(f"InChI generation unavailable: {type(exc).__name__}")
+        inchi = Chem.MolToInchi(mol) or None
+        inchikey = (Chem.MolToInchiKey(mol) or None) if inchi else None
+    except _RDKIT_ERRORS as exc:
+        warnings.append(f"InChI generation failed: {_describe(exc)}")
+    else:
+        if inchi is None:
+            warnings.append("InChI generation returned no identifier for this structure.")
 
-    formula = None
-    try:
-        from rdkit.Chem import rdMolDescriptors
-
-        formula = rdMolDescriptors.CalcMolFormula(mol)
-    except Exception:
-        warnings.append("Molecular formula could not be computed.")
+    formula = rdMolDescriptors.CalcMolFormula(mol)
 
     if not isomeric:
         raise MoleculeError("Standardisation produced an empty structure.")
