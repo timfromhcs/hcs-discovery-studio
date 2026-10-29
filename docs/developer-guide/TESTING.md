@@ -77,7 +77,9 @@ marked `scientific`; they are not correctness tests.
 `apps/web/playwright.config.ts` starts its own server:
 
 - host `127.0.0.1`, port `8791`,
-- data directory `.e2e-data` (cleaned before the run),
+- a fresh data directory `.e2e-data/run-<timestamp>` per invocation (earlier
+  runs' directories are removed; the server starts before `globalSetup`, so a
+  shared directory could not be wiped safely),
 - one worker, retries 0,
 - built SPA from `apps/web/dist`,
 - command `uv run hcs-discovery serve --port 8791`.
@@ -90,6 +92,28 @@ The three tests are:
 3. an unknown run ID shows a real error instead of a fabricated record.
 
 Traces and screenshots are written on failure under `apps/web/test-results`.
+
+## Visual and accessibility QA
+
+`apps/web/scripts/visual_qa.mjs` sweeps every route at 320, 390, 768, 1280 and
+1440 px in light and dark themes against a running server with synthetic data.
+It saves a full-page screenshot of each and fails on horizontal page overflow,
+elements past the viewport, console/page errors, failed same-origin requests,
+unnamed controls and images without alt text.
+
+```bash
+export HCS_DATA_DIR=/tmp/hcs-qa            # disposable
+uv run hcs-discovery project create --name "QA triage"
+uv run hcs-discovery dataset import examples/datasets/demo_library.csv --project <project id>
+uv run hcs-discovery workflow save examples/workflows/triage.yaml --project <project id>
+uv run hcs-discovery serve --port 8797 &   # the worker runs queued work
+uv run hcs-discovery workflow run examples/workflows/triage.yaml --project <project id> --dataset <dataset id>
+HCS_BASE_URL=http://127.0.0.1:8797 node apps/web/scripts/visual_qa.mjs
+```
+
+The automatic checks do not judge layout quality: look at the screenshots
+(default `apps/web/test-results/visual-qa`), especially tables with action
+columns and pages with long identifiers.
 
 ## Test data
 

@@ -282,6 +282,21 @@ svg {
   gap: 12px;
 }
 
+/* The editor's node table sits in a narrow column; keep its actions in view. */
+.data-table.compact-table.nodes-table {
+  min-width: 0;
+}
+
+.nodes-table td.mono {
+  overflow-wrap: anywhere;
+}
+
+.nodes-table .row-actions {
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
 .text-link {
   border: 0;
   padding: 0;
@@ -649,6 +664,9 @@ svg {
   flex-direction: column;
   gap: 8px;
   min-width: 0;
+  max-width: 100%;
+  /* Compound IDs and SMILES have no break opportunities of their own. */
+  overflow-wrap: anywhere;
 }
 
 .eyebrow {
@@ -2262,6 +2280,8 @@ svg {
 .check-list li > div {
   flex: 1;
   min-width: 0;
+  /* Diagnostics show full local paths, which are long on Windows. */
+  overflow-wrap: anywhere;
 }
 
 .check-list li > .badge {

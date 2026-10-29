@@ -533,30 +533,31 @@ export function WorkflowEditorPage() {
             <CardHeader title="Nodes" subtitle="Stable IDs are used in logs, cache keys and artifacts." icon="models" />
             {definition.nodes.length ? (
               <div className="table-wrap">
-                <table className="data-table compact-table">
+                <table className="data-table compact-table nodes-table">
                   <thead>
                     <tr>
-                      <th>ID</th>
+                      <th>ID / type</th>
                       <th>Title</th>
-                      <th className="hide-narrow">Type</th>
-                      <th className="hide-narrow">Timeout</th>
                       <th aria-label="Actions" />
                     </tr>
                   </thead>
                   <tbody>
                     {definition.nodes.map((node) => (
                       <tr key={node.id} className={selectedId === node.id ? "selected-row" : ""}>
-                        <td className="mono small">{node.id}</td>
+                        <td className="mono small">
+                          {node.id}
+                          <div className="muted">{node.type}</div>
+                        </td>
                         <td>{node.title || "—"}</td>
-                        <td className="mono small hide-narrow">{node.type}</td>
-                        <td className="tabular small hide-narrow">{node.timeout_seconds ?? 300}s</td>
-                        <td className="row-actions">
-                          <button className="text-link" onClick={() => setSelectedId(node.id)}>
-                            Edit
-                          </button>
-                          <button className="icon-btn danger-hover" aria-label={`Delete node ${node.id}`} onClick={() => removeNode(node.id)}>
-                            <Icon name="trash" size={14} />
-                          </button>
+                        <td>
+                          <div className="row-actions">
+                            <button className="text-link" onClick={() => setSelectedId(node.id)}>
+                              Edit
+                            </button>
+                            <button className="icon-btn danger-hover" aria-label={`Delete node ${node.id}`} onClick={() => removeNode(node.id)}>
+                              <Icon name="trash" size={14} />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -573,8 +574,8 @@ export function WorkflowEditorPage() {
           <CardHeader title="Inspector" subtitle={selectedNode ? selectedNode.type : "Select a node in the graph."} icon="settings" />
           {selectedNode ? (
             <div className="form-stack">
-              <Field label="Node ID" hint="Stable identifier; cannot be renamed.">
-                <Input value={selectedNode.id} readOnly className="mono" />
+              <Field label="Node ID" hint="Stable identifier; cannot be renamed." htmlFor="node-id">
+                <Input id="node-id" value={selectedNode.id} readOnly className="mono" />
               </Field>
               <Field label="Display title" htmlFor="node-title">
                 <Input

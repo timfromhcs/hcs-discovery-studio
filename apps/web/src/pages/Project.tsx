@@ -193,13 +193,15 @@ export function ProjectPage() {
                         {dataset.error_count ? <span className="error-text">{dataset.error_count}</span> : "0"}
                       </td>
                       <td className="muted small hide-narrow">{formatRelative(dataset.created_at)}</td>
-                      <td className="row-actions">
-                        <button className="text-link hide-narrow" onClick={() => setSelectedDataset(dataset)}>
-                          Inspect rows
-                        </button>
-                        <button className="icon-btn danger-hover" aria-label={`Delete ${dataset.name}`} onClick={() => setDeletingDataset(dataset)}>
-                          <Icon name="trash" size={15} />
-                        </button>
+                      <td>
+                        <div className="row-actions">
+                          <button className="text-link hide-narrow" onClick={() => setSelectedDataset(dataset)}>
+                            Inspect rows
+                          </button>
+                          <button className="icon-btn danger-hover" aria-label={`Delete ${dataset.name}`} onClick={() => setDeletingDataset(dataset)}>
+                            <Icon name="trash" size={15} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}

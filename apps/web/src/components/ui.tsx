@@ -366,15 +366,15 @@ export function Field({
 }
 
 export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
-  return <input className={`input ${props.className ?? ""}`.trim()} {...props} />;
+  return <input {...props} className={`input ${props.className ?? ""}`.trim()} />;
 }
 
 export function Select(props: SelectHTMLAttributes<HTMLSelectElement>) {
-  return <select className={`input select ${props.className ?? ""}`.trim()} {...props} />;
+  return <select {...props} className={`input select ${props.className ?? ""}`.trim()} />;
 }
 
 export function Textarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return <textarea className={`input textarea ${props.className ?? ""}`.trim()} {...props} />;
+  return <textarea {...props} className={`input textarea ${props.className ?? ""}`.trim()} />;
 }
 
 export function Checkbox({
