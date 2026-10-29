@@ -138,6 +138,10 @@ class AgentResponse(BaseModel):
     executed_tools: list[dict[str, Any]] = Field(default_factory=list)
     run_id: str | None = None
     caveats: list[str] = Field(default_factory=lambda: [SCIENTIFIC_CAVEAT])
+    # Who produced ``text``: a configured language model, or the built-in
+    # deterministic rules. A provider failure is reported, never hidden.
+    source: Literal["llm", "local_rules"] = "local_rules"
+    provider_error: str | None = None
 
 
 def _wrap_untrusted_data(label: str, content: Any) -> str:
@@ -187,12 +191,14 @@ class ResearchAgent:
                 context_parts.append(
                     f"Datasets in project {project_id}:\n{_wrap_untrusted_data('datasets', datasets_info)}"
                 )
-            except Exception:
-                pass
+            except (NotFoundError, ValidationError) as exc:
+                context_parts.append(f"Datasets for project {project_id} unavailable: {exc.message}")
 
         user_content = f"{'\n\n'.join(context_parts)}\n\nUser Question:\n{prompt}"
 
-        # If LLM provider is available and configured, query it
+        # Query the configured provider; if it is unavailable or fails, say so and
+        # answer from the deterministic local rules below.
+        provider_error: str | None = None
         if self.provider.configured:
             probe = self.provider.probe()
             if probe.status == "available":
@@ -202,10 +208,11 @@ class ResearchAgent:
                         {"role": "user", "content": user_content},
                     ]
                     reply = self.provider.chat(messages, max_tokens=1024)
-                    return AgentResponse(mode="ask", text=reply)
-                except Exception:
-                    # Fallback to local response on provider failure
-                    pass
+                    return AgentResponse(mode="ask", text=reply, source="llm")
+                except Exception as exc:  # any transport or provider failure falls back, visibly
+                    provider_error = redact_text(f"{type(exc).__name__}: {exc}")[:300]
+            else:
+                provider_error = redact_text(f"provider status {probe.status}: {probe.detail}")[:300]
 
         # Deterministic local scientific assistant response
         p_lower = prompt.lower()
@@ -227,8 +234,10 @@ class ResearchAgent:
             )
         elif "solubility" in p_lower or "esol" in p_lower:
             reply = (
-                "Delaney ESOL predicts aqueous solubility (logS) using intrinsic atom-based contributions, "
-                "molecular weight, and aromatic proportion, with leverage-based applicability domain bounds."
+                "The ESOL model is a reduced four-descriptor form of Delaney (2004): cLogP, molecular weight, "
+                "rotatable bonds and aromatic proportion. On an independent 45-compound challenge set it reaches "
+                "RMSE 0.97 log10 units and R^2 0.07, barely better than a constant baseline. Its uncertainty "
+                "column is a heuristic error scale and its domain flags are simple descriptor ranges."
             )
         elif "cns" in p_lower or "mpo" in p_lower:
             reply = (
@@ -244,7 +253,12 @@ class ResearchAgent:
                 "or request a workflow plan."
             )
 
-        return AgentResponse(mode="ask", text=reply)
+        if provider_error is not None:
+            reply = (
+                "The configured language model did not answer; this reply comes from built-in local rules. "
+                f"({provider_error})\n\n{reply}"
+            )
+        return AgentResponse(mode="ask", text=reply, source="local_rules", provider_error=provider_error)
 
     def plan(
         self,

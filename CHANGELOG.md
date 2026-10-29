@@ -114,6 +114,12 @@ intentional.
   The workflow editor's node table hid its Edit/Delete actions behind a
   horizontal scroll at every width, and table action cells used `display: flex`
   on `<td>`, misaligning row borders.
+- **Agent Ask mode hid provider failures.** When the configured LLM failed or
+  was unavailable, the error was swallowed and a canned local answer returned as
+  if nothing happened. Responses now carry `source` (`llm` or `local_rules`) and
+  `provider_error`, and a fallback answer says that no language model answered.
+  The local ESOL answer no longer claims atom contributions or leverage-based
+  domain bounds.
 - Docked pose SDF files now carry bonds, rebuilt from `REMARK SMILES` records
   that Vina copies into its output; previously they contained atoms only.
 
