@@ -36,9 +36,10 @@ reproducible**, whether it came from the UI, the CLI, or the API.
 - **Headless parity.** Every shipped UI action has a CLI and `/api/v1`
   equivalent. Long jobs expose status, logs, cancellation, failure reasons and
   artifacts.
-- **Honest scope.** Only RDKit is a runnable scientific engine in this preview.
-  Docking, MD, learned property prediction and structure prediction are registry
-  cards marked `planned`; they cannot be run.
+- **Honest scope.** RDKit chemistry, AutoDock Vina CPU docking (when the
+  official binary is installed) and two literature property estimates run
+  locally. MD, learned ADMET models and structure prediction are registry cards
+  marked `planned`; they cannot be run.
 
 This is **not** a clinical decision system, a regulator-approved medical device,
 or evidence of binding, safety or efficacy. Predictions and rankings are
@@ -51,8 +52,8 @@ prioritisation signals. Read
 |---|---|---|
 | CSV, SDF and SMILES import with row-level errors | **Available** | 16/17 demo rows imported; failures retained |
 | RDKit standardisation, descriptors and Morgan/Tanimoto similarity | **Available** | Deterministic fixture tests |
-| AutoDock Vina CPU docking | **Available** | Native structure-based virtual screening (`dock.vina`) with conformer prep |
-| Learned property prediction (ESOL & CNS MPO) | **Available** | Delaney solubility and Wager BBB permeability scoring |
+| AutoDock Vina CPU docking | **Host-dependent** | Needs the official Vina 1.2.x binary; flexible-ligand PDBQT matches Meeko on 48/51 fixtures ([report](docs/validation/ligand-prep-meeko.md)); no redocking benchmark yet |
+| Literature property estimates (ESOL, CNS MPO) | **Available** | Reduced ESOL: RMSE 0.97, R² 0.07 on 45 measured compounds ([report](docs/validation/esol-solubility.md)); CNS MPO is an approximation (cLogP for ClogD, assumed pKa) |
 | Bemis-Murcko generic scaffold splitting | **Available** | Leakage-free split validation tests |
 | PubChem & ChEMBL public data connectors | **Available** | NCBI & EBI REST search with policy-gated access |
 | DAG branching & table joins | **Available** | Kahn topological sort, fan-out, and `table.join` |
@@ -237,21 +238,25 @@ threat model and residual risks are in
 
 ## Known limitations
 
-- **Only RDKit is runnable.** Docking, MD, learned property prediction and
-  structure prediction are not implemented.
-- **Linear workflows only.** No merges, branching, loops, sub-workflows or
-  parameter sweeps.
+- **Docking is not benchmarked.** Vina runs and its ligand preparation is
+  checked against Meeko, but no redocking/pose-recovery benchmark has been run.
+  Receptors must be prepared PDBQT files under `<HCS_DATA_DIR>/receptors`.
+- **Property estimates are weak.** Reduced ESOL barely beats a constant
+  baseline on independent data; CNS MPO approximates ClogD and pKa. Neither
+  reports a calibrated uncertainty. MD, learned ADMET and structure prediction
+  are not implemented.
+- **DAGs without loops.** Fan-out and key-based `table.join` are supported; no
+  loops, conditionals, sub-workflows or parameter sweeps.
 - **Single machine.** SQLite and a local queue; no PostgreSQL deployment,
   distributed workers or multi-tenant isolation.
-- **No predictive validation.** The validation protocol exists; no accuracy
-  claim is made.
-- **LLM is a probe.** There is no chat feature, drafting node or autonomous
-  agent.
+- **Research agent is rule-based by default.** Ask/Plan/Run use allowlisted
+  tools; Ask uses a configured local LLM when available and says so when it
+  falls back to built-in rules.
+- **SQLite on one machine.** Writers are serialised; no distributed workers.
 - **No TLS or reverse proxy.** Put a hardened proxy in front of any non-local
   deployment.
-- **The cache is not size-bounded.** Clear it manually with
-  `hcs-discovery cache clear`.
-- **Project deletion leaves run directories on disk by design.**
+- **Node cache entries outlive projects.** They are content-addressed and
+  shared; `hcs-discovery cache prune` applies the size and age limits.
 
 The complete list, including partial features and risks, is in
 [Implementation status](docs/engineering/IMPLEMENTATION_STATUS.md#known-defects-and-risks).

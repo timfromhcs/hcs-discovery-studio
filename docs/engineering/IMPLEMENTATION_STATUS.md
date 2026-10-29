@@ -1,6 +1,7 @@
 # Implementation status
 
-Last updated: 2026-10-29. Version: `2.0.0` Stable.
+Last updated: 2026-10-29. Version: `2.0.0` release candidate on branch
+`release/v2.0.0`; not tagged or published yet.
 
 This document is the honest feature ledger. It distinguishes what has been
 exercised end-to-end from what is scaffolded, planned or deliberately absent.
@@ -18,10 +19,12 @@ test or a recorded manual check; it does not mean validated science.
 | RDKit import/standardise | Done | CSV/SDF/SMILES, row outcomes, descriptor tests |
 | Workflow engine | Done | Validation, execution, cache, events, manifest tests |
 | CPU scientific slice | Done | Descriptors → filters → Pareto/composite → summary with integrity checks |
-| React UI | Done for shipped features | 13 routes, light/dark/narrow screenshots |
+| React UI | Done for shipped features | Visual QA: 17 routes × 5 widths × 2 themes, 0 automatic findings |
 | CLI/API parity | Done for shipped actions | Shared services; CLI tests |
 | Local LLM provider / Safe Research Agent | Done | Ask, Plan, Run modes with strict allowlisted tools |
-| Real scientific engines | Done | AutoDock Vina CPU docking, Delaney ESOL, CNS MPO, PubChem, ChEMBL |
+| AutoDock Vina docking | Runs; not benchmarked | Host-dependent binary; ligand PDBQT matches Meeko on 48/51 fixtures; no redocking study |
+| Property estimates | Runs; weak/approximate | Reduced ESOL measured (RMSE 0.97, R² 0.07, n=45); CNS MPO approximation |
+| PubChem / ChEMBL connectors | Done | Policy-gated; mocked-transport tests; blocked by default |
 | DAG Workflows | Done | Multi-branch DAGs, Kahn topological sort, and table.join with strict-key checks |
 | GitHub CI | Pending | v1.0.0 commit green; v2.0.0 candidate must pass CI on its own SHA |
 | Public release | Pending | [`v1.0.0`](https://github.com/timfromhcs/hcs-discovery-studio/releases/tag/v1.0.0) published; `v2.0.0` not yet tagged or published |
@@ -111,74 +114,57 @@ test or a recorded manual check; it does not mean validated science.
 
 | Feature | What exists | What is missing |
 |---|---|---|
-| Local LLM | Config, metadata, optional `/models` probe, policy enforcement | No chat UI, no drafting node, no tool-calling agent |
-| Model registry | RDKit available; five planned cards; license/status fields | No runnable docking, MD, property or structure adapters |
+| Docking | Vina adapter, flexible-ligand PDBQT, per-ligand status, pose SDF with bonds, receptor confinement | Redocking/pose-recovery benchmark; receptor preparation; protonation/tautomer enumeration; flexible macrocycles |
+| Property estimates | Reduced ESOL with measured independent-set metrics; CNS MPO approximation | Full published ESOL fit; computed ClogD/pKa; calibrated uncertainty |
+| Research agent | Ask/Plan/Run with allowlisted tools, digest-bound plans, optional local LLM for Ask | LLM-based planning; resource estimates; a UI page |
 | Auth | Static bearer token for non-loopback | No users, roles, per-project ACLs, token expiry or rotation |
 | Audit | Audit rows for project/dataset/workflow/run mutations | No audit viewer or export |
 | Target/structure tables | Migrated schema | No services, API or UI |
 | Predictions table | Migrated schema | No writer and no UI |
-| Data sources page | Honest planned/unavailable status | No connectors |
 | PostgreSQL | SQLAlchemy-compatible models | No tested PostgreSQL deployment or queue semantics |
 | Observability | Structured logs, request IDs, run events | No metrics endpoint, tracing or dashboards |
 
 ## Not implemented
 
-- Docking (AutoDock Vina or any other engine).
 - Molecular dynamics (OpenMM).
 - Learned ADMET/activity prediction (Chemprop or any other model).
 - Structure prediction (Boltz-2, Chai-1).
+- GPU or Vulkan execution of any scientific engine.
 - Target explorer, structure upload, pocket detection.
-- Multi-input workflow merges, branching fan-in, loops, conditionals.
-- Sub-workflow composition or parameter sweeps.
+- Loops, conditionals, sub-workflow composition or parameter sweeps.
 - Distributed workers, Redis/Celery, multi-tenant hosting.
 - Docker image, Helm chart or cloud deployment.
 - User accounts, SSO, collaboration, comments.
-- LLM chat, autonomous agents or tool execution.
-- Predictive-accuracy benchmarks or experimental validation.
-- Coverage badge from CI (coverage is measured locally but not published as a
-  badge).
+- Experimental validation of any score.
 - Signed release artifacts (GPG or cosign) and container attestations. The wheel
-  does carry a GitHub build-provenance attestation.
+  carries a GitHub build-provenance attestation.
 - Published coverage badge or coverage upload to a third-party service.
 
-## Phase status
+## Release-gate assessment for v2.0.0
 
-| Phase | Status | Notes |
+Evidence below was produced on the `release/v2.0.0` branch on 2026-10-29.
+
+| Gate | Status | Evidence |
 |---|---|---|
-| 0. Workspace audit | Complete | Windows 11, Ryzen 7 7735HS, 19.8 GB RAM, Vulkan 1.4.357; no CUDA |
-| 1. Skeleton and contracts | Complete | uv, Python 3.12, FastAPI, SQLAlchemy, Alembic, React, Vite |
-| 2. Domain model and engine | Complete | Models, migrations, queue, executor, cache |
-| 3. Scientific vertical slice | Complete | Demo project, 16/17 rows, 4-node run, Naproxen ranked first |
-| 4. Professional UI | Complete for shipped features | 13 routes, responsive, themes, empty/error states |
-| 5. CLI/API parity and gateway | Complete for shipped actions; LLM probe only | No LLM node |
-| 6. Real engine integrations | Partial | RDKit only; planned engines are metadata |
-| 7. Performance/resilience/validation | Partial | Cache, leases, timeouts, tests; no benchmark campaign |
-| 8. Security/licenses/docs | Complete for preview | Threat model, audit, policies, docs set |
-| 9. GitHub/CI/release candidate | Complete | CI green on both OSes and CodeQL; `v0.1.0` prerelease published and verified |
-| 10. Stable v1.0.0 | Not met | Requires real engine coverage and validation |
+| Lint, format, types | Pass locally and in CI | Ruff, mypy |
+| Backend tests | Pass locally and in CI | pytest with branch coverage ≥ 70% (77%) |
+| Frontend build and E2E | Pass locally and in CI | typecheck, build, 3 Playwright tests on isolated data |
+| Visual QA | Pass locally | `apps/web/scripts/visual_qa.mjs`, screenshots reviewed by hand |
+| Fresh migration and wheel | Pass locally and in CI | Wheel ships Alembic scripts and records a revision |
+| Cache provenance | Pass | Package fingerprint, detected Vina version and receptor hash in keys |
+| CodeQL, secret scan, audits, licenses | Pass in CI | Required jobs on the PR |
+| Docking reference validation | **Not met** | No redocking benchmark has been executed |
+| Release workflow | Hardened, untested end to end | Exact-SHA CI/CodeQL gate, draft-then-verify; first real run will be the RC |
+| Release candidate published and verified | **Not met** | No tag pushed yet |
 
-## Release-gate assessment
-
-The project brief's v1.0.0 bar is not honestly met. This release is `0.1.0`
-preview.
-
-| Gate | Status | Reason |
-|---|---|---|
-| Clean-machine install | Pass (source + wheel) | Verified on Windows; Linux CI configured |
-| CPU demo end-to-end | Pass | Import → run → results → report |
-| UI professional and responsive | Pass for shipped pages | Manual review at 1440/390, light/dark |
-| CLI/API parity | Pass for shipped actions | Tests cover core flows |
-| Reproducible provenance | Pass | Manifest, hashes, cache keys, versions |
-| Secrets and network policy | Pass | Redaction, loopback default, token gate |
-| Tests and static checks | Pass locally and in CI | 82 + 3 E2E; Linux/Windows backend, CodeQL |
-| Real scientific engine breadth | Pass | RDKit, AutoDock Vina CPU docking, Delaney ESOL, CNS MPO, PubChem, ChEMBL |
-| Scientific validation | Pass | Delaney ESOL Delaney (2004) & Wager CNS MPO validation, AutoDock Vina pose extraction |
-| Public release | Pass | `v1.0.0` stable published; wheel, SBOM and checksums verified; provenance attestation verified |
+GEMINI.md requires an executed Vina redocking/reference result before Stable.
+Until that exists, `v2.0.0` can at most be published as a release candidate
+with the docking limitation stated.
 
 ## Known defects and risks
 
-- Project deletion now cascades to all associated run directories and uploaded files on disk.
-- Cache is bounded and supports size/age pruning via `hcs-discovery cache prune`.
+- Project deletion removes run directories and uploads; shared node-cache
+  entries remain until `hcs-discovery cache prune`.
 - SQLite serialises writers; concurrency above 1 is not beneficial.
 - The SPA is served from the wheel; a source sdist build without a prebuilt
   `apps/web/dist` has no UI.
@@ -191,7 +177,7 @@ preview.
 - Report tables truncate at 200 rows in Markdown and 500 in HTML; the JSON/CSV
   exports are complete.
 - The `targets`, `structures` and `predictions` tables are reserved and may
-  change before 1.0.
+  change before they are used.
 
 ## How to verify a claim
 

@@ -318,8 +318,8 @@ export function ProjectPage() {
         <CardHeader title="Project maintenance" subtitle="Deletion is permanent and removes linked datasets, compounds and runs." />
         <div className="row-between">
           <p className="muted small">
-            Export anything you need first. The original upload file remains in the configured data directory until
-            manually removed.
+            Export anything you need first. Deletion also removes this project&apos;s run directories and uploaded files;
+            shared node-cache entries remain until <code>hcs-discovery cache prune</code>.
           </p>
           <Button variant="danger" icon="trash" onClick={() => setConfirmProject(true)}>
             Delete project
