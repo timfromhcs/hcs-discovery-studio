@@ -9,13 +9,17 @@ from pathlib import Path
 from .errors import ValidationError
 
 _UNSAFE = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
+# Device names Windows reserves in any directory, with or without an extension
+# (https://learn.microsoft.com/windows/win32/fileio/naming-a-file), including the
+# superscript-digit variants and the console names.
 _RESERVED_WINDOWS = {
     "CON",
     "PRN",
     "AUX",
     "NUL",
-    *(f"COM{i}" for i in range(1, 10)),
-    *(f"LPT{i}" for i in range(1, 10)),
+    "CONIN$",
+    "CONOUT$",
+    *(f"{device}{digit}" for device in ("COM", "LPT") for digit in "0123456789¹²³"),
 }
 
 
@@ -30,7 +34,8 @@ def safe_filename(name: str, *, fallback: str = "file", max_length: int = 120) -
         candidate = f"{stem[: max_length - len(suffix) - 1]}.{suffix}"
     else:
         candidate = candidate[:max_length]
-    if candidate.split(".")[0].upper() in _RESERVED_WINDOWS:
+    # Windows ignores trailing spaces before the extension: "NUL .txt" is still NUL.
+    if candidate.split(".")[0].rstrip(" ").upper() in _RESERVED_WINDOWS:
         candidate = f"_{candidate}"
     return candidate
 

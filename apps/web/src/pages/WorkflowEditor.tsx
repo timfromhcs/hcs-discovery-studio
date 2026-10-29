@@ -273,7 +273,8 @@ export function WorkflowEditorPage() {
   if (!isNew && saved.error) {
     return (
       <div className="page">
-        <ErrorState error={saved.error} onRetry={() => void saved.refetch()} />
+        <PageHeader title="Workflow unavailable" />
+        <ErrorState error={saved.error} onRetry={() => void saved.refetch()} headingLevel={2} />
         <Link className="text-link" to={`/projects/${projectId}/workflows`}>
           Back to workflows
         </Link>
@@ -284,7 +285,8 @@ export function WorkflowEditorPage() {
   if (isNew && catalog.error) {
     return (
       <div className="page">
-        <ErrorState error={catalog.error} onRetry={() => void catalog.refetch()} />
+        <PageHeader title="Workflow unavailable" />
+        <ErrorState error={catalog.error} onRetry={() => void catalog.refetch()} headingLevel={2} />
         <Link className="text-link" to={`/projects/${projectId}/workflows`}>
           Back to workflows
         </Link>

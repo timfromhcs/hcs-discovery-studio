@@ -50,6 +50,19 @@ def test_safe_filename_strips_paths_and_reserved_names():
     assert safe_filename("a" * 400).__len__() <= 120
 
 
+@pytest.mark.parametrize(
+    "name",
+    ["CON", "con.txt", "NUL .csv", "aux.tar.gz", "COM0.log", "LPT9", "COM¹.txt", "lpt³", "CONIN$", "conout$.txt"],
+)
+def test_safe_filename_neutralises_every_windows_device_name(name: str):
+    assert safe_filename(name).startswith("_")
+
+
+@pytest.mark.parametrize("name", ["CONSOLE.txt", "COM10", "nul_results.csv", "auxiliary.json"])
+def test_safe_filename_keeps_ordinary_names_that_resemble_devices(name: str):
+    assert safe_filename(name) == name
+
+
 def test_safe_join_rejects_escape(tmp_path: Path):
     base = tmp_path / "base"
     base.mkdir()

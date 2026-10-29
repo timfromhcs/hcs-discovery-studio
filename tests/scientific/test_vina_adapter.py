@@ -154,11 +154,18 @@ def test_probe_vina() -> None:
         assert probe["version"] is not None
 
 
+def _skip_or_fail(reason: str) -> None:
+    """Skip a live test without Vina, except in the CI science gate, where a skip would hide a broken setup."""
+    if os.environ.get("HCS_REQUIRE_VINA") == "1":
+        pytest.fail(f"HCS_REQUIRE_VINA=1 but {reason}")
+    pytest.skip(reason)
+
+
 @pytest.mark.scientific
 def test_vina_real_docking_smoke(tmp_path: Path) -> None:
     adapter = VinaAdapter()
     if not adapter.is_available():
-        pytest.skip("Vina binary not found on host; skipping live docking execution test.")
+        _skip_or_fail("Vina binary not found on host; skipping live docking execution test.")
 
     receptor_file = tmp_path / "receptor.pdbqt"
     receptor_file.write_text(SAMPLE_RECEPTOR_PDBQT, encoding="utf-8")
@@ -286,7 +293,7 @@ def test_vina_node_records_per_ligand_status_and_errors(
 def test_vina_workflow_node(tmp_path: Path, settings: Settings) -> None:
     adapter = VinaAdapter()
     if not adapter.is_available():
-        pytest.skip("Vina binary not found on host; skipping workflow node live test.")
+        _skip_or_fail("Vina binary not found on host; skipping workflow node live test.")
 
     (settings.receptors_dir / "receptor.pdbqt").write_text(SAMPLE_RECEPTOR_PDBQT, encoding="utf-8")
 

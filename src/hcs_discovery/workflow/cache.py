@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import shutil
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -18,6 +19,10 @@ from typing import Any
 from ..core.hashing import sha256_file, stable_json_hash
 from ..core.paths import safe_join
 from .table import Column, Table
+
+# Entries are assembled here before being renamed into place. Cache keys are hex,
+# so this name can never collide with an entry's two-character shard directory.
+STAGING_DIR = ".staging"
 
 
 def cache_key(
@@ -94,33 +99,56 @@ class NodeCache:
         )
 
     def put(self, key: str, output: CachedOutput, artifact_files: dict[str, Path]) -> bool:
+        """Store an entry. Returns False when nothing was published.
+
+        The entry is assembled in a private staging directory and renamed into
+        place in one step, so a concurrent reader never sees a half-written entry
+        (and never deletes one as corrupt while it is being written). When another
+        writer published the same key first, its entry is kept.
+        """
         entry = self._entry_dir(key)
-        entry.mkdir(parents=True, exist_ok=True)
-        artifacts_dir = entry / "artifacts"
-        artifacts_dir.mkdir(exist_ok=True)
-        stored: list[dict[str, Any]] = []
-        for artifact in output.artifacts:
-            name = artifact["filename"]
-            source = artifact_files.get(name)
-            if source is None or not source.exists():
-                # Never publish a partial cache entry: it would replay a run with
-                # missing artifacts while still reporting success.
-                shutil.rmtree(entry, ignore_errors=True)
-                return False
-            destination = safe_join(artifacts_dir, name)
-            shutil.copy2(source, destination)
-            stored.append({**artifact, "cache_file": name, "sha256": sha256_file(destination)})
-        payload = {
-            "columns": [column.as_dict() for column in output.table.columns],
-            "rows": output.table.rows,
-            "content_hash": output.table.content_hash(),
-            "artifacts": stored,
-            "summary": output.summary,
-        }
-        tmp = entry / "entry.json.tmp"
-        tmp.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
-        tmp.replace(entry / "entry.json")
-        return True
+        staging_root = self.root / STAGING_DIR
+        staging_root.mkdir(parents=True, exist_ok=True)
+        staging = Path(tempfile.mkdtemp(prefix=f"{key[:16]}-", dir=staging_root))
+        try:
+            artifacts_dir = staging / "artifacts"
+            artifacts_dir.mkdir()
+            stored: list[dict[str, Any]] = []
+            for artifact in output.artifacts:
+                name = artifact["filename"]
+                source = artifact_files.get(name)
+                if source is None or not source.exists():
+                    # Never publish a partial cache entry: it would replay a run with
+                    # missing artifacts while still reporting success.
+                    return False
+                destination = safe_join(artifacts_dir, name)
+                shutil.copy2(source, destination)
+                stored.append({**artifact, "cache_file": name, "sha256": sha256_file(destination)})
+            payload = {
+                "columns": [column.as_dict() for column in output.table.columns],
+                "rows": output.table.rows,
+                "content_hash": output.table.content_hash(),
+                "artifacts": stored,
+                "summary": output.summary,
+            }
+            (staging / "entry.json").write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+            entry.parent.mkdir(parents=True, exist_ok=True)
+            if (entry / "entry.json").exists():
+                return True
+            # A stale directory without a manifest is an interrupted older write.
+            shutil.rmtree(entry, ignore_errors=True)
+            try:
+                staging.rename(entry)
+            except OSError:
+                # Another writer won the race; its complete entry stands.
+                return (entry / "entry.json").exists()
+            return True
+        finally:
+            shutil.rmtree(staging, ignore_errors=True)
+
+    def _manifests(self) -> list[Path]:
+        """Manifests of published entries, excluding writes still being staged."""
+        return sorted(m for m in self.root.rglob("entry.json") if STAGING_DIR not in m.relative_to(self.root).parts)
 
     def artifact_path(self, key: str, filename: str) -> Path:
         return safe_join(self._entry_dir(key) / "artifacts", filename)
@@ -131,7 +159,7 @@ class NodeCache:
         total = 0
         if not self.root.exists():
             return (0, 0)
-        for child in sorted(self.root.rglob("entry.json")):
+        for child in self._manifests():
             entries += 1
             for file in child.parent.rglob("*"):
                 if file.is_file():
@@ -160,7 +188,7 @@ class NodeCache:
         now = time.time()
         entries_info: list[dict[str, Any]] = []
 
-        for manifest in sorted(self.root.rglob("entry.json")):
+        for manifest in self._manifests():
             entry_dir = manifest.parent
             try:
                 mtime = manifest.stat().st_mtime
@@ -210,8 +238,7 @@ class NodeCache:
         entries = 0
         total = 0
         if self.root.exists():
-            for _manifest in self.root.rglob("entry.json"):
-                entries += 1
+            entries = len(self._manifests())
             for file in self.root.rglob("*"):
                 if file.is_file():
                     total += file.stat().st_size

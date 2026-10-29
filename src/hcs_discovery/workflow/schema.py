@@ -178,6 +178,19 @@ def validate_workflow(
         parents[edge.target].append(edge.source)
         children[edge.source].append(edge.target)
 
+    for node_id, node in nodes.items():
+        if node.type == "table.join" and len(parents[node_id]) < 2:
+            issues.append(
+                {
+                    "code": "join_requires_two_inputs",
+                    "node": node_id,
+                    "message": (
+                        f"Join node '{node_id}' has {len(parents[node_id])} input(s); it needs at least two "
+                        "incoming branches to merge."
+                    ),
+                }
+            )
+
     roots = [node_id for node_id, p_list in parents.items() if not p_list]
     if len(roots) > 1:
         issues.append(

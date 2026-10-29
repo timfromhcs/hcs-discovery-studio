@@ -66,7 +66,8 @@ export function ProjectPage() {
   if (project.error || !project.data) {
     return (
       <div className="page">
-        <ErrorState error={project.error ?? new Error("Project not found.")} onRetry={() => void project.refetch()} />
+        <PageHeader title="Project unavailable" />
+        <ErrorState error={project.error ?? new Error("Project not found.")} onRetry={() => void project.refetch()} headingLevel={2} />
         <LinkButton to="/" icon="arrowLeft" variant="secondary">
           Back to workspace
         </LinkButton>

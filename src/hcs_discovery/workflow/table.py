@@ -169,7 +169,14 @@ class Table:
         how: Literal["inner", "left", "outer"] = "left",
         suffix: str = "_right",
     ) -> Table:
-        """Merge this table with another table on a common key column."""
+        """Merge this table with another table on a common key column.
+
+        Rows match by key value, never by position. The right table must have
+        unique keys (one-to-one or many-to-one), otherwise the join is refused.
+        ``left`` keeps every left row in order, ``inner`` keeps matched left rows,
+        and ``outer`` additionally appends unmatched right rows, including right
+        rows whose key is missing. Keys match only when equal in value and type.
+        """
         self.require([key_column])
         other.require([key_column])
 
@@ -204,10 +211,13 @@ class Table:
             )
 
         right_index: dict[Any, dict[str, Any]] = {}
+        right_unkeyed: list[dict[str, Any]] = []
         duplicate_keys: set[Any] = set()
         for r in other.rows:
             k = r.get(key_column)
             if k is None:
+                # Cannot match anything; an outer join still keeps the row below.
+                right_unkeyed.append(r)
                 continue
             try:
                 if k in right_index:
@@ -253,6 +263,11 @@ class Table:
                     for orig_name, final_name in right_col_map.items():
                         row_dict[final_name] = r_row.get(orig_name)
                     new_rows.append(row_dict)
+            for r_row in right_unkeyed:
+                row_dict = {c.name: None for c in self.columns}
+                for orig_name, final_name in right_col_map.items():
+                    row_dict[final_name] = r_row.get(orig_name)
+                new_rows.append(row_dict)
 
         return Table(rows=new_rows, columns=merged_columns)
 

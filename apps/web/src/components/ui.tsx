@@ -278,7 +278,17 @@ export function EmptyState({
   );
 }
 
-export function ErrorState({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
+export function ErrorState({
+  error,
+  onRetry,
+  headingLevel = 3,
+}: {
+  error: unknown;
+  onRetry?: () => void;
+  /** 2 when the error replaces a whole page under its h1; 3 inside a titled section. */
+  headingLevel?: 2 | 3;
+}) {
+  const Heading = headingLevel === 2 ? "h2" : "h3";
   const message = error instanceof Error ? error.message : "Something went wrong.";
   const code = error && typeof error === "object" && "code" in error ? String(error.code) : null;
   return (
@@ -287,7 +297,7 @@ export function ErrorState({ error, onRetry }: { error: unknown; onRetry?: () =>
         <Icon name="alert" size={22} />
       </span>
       <div>
-        <h3>Could not load this view</h3>
+        <Heading>Could not load this view</Heading>
         <p>{message}</p>
         {code ? <code className="small">{code}</code> : null}
       </div>

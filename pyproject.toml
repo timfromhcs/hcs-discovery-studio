@@ -100,7 +100,7 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 minversion = "8.0"
 testpaths = ["tests"]
-addopts = "-ra --strict-markers"
+addopts = "-ra --strict-markers -m 'not network'"
 markers = [
   "network: test may use the network (never part of the default offline suite)",
   "slow: long-running test",

@@ -107,7 +107,7 @@ class ESOLSolubilityModel(PropertyModel):
             endpoint="logS",
             unit="log10(mol/L)",
             architecture="MultipleLinearRegression(4-physicochemical-descriptors)",
-            version="1.1.0",
+            version="1.2.0",
             weights_sha256=sha256_text(weights_str),
             citation="Delaney, J. S. (2004). J. Chem. Inf. Comput. Sci., 44(3), 1000-1005.",
             description=(
@@ -120,6 +120,8 @@ class ESOLSolubilityModel(PropertyModel):
                 "min_heavy_atoms": 2,
                 "max_heavy_atoms": 60,
                 "allowed_elements": ["H", "C", "N", "O", "P", "S", "F", "Cl", "Br", "I"],
+                "formal_charges": "none (neutral form only)",
+                "components": 1,
             },
             benchmark_metrics={
                 # Measured by scripts/science/validate_esol.py on
@@ -187,6 +189,16 @@ class ESOLSolubilityModel(PropertyModel):
                 domain_ok = False
                 warnings.append(f"Uncommon element '{atom.GetSymbol()}' not in ESOL domain")
                 break
+
+        # ESOL describes the intrinsic solubility of a single neutral species.
+        charged = sum(1 for atom in mol.GetAtoms() if atom.GetFormalCharge() != 0)
+        if charged:
+            domain_ok = False
+            warnings.append(f"{charged} charged atom(s); ESOL describes the neutral form")
+        fragments = len(Chem.GetMolFrags(mol))
+        if fragments > 1:
+            domain_ok = False
+            warnings.append(f"{fragments} disconnected components; ESOL describes a single species")
 
         clogp = Crippen.MolLogP(mol)
         rot_bonds = Lipinski.NumRotatableBonds(mol)

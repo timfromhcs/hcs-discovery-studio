@@ -120,7 +120,12 @@ export function RunMonitorPage() {
   if (run.error || !run.data) {
     return (
       <div className="page">
-        <ErrorState error={run.error ?? new Error("Run not found.")} onRetry={() => void run.refetch()} />
+        <PageHeader title="Run unavailable" />
+        <ErrorState
+          error={run.error ?? new Error("Run not found.")}
+          onRetry={() => void run.refetch()}
+          headingLevel={2}
+        />
         <LinkButton to="/" icon="arrowLeft">
           Back to workspace
         </LinkButton>
