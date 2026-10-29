@@ -108,7 +108,8 @@ export function ResultsPage() {
   if (run.error || !run.data) {
     return (
       <div className="page">
-        <ErrorState error={run.error ?? new Error("Run not found.")} onRetry={() => void run.refetch()} />
+        <PageHeader title="Results unavailable" />
+        <ErrorState error={run.error ?? new Error("Run not found.")} onRetry={() => void run.refetch()} headingLevel={2} />
         <LinkButton to="/" icon="arrowLeft">
           Workspace
         </LinkButton>

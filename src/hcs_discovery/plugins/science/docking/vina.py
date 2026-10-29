@@ -407,16 +407,22 @@ def vina_docking_columns(prefix: str = "docking") -> list[Column]:
             "Pose RMSD l.b.",
             "number",
             unit="Å",
-            direction="lower",
-            method="RMSD lower bound to best mode",
+            method="Vina RMSD lower bound of the reported mode relative to mode 1",
+            description=(
+                "Vina measures this against its own best mode, so it is always 0 for the best pose "
+                "reported here. It is not an error against a reference structure and not a ranking objective."
+            ),
         ),
         Column(
             f"{prefix}_rmsd_ub",
             "Pose RMSD u.b.",
             "number",
             unit="Å",
-            direction="lower",
-            method="RMSD upper bound to best mode",
+            method="Vina RMSD upper bound of the reported mode relative to mode 1",
+            description=(
+                "Vina measures this against its own best mode, so it is always 0 for the best pose "
+                "reported here. It is not an error against a reference structure and not a ranking objective."
+            ),
         ),
         Column(
             f"{prefix}_pose_artifact",

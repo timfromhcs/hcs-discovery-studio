@@ -1,0 +1,342 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-10-29T18:55:05+00:00",
+  "complex": "PDB 1IEP, imatinib / Abl kinase",
+  "fixture": {
+    "source": "https://github.com/ccsb-scripps/AutoDock-Vina/tree/bb64e5e26b520569a86360d69248069b5e665b3f/example/basic_docking",
+    "license": "Apache-2.0",
+    "sha256": {
+      "receptor.pdbqt": "f13cf3b36f61d87c3b58983e0b8ecf1c3456a685eb86dfe9ccfb139c7bdc2586",
+      "crystal_ligand.sdf": "051b8742c32adc05c07fb486a4e7c9327f84e131cee33ac4e6a568d07553eb38",
+      "reference_ligand.pdbqt": "15fb35648d8c18c70317842f3a0631b73a19429c710a037ab07310084d579bb8",
+      "box.txt": "3dff08200b5b9c2ca0932c832c9dffc5823b39caec6c92f76be5f7c5ea49d8de"
+    }
+  },
+  "ligand_smiles": "Cc1ccc(NC(=O)c2ccc(CN3CC[NH+](C)CC3)cc2)cc1Nc1nccc(-c2cccnc2)n1",
+  "box": {
+    "center_x": 15.19,
+    "center_y": 53.903,
+    "center_z": 16.917,
+    "size_x": 20.0,
+    "size_y": 20.0,
+    "size_z": 20.0
+  },
+  "settings": {
+    "exhaustiveness": 8,
+    "num_modes": 9,
+    "cpu": 4,
+    "seeds": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ]
+  },
+  "hcs_preparation_method": "hcs-pdbqt-1",
+  "rmsd": "symmetry-aware heavy-atom RMSD to the crystal ligand, in place, no superposition (RDKit CalcRMS)",
+  "criterion": "top-ranked pose RMSD <= 2.0 \u00c5 for every seed, per arm",
+  "environment": {
+    "autodock_vina": "1.2.5",
+    "vina_binary_sha256": "b5a23b226ee5dc1b028df04082d13a7b0e5b9b12b988bbcf9498cb351e20b38f",
+    "rdkit": "2026.09.1",
+    "python": "3.12.13",
+    "platform": "Windows 11 AMD64"
+  },
+  "summary": {
+    "hcs": {
+      "seeds": 5,
+      "top_pose_within_threshold": 5,
+      "max_top_pose_rmsd_angstrom": 0.944,
+      "passed": true
+    },
+    "vina_example": {
+      "seeds": 5,
+      "top_pose_within_threshold": 5,
+      "max_top_pose_rmsd_angstrom": 0.374,
+      "passed": true
+    }
+  },
+  "passed": true,
+  "arms": {
+    "hcs": [
+      {
+        "seed": 1,
+        "top_pose_rmsd_angstrom": 0.422,
+        "top_pose_affinity_kcal_mol": -12.903,
+        "best_mode_rmsd_angstrom": 0.422,
+        "seconds": 33.1,
+        "modes": [
+          {
+            "mode": 1,
+            "affinity_kcal_mol": -12.903,
+            "rmsd_angstrom": 0.422
+          },
+          {
+            "mode": 2,
+            "affinity_kcal_mol": -11.186,
+            "rmsd_angstrom": 12.164
+          },
+          {
+            "mode": 3,
+            "affinity_kcal_mol": -10.224,
+            "rmsd_angstrom": 12.39
+          },
+          {
+            "mode": 4,
+            "affinity_kcal_mol": -9.908,
+            "rmsd_angstrom": 1.887
+          }
+        ],
+        "preparation_warnings": [],
+        "torsions": 7
+      },
+      {
+        "seed": 2,
+        "top_pose_rmsd_angstrom": 0.944,
+        "top_pose_affinity_kcal_mol": -12.702,
+        "best_mode_rmsd_angstrom": 0.944,
+        "seconds": 33.7,
+        "modes": [
+          {
+            "mode": 1,
+            "affinity_kcal_mol": -12.702,
+            "rmsd_angstrom": 0.944
+          },
+          {
+            "mode": 2,
+            "affinity_kcal_mol": -9.881,
+            "rmsd_angstrom": 12.4
+          }
+        ],
+        "preparation_warnings": [],
+        "torsions": 7
+      },
+      {
+        "seed": 3,
+        "top_pose_rmsd_angstrom": 0.867,
+        "top_pose_affinity_kcal_mol": -12.454,
+        "best_mode_rmsd_angstrom": 0.867,
+        "seconds": 32.7,
+        "modes": [
+          {
+            "mode": 1,
+            "affinity_kcal_mol": -12.454,
+            "rmsd_angstrom": 0.867
+          },
+          {
+            "mode": 2,
+            "affinity_kcal_mol": -10.601,
+            "rmsd_angstrom": 12.212
+          },
+          {
+            "mode": 3,
+            "affinity_kcal_mol": -9.592,
+            "rmsd_angstrom": 13.39
+          },
+          {
+            "mode": 4,
+            "affinity_kcal_mol": -9.508,
+            "rmsd_angstrom": 12.572
+          }
+        ],
+        "preparation_warnings": [],
+        "torsions": 7
+      },
+      {
+        "seed": 4,
+        "top_pose_rmsd_angstrom": 0.824,
+        "top_pose_affinity_kcal_mol": -12.66,
+        "best_mode_rmsd_angstrom": 0.824,
+        "seconds": 35.8,
+        "modes": [
+          {
+            "mode": 1,
+            "affinity_kcal_mol": -12.66,
+            "rmsd_angstrom": 0.824
+          },
+          {
+            "mode": 2,
+            "affinity_kcal_mol": -9.998,
+            "rmsd_angstrom": 1.946
+          }
+        ],
+        "preparation_warnings": [],
+        "torsions": 7
+      },
+      {
+        "seed": 5,
+        "top_pose_rmsd_angstrom": 0.653,
+        "top_pose_affinity_kcal_mol": -12.618,
+        "best_mode_rmsd_angstrom": 0.653,
+        "seconds": 27.4,
+        "modes": [
+          {
+            "mode": 1,
+            "affinity_kcal_mol": -12.618,
+            "rmsd_angstrom": 0.653
+          },
+          {
+            "mode": 2,
+            "affinity_kcal_mol": -10.91,
+            "rmsd_angstrom": 12.123
+          },
+          {
+            "mode": 3,
+            "affinity_kcal_mol": -10.64,
+            "rmsd_angstrom": 12.363
+          },
+          {
+            "mode": 4,
+            "affinity_kcal_mol": -10.033,
+            "rmsd_angstrom": 1.943
+          },
+          {
+            "mode": 5,
+            "affinity_kcal_mol": -9.794,
+            "rmsd_angstrom": 12.435
+          }
+        ],
+        "preparation_warnings": [],
+        "torsions": 7
+      }
+    ],
+    "vina_example": [
+      {
+        "seed": 1,
+        "top_pose_rmsd_angstrom": 0.295,
+        "top_pose_affinity_kcal_mol": -13.289,
+        "best_mode_rmsd_angstrom": 0.295,
+        "seconds": 35.3,
+        "modes": [
+          {
+            "mode": 1,
+            "affinity_kcal_mol": -13.289,
+            "rmsd_angstrom": 0.295
+          },
+          {
+            "mode": 2,
+            "affinity_kcal_mol": -11.425,
+            "rmsd_angstrom": 1.436
+          },
+          {
+            "mode": 3,
+            "affinity_kcal_mol": -11.226,
+            "rmsd_angstrom": 12.325
+          },
+          {
+            "mode": 4,
+            "affinity_kcal_mol": -11.038,
+            "rmsd_angstrom": 12.003
+          }
+        ]
+      },
+      {
+        "seed": 2,
+        "top_pose_rmsd_angstrom": 0.367,
+        "top_pose_affinity_kcal_mol": -13.215,
+        "best_mode_rmsd_angstrom": 0.367,
+        "seconds": 31.8,
+        "modes": [
+          {
+            "mode": 1,
+            "affinity_kcal_mol": -13.215,
+            "rmsd_angstrom": 0.367
+          },
+          {
+            "mode": 2,
+            "affinity_kcal_mol": -11.255,
+            "rmsd_angstrom": 12.287
+          },
+          {
+            "mode": 3,
+            "affinity_kcal_mol": -11.126,
+            "rmsd_angstrom": 12.061
+          }
+        ]
+      },
+      {
+        "seed": 3,
+        "top_pose_rmsd_angstrom": 0.319,
+        "top_pose_affinity_kcal_mol": -13.232,
+        "best_mode_rmsd_angstrom": 0.319,
+        "seconds": 36.3,
+        "modes": [
+          {
+            "mode": 1,
+            "affinity_kcal_mol": -13.232,
+            "rmsd_angstrom": 0.319
+          },
+          {
+            "mode": 2,
+            "affinity_kcal_mol": -11.299,
+            "rmsd_angstrom": 12.294
+          },
+          {
+            "mode": 3,
+            "affinity_kcal_mol": -11.14,
+            "rmsd_angstrom": 12.081
+          }
+        ]
+      },
+      {
+        "seed": 4,
+        "top_pose_rmsd_angstrom": 0.374,
+        "top_pose_affinity_kcal_mol": -13.18,
+        "best_mode_rmsd_angstrom": 0.374,
+        "seconds": 29.8,
+        "modes": [
+          {
+            "mode": 1,
+            "affinity_kcal_mol": -13.18,
+            "rmsd_angstrom": 0.374
+          },
+          {
+            "mode": 2,
+            "affinity_kcal_mol": -11.217,
+            "rmsd_angstrom": 12.311
+          },
+          {
+            "mode": 3,
+            "affinity_kcal_mol": -11.088,
+            "rmsd_angstrom": 12.178
+          },
+          {
+            "mode": 4,
+            "affinity_kcal_mol": -10.521,
+            "rmsd_angstrom": 12.501
+          }
+        ]
+      },
+      {
+        "seed": 5,
+        "top_pose_rmsd_angstrom": 0.305,
+        "top_pose_affinity_kcal_mol": -13.245,
+        "best_mode_rmsd_angstrom": 0.305,
+        "seconds": 25.9,
+        "modes": [
+          {
+            "mode": 1,
+            "affinity_kcal_mol": -13.245,
+            "rmsd_angstrom": 0.305
+          },
+          {
+            "mode": 2,
+            "affinity_kcal_mol": -11.251,
+            "rmsd_angstrom": 12.284
+          },
+          {
+            "mode": 3,
+            "affinity_kcal_mol": -11.138,
+            "rmsd_angstrom": 12.12
+          },
+          {
+            "mode": 4,
+            "affinity_kcal_mol": -10.652,
+            "rmsd_angstrom": 12.494
+          }
+        ]
+      }
+    ]
+  }
+}

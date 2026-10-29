@@ -2,7 +2,7 @@
   "schema_version": 1,
   "model": {
     "model_id": "esol_solubility",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "weights_sha256": "09fcfc4a4a1ea22756d2328267cbeec4566900f3c2f427f689162f395a60053c",
     "citation": "Delaney, J. S. (2004). J. Chem. Inf. Comput. Sci., 44(3), 1000-1005."
   },

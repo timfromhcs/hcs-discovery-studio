@@ -123,8 +123,52 @@ intentional.
 - Docked pose SDF files now carry bonds, rebuilt from `REMARK SMILES` records
   that Vina copies into its output; previously they contained atoms only.
 
+- **Docking redocking gate:** `scripts/science/redock_vina_reference.py`
+  redocks imatinib into PDB 1IEP using the official Vina example files
+  (Apache-2.0, pinned and hash-checked) and the product's own preparation,
+  with the Vina authors' preparation as a control. The new CI job
+  `science-vina` downloads the pinned Vina 1.2.5 Linux binary, runs the live
+  Vina tests (failing instead of skipping) and requires the top pose within
+  2.0 Å of the crystal pose for every seed.
+- PubChem lookups returned no structures: PubChem renamed `IsomericSMILES`
+  and `CanonicalSMILES` to `SMILES` and `ConnectivitySMILES` in 2025, and the
+  connector read the old keys. Both names are now read, and every PubChem and
+  ChEMBL record carries a `structure_check` that recomputes the InChIKey from
+  the returned SMILES. An opt-in `network` test guards against the next rename.
+- Connectors enforce the network policy even with a test transport, require
+  HTTPS and a JSON content type, cap the payload while streaming and honour a
+  capped `Retry-After`. Network tests are excluded from the default suite.
+- Agent runs are bound to the reviewed plan digest (`approved_plan_hash`, CLI
+  `--plan-digest`) and each plan runs at most once, claimed atomically before
+  any side effect. The CLI could previously not run a plan with more than one
+  step.
+- Concurrent writers of the same node-cache key could expose or delete a
+  half-written entry; entries are now staged and renamed into place.
+- An outer `table.join` dropped right rows with a missing key; they are now
+  kept, unmatched keys are logged, and a join node with fewer than two inputs
+  is rejected before queueing.
+- Standardisation no longer turns arbitrary exceptions into warnings (only
+  RDKit chemistry errors), and reports neutralisation or tautomer changes only
+  when the structure actually changed.
+- ESOL flags charged and multi-component inputs as outside its domain
+  (model 1.2.0; predictions unchanged).
+- Windows device names (`COM0`, `COM¹`, `CONIN$`, `NUL .txt`, …) are
+  neutralised in file names.
+- `docking_rmsd_lb/ub` no longer present themselves as ranking objectives;
+  Vina measures them against its own best mode, so they are 0 for the best pose.
+- Text contrast now meets WCAG AA in both themes (muted, faint, accent and
+  status colours), page-level error views have an `h1`, and plot points show a
+  clear keyboard focus ring.
+- The wheel smoke test also runs on Windows and checks migrations and `/ready`.
+
 ### Validation
 
+- Vina redocking, 1IEP, Vina 1.2.5 on Windows 11, 5 seeds: HCS preparation top
+  pose 0.42–0.94 Å, Vina-example control 0.29–0.37 Å
+  (`docs/validation/vina-redocking-1iep.md`).
+- Extended visual QA: 16 routes × 320/390/640/768/1280/1440 px × light/dark,
+  192 captures with no findings for overflow, names, contrast, headings and
+  keyboard focus.
 - Visual QA (`apps/web/scripts/visual_qa.mjs`): 17 routes × 320/390/768/1280/1440
   px × light/dark against a synthetic dataset; 170 captures with no automatic
   findings after the fixes above, and the screenshots were reviewed by hand.
@@ -139,7 +183,9 @@ intentional.
 
 - Unknown node config or agent tool payload fields are rejected.
 - `table.join` fails on duplicate right keys and suffix collisions.
-- Agent `run` requires `--plan-id` (CLI) or `plan_id` (API).
+- Agent `run` requires `--plan-id` (CLI) or `plan_id` (API), plus an
+  approval. The CLI takes `--plan-digest` instead of `--tool`/`--args`, and a
+  plan cannot be run twice.
 - Connector 3xx responses are errors; 404s raise unless explicitly tolerated.
 - Constraint objectives no longer contribute to composite scores or Pareto
   ranking; they gate eligibility instead.

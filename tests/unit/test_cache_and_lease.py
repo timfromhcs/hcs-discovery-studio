@@ -6,10 +6,11 @@ import json
 import time
 from pathlib import Path
 
+import hcs_discovery.workflow.cache as cache_module
 from hcs_discovery.core.timeutil import db_now
 from hcs_discovery.database.base import get_session_factory
 from hcs_discovery.services.runs import create_run
-from hcs_discovery.workflow.cache import CachedOutput, NodeCache
+from hcs_discovery.workflow.cache import STAGING_DIR, CachedOutput, NodeCache
 from hcs_discovery.workflow.executor import _LeaseHeartbeat
 from hcs_discovery.workflow.table import Column, Table
 
@@ -87,6 +88,61 @@ def test_cache_refuses_to_publish_when_an_artifact_is_missing(tmp_path: Path):
     assert cache.put(KEY, output, {"summary.md": tmp_path / "does-not-exist.md"}) is False
     assert not _entry(cache).exists()
     assert cache.get(KEY) is None
+    assert not any((cache.root / STAGING_DIR).iterdir())
+
+
+def test_cache_entry_is_never_visible_half_written(tmp_path: Path, monkeypatch):
+    """A reader during a write sees either nothing or the complete entry."""
+    cache = NodeCache(tmp_path / "cache")
+    output, files = _output(tmp_path)
+    seen: list[object] = []
+    real_copy = cache_module.shutil.copy2
+
+    def copy_then_read(source, destination):
+        result = real_copy(source, destination)
+        seen.append(cache.get(KEY))
+        return result
+
+    monkeypatch.setattr(cache_module.shutil, "copy2", copy_then_read)
+    assert cache.put(KEY, output, files) is True
+    assert seen == [None]
+    assert cache.get(KEY) is not None
+    assert cache.stats()["entries"] == 1
+    assert not any((cache.root / STAGING_DIR).iterdir())
+
+
+def test_cache_keeps_the_entry_of_the_writer_that_won(tmp_path: Path):
+    cache = NodeCache(tmp_path / "cache")
+    output, files = _output(tmp_path)
+    assert cache.put(KEY, output, files) is True
+    first = (_entry(cache) / "entry.json").stat().st_mtime_ns
+    assert cache.put(KEY, output, files) is True
+    assert (_entry(cache) / "entry.json").stat().st_mtime_ns == first
+    assert cache.get(KEY) is not None
+
+
+def test_cache_replaces_an_interrupted_entry_without_manifest(tmp_path: Path):
+    cache = NodeCache(tmp_path / "cache")
+    output, files = _output(tmp_path)
+    (_entry(cache) / "artifacts").mkdir(parents=True)
+    (_entry(cache) / "artifacts" / "summary.md").write_text("partial", encoding="utf-8")
+    assert cache.get(KEY) is None
+    assert cache.put(KEY, output, files) is True
+    cached = cache.get(KEY)
+    assert cached is not None
+    assert (_entry(cache) / "artifacts" / "summary.md").read_text(encoding="utf-8") == "# summary\n"
+
+
+def test_cache_accounting_ignores_writes_in_progress(tmp_path: Path):
+    cache = NodeCache(tmp_path / "cache")
+    output, files = _output(tmp_path)
+    assert cache.put(KEY, output, files)
+    in_progress = cache.root / STAGING_DIR / "pending"
+    in_progress.mkdir(parents=True)
+    (in_progress / "entry.json").write_text("{}", encoding="utf-8")
+    assert cache.stats()["entries"] == 1
+    assert cache.prune(max_mb=0, dry_run=True) == (1, cache.stats()["bytes"] - 2)
+    assert in_progress.exists()
 
 
 def test_lease_heartbeat_renews_and_detects_loss(settings, session, triage_definition, project, dataset):

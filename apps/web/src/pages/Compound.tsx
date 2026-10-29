@@ -40,7 +40,8 @@ export function CompoundPage() {
   if (compound.error || !compound.data) {
     return (
       <div className="page">
-        <ErrorState error={compound.error ?? new Error("Compound not found.")} onRetry={() => void compound.refetch()} />
+        <PageHeader title="Compound unavailable" />
+        <ErrorState error={compound.error ?? new Error("Compound not found.")} onRetry={() => void compound.refetch()} headingLevel={2} />
         <LinkButton to="/" icon="arrowLeft">
           Back to workspace
         </LinkButton>

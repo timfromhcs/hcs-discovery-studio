@@ -20,7 +20,7 @@
 
   --text: #e7eff5;
   --text-muted: #92a6b6;
-  --text-faint: #677c8d;
+  --text-faint: #7e93a4;
 
   --accent: #3dd6c3;
   --accent-strong: #6ce8d8;
@@ -73,20 +73,20 @@
   --border-accent: rgba(15, 138, 124, 0.4);
 
   --text: #10222c;
-  --text-muted: #526875;
-  --text-faint: #7b909c;
+  --text-muted: #3f5360;
+  --text-faint: #586d79;
 
-  --accent: #0f8a7c;
-  --accent-strong: #0a6e63;
+  --accent: #0b655b;
+  --accent-strong: #08524a;
   --accent-ink: #ffffff;
   --accent-soft: rgba(15, 138, 124, 0.1);
   --accent-soft-strong: rgba(15, 138, 124, 0.17);
 
-  --blue: #2f6fce;
+  --blue: #285fb1;
   --blue-soft: rgba(47, 111, 206, 0.1);
-  --ok: #1d8a4e;
+  --ok: #176e3e;
   --ok-soft: rgba(29, 138, 78, 0.1);
-  --warn: #9a6210;
+  --warn: #84540e;
   --warn-soft: rgba(154, 98, 16, 0.12);
   --danger: #b3263a;
   --danger-soft: rgba(179, 38, 58, 0.09);
@@ -3087,11 +3087,20 @@ svg {
   transition: r 0.12s ease;
 }
 
-.point:hover,
-.point:focus {
+.point:hover {
   stroke: var(--text);
   stroke-width: 1.6;
+}
+
+.point:focus {
   outline: none;
+}
+
+/* Keyboard focus needs more than the hover stroke to stand out on a dense plot. */
+.point:focus-visible {
+  stroke: var(--text);
+  stroke-width: 3;
+  r: 7px;
 }
 
 .point.front {
