@@ -6,7 +6,7 @@ import httpx
 
 from ...core.config import Settings
 from ...core.errors import ValidationError
-from .base import BaseConnector, ConnectorRecord
+from .base import BaseConnector, ConnectorRecord, structure_check
 
 CHEMBL_BASE_URL = "https://www.ebi.ac.uk/chembl/api/data"
 CHEMBL_LICENSE = "Creative Commons Attribution-ShareAlike 3.0 Unported (CC-BY-SA 3.0 - EMBL-EBI ChEMBL)"
@@ -80,6 +80,9 @@ class ChEMBLConnector(BaseConnector):
                 "molecule_type": item.get("molecule_type"),
                 "canonical_smiles": structures.get("canonical_smiles"),
                 "standard_inchi_key": structures.get("standard_inchi_key"),
+                "structure_check": structure_check(
+                    structures.get("canonical_smiles"), structures.get("standard_inchi_key")
+                ),
             }
             records.append(
                 ConnectorRecord(
