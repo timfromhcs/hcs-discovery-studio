@@ -73,6 +73,7 @@ class Structure(Base):
     format: Mapped[str] = mapped_column(String(16), nullable=False)
     rel_path: Mapped[str] = mapped_column(String(400), nullable=False)
     sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    license: Mapped[str] = mapped_column(String(120), default="unknown", nullable=False)
     quality: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=db_now, nullable=False)
 

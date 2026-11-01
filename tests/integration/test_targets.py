@@ -103,6 +103,7 @@ def test_import_structure_records_checksum_and_inspection(settings, session, pro
     assert len(structure.sha256) == 64
     assert structure.quality["atom_count"] == 9
     assert structure.quality["ligands"] == ["LIG"]
+    assert structure.license == "synthetic-test-data"
     stored = structure_path(structure, settings)
     assert stored.exists()
     assert stored.parent.name == "structures"
@@ -147,6 +148,7 @@ def test_structure_detail_exposes_the_full_inspection(settings, session, project
     assert payload["inspection"]["pdb_id"] == "1TST"
     assert [chain["chain_id"] for chain in payload["inspection"]["chains"]] == ["A", "B"]
     assert payload["summary"]["waters"] == 1
+    assert payload["license"] == "synthetic-test-data"
 
 
 def test_deleting_a_target_keeps_its_structures_and_detaches_them(settings, session, project):

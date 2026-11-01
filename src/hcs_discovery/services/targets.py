@@ -153,8 +153,7 @@ def update_target(
     return target
 
 
-def delete_target(session: Session, target_id: str, *, settings: Settings | None = None) -> dict[str, Any]:
-    settings = settings or get_settings()
+def delete_target(session: Session, target_id: str) -> dict[str, Any]:
     target = get_target(session, target_id)
     structures = session.execute(select(Structure).where(Structure.target_id == target.id)).scalars().all()
     # Deleting a target keeps its structures but detaches them (ON DELETE SET NULL).
@@ -200,6 +199,11 @@ def import_structure(
     fmt = detect_format(filename)
     if not source or len(source) > 80:
         raise ValidationError("Source must be a short non-empty label (max 80 characters).")
+    if not license or len(license) > 120:
+        raise ValidationError(
+            "License must be a short non-empty label (max 120 characters).",
+            details={"hint": "Use 'unknown' when the terms were not checked; do not guess."},
+        )
 
     structure_id = new_id("str")
     upload_dir = safe_join(settings.uploads_dir, project_id, "structures")
@@ -223,6 +227,7 @@ def import_structure(
         format=fmt,
         rel_path=stored.relative_to(settings.data_dir).as_posix(),
         sha256=digest,
+        license=license.strip(),
         quality=inspection.as_dict(),
     )
     session.add(structure)
@@ -315,6 +320,7 @@ def _structure_dict(structure: Structure, *, include_inspection: bool = True) ->
         "accession": structure.accession,
         "format": structure.format,
         "sha256": structure.sha256,
+        "license": structure.license,
         "created_at": structure.created_at.isoformat() + "Z",
         "summary": {
             key: (structure.quality or {}).get(key)

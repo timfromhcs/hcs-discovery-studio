@@ -532,6 +532,10 @@ Worked through GEMINI.md again from the merged `main`.
   case-insensitive duplicate protection; structure import that hashes the exact
   bytes, inspects before writing, and removes the artifact if the file is
   rejected; `target delete` detaches structures instead of destroying evidence.
+- Added migration `9f3c1a7d2b48` (`structures.license`). The license was only in
+  the audit log before, so a redistribution decision could not be read back per
+  structure. `tests/integration/test_migrations.py` now upgrades a legacy
+  database, keeps the existing structure row and asserts `license='unknown'`.
 - Added `src/hcs_discovery/api/routes/targets.py` and `api/schemas.py` target
   models, wired into `create_app`.
 - Added the `hcs-discovery target` CLI family (create/list/show/update/delete,

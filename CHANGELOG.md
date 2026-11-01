@@ -12,10 +12,13 @@ All notable changes to this project are documented here. The format follows
   and `structures` tables now have services, versioned routes
   (`/api/v1/projects/{id}/targets`, `/api/v1/projects/{id}/structures`) and a
   `hcs-discovery target` command family. Structure import stores the exact bytes,
-  records their SHA-256, and reports an inspection built without new
+  records their SHA-256 and license, and reports an inspection built without new
   dependencies: chains, residues, missing-residue gaps, ligand types, waters,
   ions, alternate locations and warnings. mmCIF is refused with
   `unsupported_format` instead of being partially parsed.
+  Additive migration `9f3c1a7d2b48` adds `structures.license`; an existing
+  database upgrades with its rows intact and `license='unknown'` rather than a
+  guess.
   Deleting a target keeps its structures and detaches them; deleting a structure
   removes the row and the file. No UI page yet, and no binding-site definition or
   receptor preparation.
