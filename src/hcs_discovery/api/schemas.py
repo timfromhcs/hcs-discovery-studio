@@ -13,6 +13,22 @@ class ProjectCreate(BaseModel):
     purpose: str = Field(default="", max_length=2000)
 
 
+class TargetCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    gene_symbol: str | None = Field(default=None, max_length=64)
+    uniprot_id: str | None = Field(default=None, max_length=32)
+    organism: str | None = Field(default=None, max_length=120)
+    notes: str = Field(default="", max_length=10000)
+
+
+class TargetUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    gene_symbol: str | None = Field(default=None, max_length=64)
+    uniprot_id: str | None = Field(default=None, max_length=32)
+    organism: str | None = Field(default=None, max_length=120)
+    notes: str | None = Field(default=None, max_length=10000)
+
+
 class WorkflowSaveRequest(BaseModel):
     project_id: str
     definition: dict[str, Any]

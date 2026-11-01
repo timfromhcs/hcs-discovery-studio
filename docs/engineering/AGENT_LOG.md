@@ -522,6 +522,32 @@ Worked through GEMINI.md again from the merged `main`.
 - Docs: `docs/research/HAEL.md`, `docs/research/RESEARCH_REGISTER.md`.
 - Not done: workflow node, API route, CLI command, UI, real-task evaluation.
 
+## 2026-11-01 — WP2 backbone: targets and structures with provenance
+
+- Added `src/hcs_discovery/structures/pdb.py`: dependency-free PDB inspection
+  (models, chains, residues, missing-residue gaps, ligands, waters, ions,
+  alternate locations, HEADER/TITLE), 64 MiB size guard, and an explicit
+  `unsupported_format` refusal for mmCIF rather than a partial parse.
+- Added `src/hcs_discovery/services/targets.py`: target CRUD with provenance and
+  case-insensitive duplicate protection; structure import that hashes the exact
+  bytes, inspects before writing, and removes the artifact if the file is
+  rejected; `target delete` detaches structures instead of destroying evidence.
+- Added `src/hcs_discovery/api/routes/targets.py` and `api/schemas.py` target
+  models, wired into `create_app`.
+- Added the `hcs-discovery target` CLI family (create/list/show/update/delete,
+  import-structure, structures, structure, delete-structure) with `--json`,
+  confirmation prompts and stable exit codes.
+- Tests: 11 unit (`tests/unit/test_structure_inspection.py`) and 18 integration
+  (`tests/integration/test_targets.py`) covering service, API and CLI parity,
+  cross-project attachment refusal, duplicate names, deletion semantics and the
+  "rejected import leaves no file and no row" rule. Fixture
+  `tests/fixtures/structures/tiny_two_chain.pdb` is hand-written synthetic data
+  (REMARK-marked), not a real structure.
+- Gates on the branch: 418 passed / 2 skipped, 81% branch coverage, ruff, mypy,
+  docs links.
+- Not done: target UI page, binding-site/box definition, receptor preparation,
+  UniProt/RCSB metadata connectors, E2E journey.
+
 ## Blockers
 
 - None technical at the time of writing. The `v0.1.0` preview is published and

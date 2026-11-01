@@ -57,6 +57,7 @@ prioritisation signals. Read
 | Bemis-Murcko generic scaffold splitting | **Available** | Leakage-free split validation tests |
 | PubChem & ChEMBL public data connectors | **Available** | NCBI & EBI REST search with policy-gated access |
 | DAG branching & table joins | **Available** | Kahn topological sort, fan-out, and `table.join` |
+| Targets & structures with provenance | **Available** (API + CLI, no UI page yet) | Target CRUD, PDB import with SHA-256 and chain/ligand/missing-residue inspection; mmCIF refused explicitly |
 | Deb's Fast Non-dominated Sorting & Pareto ranking | **Available** | Multi-objective sorting invariant tests |
 | Safe local research assistant | **Available** | Ask, Plan, Run modes with strict allowlisted tools |
 | Persistent lease-based queue & restart recovery | **Available** | Queue/worker integration tests |
@@ -203,7 +204,7 @@ never labels a model Vulkan-compatible unless that adapter has a real probe.
 
 | Gate | Command | Result |
 |---|---|---|
-| Backend tests | `uv run pytest -q` | 391 passed with a Vina binary installed; 389 passed + 2 skipped without one (the skips are the live docking tests). Same in CI |
+| Backend tests | `uv run pytest -q` | 420 passed with a Vina binary installed; 418 passed + 2 skipped without one (the skips are the live docking tests). Same in CI |
 | Coverage | `uv run pytest --cov=hcs_discovery --cov-branch` | 81% branch coverage locally; CI floor 70%, HAEL modules ≥94% |
 | Python format/lint/type | `uv run ruff format --check .`, `uv run ruff check .`, `uv run mypy` | Clean locally and in CI |
 | Frontend typecheck/build | `npm run typecheck`, `npm run build` in `apps/web` | Clean locally and in CI |

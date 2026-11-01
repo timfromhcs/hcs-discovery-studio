@@ -81,7 +81,7 @@ test or a recorded manual check; it does not mean validated science.
 
 - Self-contained wheel bundling the built SPA; smoke-tested locally on port 8793
   and by the CI wheel job.
-- 391 backend tests passing locally with a Vina binary installed (389 passed +
+- 420 backend tests passing locally with a Vina binary installed (418 passed +
   2 skipped without one, 1 network test deselected), and in CI.
 - 3 Playwright end-to-end tests passing locally and in CI.
 - Ruff format/check and mypy clean locally and in CI.
@@ -124,7 +124,7 @@ test or a recorded manual check; it does not mean validated science.
 | Research agent | Ask/Plan/Run with allowlisted tools, digest-bound plans, optional local LLM for Ask | LLM-based planning; resource estimates; a UI page |
 | Auth | Static bearer token for non-loopback | No users, roles, per-project ACLs, token expiry or rotation |
 | Audit | Audit rows for project/dataset/workflow/run mutations | No audit viewer or export |
-| Target/structure tables | Migrated schema | No services, API or UI |
+| Target/structure records | Service + API + CLI with provenance, checksums and inspection | No UI page; no binding-site/box definition; no receptor preparation; PDB only (mmCIF refused) |
 | Predictions table | Migrated schema | No writer and no UI |
 | PostgreSQL | SQLAlchemy-compatible models | No tested PostgreSQL deployment or queue semantics |
 | Observability | Structured logs, request IDs, run events | No metrics endpoint, tracing or dashboards |
@@ -135,7 +135,7 @@ test or a recorded manual check; it does not mean validated science.
 - Learned ADMET/activity prediction (Chemprop or any other model).
 - Structure prediction (Boltz-2, Chai-1).
 - GPU or Vulkan execution of any scientific engine.
-- Target explorer, structure upload, pocket detection.
+- Target explorer UI, pocket detection, binding-site definition and receptor preparation.
 - Loops, conditionals, sub-workflow composition or parameter sweeps.
 - Distributed workers, Redis/Celery, multi-tenant hosting.
 - Docker image, Helm chart or cloud deployment.
@@ -152,8 +152,8 @@ Evidence below was produced on `main` at commit `12febcf` and re-run locally on
 
 | Gate | Status | Evidence |
 |---|---|---|
-| Lint, format, types | Pass locally and in CI | Ruff, mypy (79 source files) |
-| Backend tests | Pass locally and in CI | 391 passed with a Vina binary (389 passed + 2 skipped without one, 1 network test deselected); 81% branch coverage; Hypothesis properties for ranking and joins; HAEL modules ≥94% |
+| Lint, format, types | Pass locally and in CI | Ruff, mypy (89 source files) |
+| Backend tests | Pass locally and in CI | 420 passed with a Vina binary (418 passed + 2 skipped without one, 1 network test deselected); 81% branch coverage; Hypothesis properties for ranking and joins; HAEL modules ≥94% |
 | Frontend build and E2E | Pass locally and in CI | typecheck, build, 3 Playwright tests on isolated data |
 | Visual QA | Pass locally | `apps/web/scripts/visual_qa.mjs`: 18 routes × 6 widths (incl. 640 px = 200% zoom) × 2 themes = 192 captures, WCAG AA text contrast, heading order, keyboard focus; screenshots reviewed by hand |
 | Fresh migration and wheel | Pass locally and in CI | Wheel ships Alembic scripts and records a revision; wheel installed into a clean venv and completed db upgrade → project → import → run → results |
