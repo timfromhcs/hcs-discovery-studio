@@ -6,7 +6,21 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- **HAEL adaptive scheduler (experimental, library only).**
+  `src/hcs_discovery/hael/` implements the HCS Adaptive Evidence Ladder: typed
+  evidence with unit/endpoint/calibration gates, an acquisition rule
+  `(EHVI + λ·EIG + ν·ΔDiversity) / (C + ε)`, a measured-only cost model and a
+  deterministic, auditable decision trace. 94 unit and property tests pin the
+  rules that matter (dimensional integrity, gate integrity, cost and information
+  monotonicity, diversity, determinism, budget, failure recovery, auditability).
+  It is **not** wired into a workflow, has no API/CLI/UI, supports at most two
+  objective dimensions and has no evaluation on a real task, so it stays
+  `experimental` and is never a default. Design, ablation and limits:
+  `docs/research/HAEL.md`.
+- **Research register.** `docs/research/RESEARCH_REGISTER.md` records each open or
+  answered research question with its evidence, including negative results.
 
 ## [2.0.0] - 2026-10-29
 

@@ -26,6 +26,7 @@ test or a recorded manual check; it does not mean validated science.
 | Property estimates | Runs; weak/approximate | Reduced ESOL measured (RMSE 0.97, R² 0.07, n=45); CNS MPO approximation |
 | PubChem / ChEMBL connectors | Done | Policy-gated; mocked-transport tests; blocked by default |
 | DAG Workflows | Done | Multi-branch DAGs, Kahn topological sort, and table.join with strict-key checks |
+| HAEL adaptive scheduler | Experimental, library only | Typed evidence gates, cost model, deterministic trace, 94 property/guard tests ([design](../research/HAEL.md)); no workflow node, API, CLI or UI yet |
 | GitHub CI | Pass on `main` | CI 40947455326 and CodeQL 40947455914 passed on commit `12febcf` |
 | Public release | Pending | [`v1.0.0`](https://github.com/timfromhcs/hcs-discovery-studio/releases/tag/v1.0.0) published; `v2.0.0` not yet tagged or published |
 | v2.0.0 Stable | Awaiting release candidate run and owner approval | Local gates pass on the merged SHA; tag/publication not performed |
@@ -80,7 +81,7 @@ test or a recorded manual check; it does not mean validated science.
 
 - Self-contained wheel bundling the built SPA; smoke-tested locally on port 8793
   and by the CI wheel job.
-- 297 backend tests passing locally with a Vina binary installed (295 passed +
+- 391 backend tests passing locally with a Vina binary installed (389 passed +
   2 skipped without one, 1 network test deselected), and in CI.
 - 3 Playwright end-to-end tests passing locally and in CI.
 - Ruff format/check and mypy clean locally and in CI.
@@ -118,6 +119,7 @@ test or a recorded manual check; it does not mean validated science.
 | Feature | What exists | What is missing |
 |---|---|---|
 | Docking | Vina adapter, flexible-ligand PDBQT, per-ligand status, pose SDF with bonds, receptor confinement, single-complex redocking gate | Multi-target pose-recovery benchmark; receptor preparation; protonation/tautomer enumeration; flexible macrocycles |
+| HAEL scheduler | Typed evidence with units/gates, acquisition rule, measured cost model, deterministic trace, synthetic matched-budget ablation, 94 tests | No workflow node, API route, CLI command or UI; two objective dimensions maximum; no evaluation on a real task |
 | Property estimates | Reduced ESOL with measured independent-set metrics; CNS MPO approximation | Full published ESOL fit; computed ClogD/pKa; calibrated uncertainty |
 | Research agent | Ask/Plan/Run with allowlisted tools, digest-bound plans, optional local LLM for Ask | LLM-based planning; resource estimates; a UI page |
 | Auth | Static bearer token for non-loopback | No users, roles, per-project ACLs, token expiry or rotation |
@@ -151,7 +153,7 @@ Evidence below was produced on `main` at commit `12febcf` and re-run locally on
 | Gate | Status | Evidence |
 |---|---|---|
 | Lint, format, types | Pass locally and in CI | Ruff, mypy (79 source files) |
-| Backend tests | Pass locally and in CI | 297 passed with a Vina binary (295 passed + 2 skipped without one, 1 network test deselected); 79% branch coverage; Hypothesis properties for ranking and joins |
+| Backend tests | Pass locally and in CI | 391 passed with a Vina binary (389 passed + 2 skipped without one, 1 network test deselected); 81% branch coverage; Hypothesis properties for ranking and joins; HAEL modules ≥94% |
 | Frontend build and E2E | Pass locally and in CI | typecheck, build, 3 Playwright tests on isolated data |
 | Visual QA | Pass locally | `apps/web/scripts/visual_qa.mjs`: 18 routes × 6 widths (incl. 640 px = 200% zoom) × 2 themes = 192 captures, WCAG AA text contrast, heading order, keyboard focus; screenshots reviewed by hand |
 | Fresh migration and wheel | Pass locally and in CI | Wheel ships Alembic scripts and records a revision; wheel installed into a clean venv and completed db upgrade → project → import → run → results |

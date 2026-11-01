@@ -492,6 +492,36 @@ Worked through GEMINI.md again from the merged `main`.
   owner approval for a Stable tag, and the release workflow's first real run is
   the release-candidate run itself.
 
+## 2026-11-01 — WP6: HAEL evidence ladder and scheduler (experimental)
+
+- Added `src/hcs_discovery/hael/`: `units` (registry, no implicit conversion),
+  `evidence` (typed items, evaluation failures, objective vectors, gates, Pareto
+  frontier, content digest), `cost` (measured p90 with an explicit cold-start
+  policy that refuses to guess), `acquisition` (1-D closed-form EI, 2-D seeded
+  Monte-Carlo EHVI, analytic Gaussian EIG, scaffold/pocket novelty) and
+  `scheduler` (deterministic trace, budget, cancellation, failure recovery).
+- 94 tests in `tests/unit/test_hael_{evidence,acquisition,scheduler,guards}.py`.
+  Branch coverage: acquisition 99%, evidence 99%, scheduler 94%, cost 95%,
+  units 96%.
+- Deliberate refusals, each covered by a test: >2 objective dimensions raises
+  `UnsupportedObjectiveDimensionError`; an unmeasured and unconfigured cost is
+  `unknown_cost` and the action is skipped; an exploratory or out-of-domain item
+  cannot enter the validated frontier; several validated values for one
+  candidate/dimension are omitted instead of averaged.
+- Two bugs found by the tests while writing them: (a) `ledger or EvidenceLedger()`
+  silently discards an empty ledger because `__len__ == 0` makes it falsy —
+  fixed in the test helper and documented; (b) the no-incumbent EI branch was
+  degenerate (it returned `3σ` regardless of the prediction), so a stronger
+  prediction did not score higher; it now measures against the dimension's zero
+  point.
+- Ablation (`scripts/science/benchmark_hael.py`, 20 seeds, synthetic): mean
+  regret of the selected candidate — hael −0.285, hael_cost_unaware −0.498,
+  descriptor_only −0.519, random −1.140, static_cascade −1.450. HAEL leads, but
+  only clearly against uninformed policies; on synthetic data. Recorded as a
+  finding, not a promotion: HAEL remains experimental.
+- Docs: `docs/research/HAEL.md`, `docs/research/RESEARCH_REGISTER.md`.
+- Not done: workflow node, API route, CLI command, UI, real-task evaluation.
+
 ## Blockers
 
 - None technical at the time of writing. The `v0.1.0` preview is published and
