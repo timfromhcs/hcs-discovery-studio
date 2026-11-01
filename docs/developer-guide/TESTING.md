@@ -139,11 +139,14 @@ columns and pages with long identifiers.
 Warnings are not failures. The gate is the final `passed` count and a zero exit
 code.
 
-The recorded local baseline for 0.1.0 is:
+The recorded local baseline for 2.0.0 is:
 
 ```text
-82 passed
+389 passed, 2 skipped   (no Vina binary on the host)
+391 passed              (with HCS_VINA_BINARY set and HCS_REQUIRE_VINA=1)
+81% branch coverage
 3 Playwright tests passed
+192 visual QA captures, 0 findings
 ruff format --check: clean
 ruff check: clean
 mypy: clean

@@ -65,6 +65,7 @@ prioritisation signals. Read
 | React UI for project → import → workflow → run → results | **Available** | 3 Playwright E2E tests |
 | CLI and versioned HTTP API | **Available** | Shared domain services; CLI integration tests |
 | Self-contained wheel with bundled SPA | **Available** | Built and smoke-tested without Node runtime |
+| HAEL adaptive scheduler (experimental, library only) | **Experimental** | Typed evidence gates, pinned acquisition properties and a synthetic ablation ([design and results](docs/research/HAEL.md)); not wired to a workflow, not the default |
 | OpenMM, Boltz-2, Chai-1 | **Planned** | Tracked honestly in model registry |
 
 The full ledger, including partial features and known defects, is in
@@ -202,8 +203,8 @@ never labels a model Vulkan-compatible unless that adapter has a real probe.
 
 | Gate | Command | Result |
 |---|---|---|
-| Backend tests | `uv run pytest -q` | 297 passed with a Vina binary installed; 295 passed + 2 skipped without one (the skips are the live docking tests). Same in CI |
-| Coverage | `uv run pytest --cov=hcs_discovery --cov-branch` | 79% branch coverage locally; CI floor 70% |
+| Backend tests | `uv run pytest -q` | 391 passed with a Vina binary installed; 389 passed + 2 skipped without one (the skips are the live docking tests). Same in CI |
+| Coverage | `uv run pytest --cov=hcs_discovery --cov-branch` | 81% branch coverage locally; CI floor 70%, HAEL modules ≥94% |
 | Python format/lint/type | `uv run ruff format --check .`, `uv run ruff check .`, `uv run mypy` | Clean locally and in CI |
 | Frontend typecheck/build | `npm run typecheck`, `npm run build` in `apps/web` | Clean locally and in CI |
 | End-to-end | `npm run test:e2e` in `apps/web` | 3 passed locally and in CI |
@@ -295,7 +296,9 @@ More help: [Windows install](docs/user-guide/INSTALL_WINDOWS.md),
 - **Engineering:** [Implementation status](docs/engineering/IMPLEMENTATION_STATUS.md) ·
   [Agent log](docs/engineering/AGENT_LOG.md)
 - **Research and validation:** [Component/license audit](docs/research/COMPONENT_AND_LICENSE_AUDIT.md) ·
-  [Validation protocol](docs/scientific-validation/VALIDATION_PROTOCOL.md)
+  [Validation protocol](docs/scientific-validation/VALIDATION_PROTOCOL.md) ·
+  [HAEL (experimental)](docs/research/HAEL.md) ·
+  [Research register](docs/research/RESEARCH_REGISTER.md)
 - **Security:** [Threat model](docs/security/THREAT_MODEL.md) · [SECURITY.md](SECURITY.md)
 - **Contributing:** [CONTRIBUTING.md](CONTRIBUTING.md) ·
   [Developer guide](docs/developer-guide/CONTRIBUTING.md) ·
