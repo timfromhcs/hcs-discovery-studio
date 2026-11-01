@@ -122,6 +122,15 @@ intentional.
   domain bounds.
 - Docked pose SDF files now carry bonds, rebuilt from `REMARK SMILES` records
   that Vina copies into its output; previously they contained atoms only.
+- **`workflow run --no-follow` and `run retry --no-follow` exited 1 after a
+  successful submission** in human (non-`--json`) mode and told the user it was
+  "Waiting for a worker". They now report the queued run, name the command that
+  executes it, and exit 0. Following a run with no worker running also prints a
+  one-time hint instead of looking hung.
+- **The compound-library search field had no instantaneous focus indicator:** the
+  input sets `outline: none` and the wrapper's ring was tied to a 140 ms
+  `box-shadow` transition, so keyboard focus was not signalled at once (WCAG 2.2
+  focus appearance). Only the resting border animates now.
 
 - **Docking redocking gate:** `scripts/science/redock_vina_reference.py`
   redocks imatinib into PDB 1IEP using the official Vina example files

@@ -55,6 +55,10 @@ app = typer.Typer(
     add_completion=False,
     pretty_exceptions_show_locals=False,
 )
+
+# `_follow_run` polls every 0.4 s; about five seconds of an unclaimed run is long
+# enough to look hung, so say once that no worker is running.
+_QUEUE_HINT_POLLS = 12
 project_app = typer.Typer(help="Project management.", no_args_is_help=True)
 dataset_app = typer.Typer(help="Dataset import and inspection.", no_args_is_help=True)
 workflow_app = typer.Typer(help="Workflow validation and submission.", no_args_is_help=True)
@@ -594,24 +598,50 @@ def workflow_run(
                 seed=seed,
             )
         run_id = run.id
-    if _state(ctx).json and not follow:
-        typer.echo(json.dumps({"run_id": run_id, "status": "queued"}))
+    if not follow:
+        # Submitting is a success; only the followed run's terminal state decides the exit code.
+        _report_queued(ctx, run_id, verb="Run")
         return
     if not _state(ctx).json:
         typer.echo(f"Run {run_id} queued. Waiting for a worker...")
-    status = _follow_run(run_id, json_mode=_state(ctx).json) if follow else "queued"
+    status = _follow_run(run_id, json_mode=_state(ctx).json)
     if status != "succeeded":
         raise typer.Exit(8 if status == "failed" else 7 if status == "cancelled" else 1)
 
 
+def _report_queued(ctx: typer.Context, run_id: str, *, verb: str) -> None:
+    """Report a submitted run without waiting for a worker."""
+    if _state(ctx).json:
+        typer.echo(json.dumps({"run_id": run_id, "status": "queued"}))
+    else:
+        typer.echo(
+            f"{verb} {run_id} queued. Start a worker (`hcs-discovery worker` or "
+            "`hcs-discovery serve`, which runs one) to execute it."
+        )
+
+
 def _follow_run(run_id: str, *, json_mode: bool) -> str:
     last = 0
+    idle_polls = 0
+    hint_shown = False
     with get_session_factory()() as session:
         while True:
             from ..services import events_after
 
             events = events_after(session, run_id, after_seq=last)
             run = get_run(session, run_id)
+            if not events and run.status == "queued":
+                # Say so instead of looking hung when no worker is running.
+                idle_polls += 1
+                if not json_mode and not hint_shown and idle_polls >= _QUEUE_HINT_POLLS:
+                    typer.echo(
+                        "Still queued: no worker has claimed this run. Start one with "
+                        "`hcs-discovery worker` or run `hcs-discovery serve`.",
+                        err=True,
+                    )
+                    hint_shown = True
+            else:
+                idle_polls = 0
             for event in events:
                 last = event["seq"]
                 if json_mode:
@@ -693,12 +723,12 @@ def run_retry(
             seed=source.seed,
         )
         new_id = run.id
-    if _state(ctx).json and not follow:
-        typer.echo(json.dumps({"run_id": new_id, "status": "queued"}))
+    if not follow:
+        _report_queued(ctx, new_id, verb="Retry")
         return
     if not _state(ctx).json:
         typer.echo(f"Retry {new_id} queued. Waiting for a worker...")
-    status = _follow_run(new_id, json_mode=_state(ctx).json) if follow else "queued"
+    status = _follow_run(new_id, json_mode=_state(ctx).json)
     if status != "succeeded":
         raise typer.Exit(8 if status == "failed" else 7 if status == "cancelled" else 1)
 

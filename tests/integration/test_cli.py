@@ -84,6 +84,51 @@ def test_workflow_validate_and_run(settings, tmp_path: Path):
     assert "not measurements" in target.read_text(encoding="utf-8")
 
 
+def test_workflow_run_no_follow_exits_zero_in_human_and_json_mode(settings):
+    """Submitting without following is a success, not a failed run.
+
+    Regression: human mode printed "Waiting for a worker..." and exited 1 even
+    though the run had been accepted.
+    """
+    project = _json(runner.invoke(app, ["--json", "project", "create", "--name", "No follow"]))
+    dataset = _json(runner.invoke(app, ["--json", "dataset", "import", str(DEMO_CSV), "--project", project["id"]]))
+    base = ["workflow", "run", str(TRIAGE_YAML), "--project", project["id"], "--dataset", dataset["id"], "--no-follow"]
+
+    human = runner.invoke(app, base)
+    assert human.exit_code == 0, human.output
+    assert "Waiting for a worker" not in human.output
+    assert "queued" in human.output
+    assert "hcs-discovery worker" in human.output
+
+    machine = runner.invoke(app, ["--json", *base])
+    assert machine.exit_code == 0, machine.output
+    assert json.loads(machine.output)["status"] == "queued"
+
+
+def test_run_retry_no_follow_exits_zero_in_human_mode(settings):
+    project = _json(runner.invoke(app, ["--json", "project", "create", "--name", "Retry no follow"]))
+    dataset = _json(runner.invoke(app, ["--json", "dataset", "import", str(DEMO_CSV), "--project", project["id"]]))
+    submitted = _json(
+        runner.invoke(
+            app,
+            [
+                "--json",
+                "workflow",
+                "run",
+                str(TRIAGE_YAML),
+                "--project",
+                project["id"],
+                "--dataset",
+                dataset["id"],
+                "--no-follow",
+            ],
+        )
+    )
+    retried = runner.invoke(app, ["run", "retry", submitted["run_id"], "--no-follow"])
+    assert retried.exit_code == 0, retried.output
+    assert "Waiting for a worker" not in retried.output
+
+
 def test_compounds_validate_exit_codes(settings, tmp_path: Path):
     good = runner.invoke(app, ["--json", "compounds", "validate", str(DEMO_CSV)])
     assert good.exit_code == 0

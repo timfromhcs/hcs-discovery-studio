@@ -1,7 +1,7 @@
 # Implementation status
 
-Last updated: 2026-10-29. Version: `2.0.0` release candidate on branch
-`release/v2.0.0`; not tagged or published yet.
+Last updated: 2026-11-01. Version: `2.0.0` release candidate merged to `main`
+(commit `12febcf`, PR #7); not tagged or published yet.
 
 This document is the honest feature ledger. It distinguishes what has been
 exercised end-to-end from what is scaffolded, planned or deliberately absent.
@@ -19,16 +19,16 @@ test or a recorded manual check; it does not mean validated science.
 | RDKit import/standardise | Done | CSV/SDF/SMILES, row outcomes, descriptor tests |
 | Workflow engine | Done | Validation, execution, cache, events, manifest tests |
 | CPU scientific slice | Done | Descriptors → filters → Pareto/composite → summary with integrity checks |
-| React UI | Done for shipped features | Visual QA: 17 routes × 5 widths × 2 themes, 0 automatic findings |
+| React UI | Done for shipped features | Visual QA: 18 routes × 6 widths × 2 themes, 0 automatic findings |
 | CLI/API parity | Done for shipped actions | Shared services; CLI tests |
 | Local LLM provider / Safe Research Agent | Done | Ask, Plan, Run modes with strict allowlisted tools |
 | AutoDock Vina docking | Runs; reference-tested on one complex | Host-dependent binary; ligand PDBQT matches Meeko on 48/51 fixtures; 1IEP redocking ≤ 0.94 Å over 5 seeds, enforced in CI; not benchmarked |
 | Property estimates | Runs; weak/approximate | Reduced ESOL measured (RMSE 0.97, R² 0.07, n=45); CNS MPO approximation |
 | PubChem / ChEMBL connectors | Done | Policy-gated; mocked-transport tests; blocked by default |
 | DAG Workflows | Done | Multi-branch DAGs, Kahn topological sort, and table.join with strict-key checks |
-| GitHub CI | Pending | v1.0.0 commit green; v2.0.0 candidate must pass CI on its own SHA |
+| GitHub CI | Pass on `main` | CI 40947455326 and CodeQL 40947455914 passed on commit `12febcf` |
 | Public release | Pending | [`v1.0.0`](https://github.com/timfromhcs/hcs-discovery-studio/releases/tag/v1.0.0) published; `v2.0.0` not yet tagged or published |
-| v2.0.0 Stable | In progress | Local gates pass; cloud CI, E2E on CI and release publication outstanding |
+| v2.0.0 Stable | Awaiting release candidate run and owner approval | Local gates pass on the merged SHA; tag/publication not performed |
 
 ## Working now
 
@@ -80,10 +80,13 @@ test or a recorded manual check; it does not mean validated science.
 
 - Self-contained wheel bundling the built SPA; smoke-tested locally on port 8793
   and by the CI wheel job.
-- 82 backend tests passing locally and in CI.
+- 297 backend tests passing locally with a Vina binary installed (295 passed +
+  2 skipped without one, 1 network test deselected), and in CI.
 - 3 Playwright end-to-end tests passing locally and in CI.
 - Ruff format/check and mypy clean locally and in CI.
 - Frontend typecheck and production build clean locally and in CI.
+- Visual and accessibility QA: 18 routes × 6 widths (incl. 640 px = 200% zoom) ×
+  2 themes = 192 captures, 0 automatic findings, screenshots reviewed by hand.
 - Genuine screenshots in `docs/screenshots/`.
 - GitHub Actions run
   [40677454655](https://github.com/timfromhcs/hcs-discovery-studio/actions/runs/40677454655)
@@ -142,19 +145,20 @@ test or a recorded manual check; it does not mean validated science.
 
 ## Release-gate assessment for v2.0.0
 
-Evidence below was produced on the `release/v2.0.0` and `fix/v2-stable-gates` branches on 2026-10-29.
+Evidence below was produced on `main` at commit `12febcf` and re-run locally on
+2026-11-01 on the working tree that follows it.
 
 | Gate | Status | Evidence |
 |---|---|---|
-| Lint, format, types | Pass locally and in CI | Ruff, mypy |
-| Backend tests | Pass locally and in CI | 295 pytest tests, branch coverage ≥ 70% (79%), Hypothesis properties for ranking and joins |
+| Lint, format, types | Pass locally and in CI | Ruff, mypy (79 source files) |
+| Backend tests | Pass locally and in CI | 297 passed with a Vina binary (295 passed + 2 skipped without one, 1 network test deselected); 79% branch coverage; Hypothesis properties for ranking and joins |
 | Frontend build and E2E | Pass locally and in CI | typecheck, build, 3 Playwright tests on isolated data |
-| Visual QA | Pass locally | `apps/web/scripts/visual_qa.mjs`: 16 routes × 6 widths (incl. 640 px = 200% zoom) × 2 themes, WCAG AA text contrast, heading order, keyboard focus; screenshots reviewed by hand |
-| Fresh migration and wheel | Pass locally and in CI | Wheel ships Alembic scripts and records a revision |
+| Visual QA | Pass locally | `apps/web/scripts/visual_qa.mjs`: 18 routes × 6 widths (incl. 640 px = 200% zoom) × 2 themes = 192 captures, WCAG AA text contrast, heading order, keyboard focus; screenshots reviewed by hand |
+| Fresh migration and wheel | Pass locally and in CI | Wheel ships Alembic scripts and records a revision; wheel installed into a clean venv and completed db upgrade → project → import → run → results |
 | Cache provenance | Pass | Package fingerprint, detected Vina version and receptor hash in keys |
-| CodeQL, secret scan, audits, licenses | Pass in CI | Required jobs on the PR |
+| CodeQL, secret scan, audits, licenses | Pass in CI | Required jobs on the PR and on `main` |
 | Docking reference validation | Pass (one complex) | 1IEP redocking: HCS preparation 0.42–0.94 Å, Vina-example control 0.29–0.37 Å, 5 seeds; CI job `science-vina` enforces ≤ 2.0 Å ([report](../validation/vina-redocking-1iep.md)) |
-| Release workflow | Hardened, untested end to end | Exact-SHA CI/CodeQL gate, draft-then-verify; first real run will be the RC |
+| Release workflow | Hardened, untested end to end | Exact-SHA CI/CodeQL gate, draft-then-verify; the release-candidate run will be its first real execution |
 | Release candidate published and verified | **Not met** | No tag pushed yet |
 
 GEMINI.md required an executed Vina redocking/reference result before Stable;
