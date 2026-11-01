@@ -202,11 +202,12 @@ never labels a model Vulkan-compatible unless that adapter has a real probe.
 
 | Gate | Command | Result |
 |---|---|---|
-| Backend tests | `uv run pytest -q` | 82 passed locally and in CI |
-| Coverage | `uv run pytest --cov=hcs_discovery` | 75% locally; CI floor 70% |
+| Backend tests | `uv run pytest -q` | 297 passed with a Vina binary installed; 295 passed + 2 skipped without one (the skips are the live docking tests). Same in CI |
+| Coverage | `uv run pytest --cov=hcs_discovery --cov-branch` | 79% branch coverage locally; CI floor 70% |
 | Python format/lint/type | `uv run ruff format --check .`, `uv run ruff check .`, `uv run mypy` | Clean locally and in CI |
 | Frontend typecheck/build | `npm run typecheck`, `npm run build` in `apps/web` | Clean locally and in CI |
 | End-to-end | `npm run test:e2e` in `apps/web` | 3 passed locally and in CI |
+| Visual and a11y QA | `node apps/web/scripts/visual_qa.mjs` against a running app | 192 captures (18 routes × 6 widths × 2 themes), 0 automatic findings |
 | License policy | `uv run python scripts/ci/check_licenses.py`, `node scripts/ci/check_licenses.mjs` | Pass locally and in CI |
 | Dependency audit | `pip-audit`, `npm audit --omit=dev` | No known vulnerabilities at release time |
 | Secret scan | gitleaks | Pass in CI on full history |

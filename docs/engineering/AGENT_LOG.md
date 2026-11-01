@@ -452,6 +452,46 @@ Worked through GEMINI.md again from the merged `main`.
 - Not done: `actionlint` could not be run here (fetching it was not permitted);
   the release workflow has still not run end to end.
 
+## 2026-11-01 — WP0: v2.0.0 release-truth audit and local re-verification
+
+- Ground truth: `main` = `12febcf` (PR #7 merged). Tags exist only for `v0.1.0`
+  and `v1.0.0`; `v2.0.0` is **not** tagged or published. CI 40947455326 and
+  CodeQL 40947455914 passed on `12febcf`.
+- Re-ran every local gate on the working tree: `ruff format --check` (148 files),
+  `ruff check`, `mypy` (79 files), `pytest` (297 passed with the Vina binary,
+  295 passed + 2 skipped without it, 79% branch coverage), `npm ci`,
+  `npm run typecheck`, `npm run build`, 3 Playwright E2E tests,
+  `check_licenses.py` (51 packages), `check_licenses.mjs` (11 packages),
+  `check_links.py` (35 files), `uv build --wheel`.
+- Wheel `hcs_discovery_studio-2.0.0-py3-none-any.whl` installed into a fresh
+  Python 3.12 venv; ran `version`, `db upgrade` (→ `558a25772f08`), project
+  create, 6/6 row import, workflow submit, `worker --once`, run succeeded.
+- Defect found and fixed (1): the library search field had no *instantaneous*
+  focus indicator — `.search-field input` has `outline: none` and the wrapper's
+  ring was coupled to a 140 ms `box-shadow` transition. Visual QA flagged
+  "no visible focus indicator on input" at 1280 px light. Only the resting
+  border now animates; the focus ring is immediate.
+- Defect found and fixed (2): `workflow run --no-follow` and `run retry
+  --no-follow` printed "Waiting for a worker…" and exited 1 in human mode even
+  though the run was accepted (`--json` was correct). Both now report the queued
+  run with an actionable hint and exit 0; two regression tests added.
+- Defect found and fixed (3): following a run with no worker running looked like
+  a hang. `_follow_run` now prints a one-time hint after ~5 s that no worker has
+  claimed the run.
+- Docking evidence reproduced on this host: downloaded the official
+  `vina_1.2.5_win.exe` (SHA-256 `b5a23b22…b38f`, the hash already recorded in the
+  report), 13/13 live adapter tests pass with `HCS_REQUIRE_VINA=1`, and
+  `redock_vina_reference.py --gate` reproduced the published 1IEP numbers
+  (hcs 0.42–0.94 Å, vina_example 0.29–0.37 Å, `overall: pass`).
+- Documentation drift corrected: `WORKFLOW_ENGINE.md` claimed a linear
+  single-input engine with joins rejected; `README.md` and
+  `IMPLEMENTATION_STATUS.md` claimed 82 tests and 75–79% coverage on stale
+  evidence. All three now state the measured values and the real DAG +
+  `table.join` semantics.
+- Not done: tag/publication of `v2.0.0` — AGENTS.md §0.2 and §30.4 require
+  owner approval for a Stable tag, and the release workflow's first real run is
+  the release-candidate run itself.
+
 ## Blockers
 
 - None technical at the time of writing. The `v0.1.0` preview is published and

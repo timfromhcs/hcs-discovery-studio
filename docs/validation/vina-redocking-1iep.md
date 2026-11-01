@@ -42,6 +42,16 @@ It says nothing about affinity ranking, other targets or prospective docking.
 
 Overall: **pass**.
 
+## Reproduction
+
+Re-run on 2026-11-01 from `main` (Windows 11, same Vina 1.2.5 Windows binary
+SHA-256 `b5a23b22…b38f`, RDKit 2026.09.1) with
+`python scripts/science/redock_vina_reference.py --gate`: identical top-pose
+RMSDs to two decimals for both arms (hcs 0.42–0.94 Å, vina_example 0.29–0.37 Å)
+and `overall: pass`. Wall-clock per seed was 32–35 s. The 13 live adapter tests
+in `tests/scientific/test_vina_adapter.py` also pass on that host when
+`HCS_VINA_BINARY` points at the binary and `HCS_REQUIRE_VINA=1` is set.
+
 ## Limitations
 
 - One complex, one receptor conformation, redocking into the holo structure. Cross-docking

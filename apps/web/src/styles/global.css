@@ -1448,7 +1448,9 @@ svg {
   border-radius: 9px;
   background: var(--surface-2);
   color: var(--text-faint);
-  transition: border-color 0.14s ease, box-shadow 0.14s ease;
+  /* Only the resting border animates. The focus ring below must appear at once so
+     keyboard users see an indicator immediately (WCAG 2.2 focus appearance). */
+  transition: border-color 0.14s ease;
 }
 
 .search-field:focus-within {

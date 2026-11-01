@@ -1,9 +1,21 @@
 # Workflow engine
 
 The workflow engine turns a declarative YAML/JSON definition plus an imported
-dataset into a reproducible, inspectable run. It is deliberately small: a linear
-single-input chain of typed nodes, persisted state, and a content-addressed
-cache. Multi-input merge nodes are rejected rather than approximated.
+dataset into a reproducible, inspectable run. It is a typed
+directed acyclic graph of typed nodes, persisted state, and a content-addressed
+cache. Fan-out is allowed and fan-in happens only through an explicit
+`table.join` node, so a merge is never silently approximated.
+
+## Graph shape
+
+- Exactly one root: the dataset entry point.
+- A node with one parent receives that parent's table.
+- A node with several parents must be `table.join`, which merges them on an
+  explicit key column. Any other multi-input target is rejected with
+  `multiple_inputs_unsupported`; a join with fewer than two parents is rejected
+  with `join_requires_two_inputs`.
+- Branches stay independent until a join; the executor runs nodes in
+  topological order (Kahn) and records every node's inputs and content hash.
 
 ## Definition format
 
@@ -54,7 +66,9 @@ cannot silently change a scientific result.
 - no cycles or disconnected nodes,
 - each node's config validates against its Pydantic model,
 - required input columns are present in the propagated table schema,
-- multi-input targets are rejected with `multiple_inputs_unsupported`.
+- multi-input targets are rejected with `multiple_inputs_unsupported` unless the
+  node is `table.join`, and `table.join` requires at least two parents
+  (`join_requires_two_inputs`).
 
 The CLI exposes the same check:
 
@@ -167,8 +181,11 @@ backend (`cpu`). It does not claim that a result is experimentally valid.
 
 ## Known limits
 
-- One input per node; no joins, merges or branching fan-in.
+- Fan-out is supported; fan-in only through `table.join` with an explicit key.
+  Duplicate right-hand keys and suffix collisions fail the node instead of
+  duplicating or overwriting rows.
 - One root; the dataset is always the entry point.
+- No loops, conditionals, parameter sweeps or sub-workflow composition.
 - No distributed workers, no PostgreSQL queue, no multi-tenant isolation.
 - Node handlers run in-process. There is no OS sandbox for third-party nodes.
 - A crashed process can leave a run queued for one lease period before recovery.
