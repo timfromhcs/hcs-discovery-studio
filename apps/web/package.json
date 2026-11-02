@@ -12,6 +12,7 @@
     "screenshots": "node scripts/capture_screenshots.mjs"
   },
   "dependencies": {
+    "@rdkit/rdkit": "^2026.9.1",
     "@tanstack/react-query": "^5.90.2",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",

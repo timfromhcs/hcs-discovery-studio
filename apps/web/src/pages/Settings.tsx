@@ -19,6 +19,7 @@ import {
 } from "../components/ui";
 import { formatBytes, formatDate } from "../lib/format";
 import { useBrowserCapabilities } from "../lib/browserCapabilities";
+import { BrowserChemistry } from "../components/BrowserChemistry";
 
 const ENV_VARS: Array<{ name: string; description: string }> = [
   { name: "HCS_DATA_DIR", description: "Database, uploads, artifacts and cache directory (default ./data)." },
@@ -250,6 +251,13 @@ export function SettingsPage() {
                       : "none"),
                   mono: true,
                 },
+                {
+                  label: "WebGPU compute",
+                  value: browser.webgpu.computeVerified
+                    ? `verified${browser.webgpu.maxComputeInvocations ? ` (${browser.webgpu.maxComputeInvocations}/workgroup)` : ""}`
+                    : "not verified",
+                  mono: true,
+                },
               ]}
             />
             <InlineNotice tone="info" title="Capability detection only">
@@ -261,6 +269,8 @@ export function SettingsPage() {
           <p className="muted small">Probing browser capabilities…</p>
         )}
       </Card>
+
+      <BrowserChemistry />
 
       <Card>
         <CardHeader title="Environment variables" subtitle="Set these before starting the service; the UI never writes them." icon="settings" />
