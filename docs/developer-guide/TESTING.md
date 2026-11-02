@@ -142,8 +142,8 @@ code.
 The recorded local baseline for 2.0.0 is:
 
 ```text
-389 passed, 2 skipped   (no Vina binary on the host)
-391 passed              (with HCS_VINA_BINARY set and HCS_REQUIRE_VINA=1)
+419 passed, 2 skipped   (no Vina binary on the host)
+421 passed              (with HCS_VINA_BINARY set and HCS_REQUIRE_VINA=1)
 81% branch coverage
 3 Playwright tests passed
 192 visual QA captures, 0 findings

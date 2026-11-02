@@ -1,0 +1,15 @@
+HEADER    SYNTHETIC TEST FIXTURE                  01 NOV 26   1TST
+TITLE     SYNTHETIC TWO-CHAIN FIXTURE FOR INSPECTION TESTS, NOT A REAL STRUCTURE
+REMARK   1 HAND-WRITTEN TEST DATA. DO NOT USE FOR ANY SCIENTIFIC PURPOSE.
+MODEL        1
+ATOM      1 N    ALA A   1       1.000   2.000   3.000  1.00 20.00           N
+ATOM      2 CA   ALA A   1       2.000   2.000   3.000  1.00 20.00           C
+ATOM      3 N    GLY A   2       3.000   2.000   3.000  1.00 20.00           N
+ATOM      4 CA  ASER A   5       4.000   2.000   3.000  1.00 20.00           C
+ATOM      5 CA  BSER A   5       4.200   2.100   3.000  1.00 20.00           C
+ATOM      6 N    PHE B   1       5.000   6.000   7.000  1.00 20.00           N
+HETATM    7 C1   LIG B 101       8.000   8.000   8.000  1.00 20.00           C
+HETATM    8 O    HOH B 201       9.000   9.000   9.000  1.00 20.00           O
+HETATM    9 ZN    ZN B 301      10.000  10.000  10.000  1.00 20.00          ZN
+ENDMDL
+END

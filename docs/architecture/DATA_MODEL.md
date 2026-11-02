@@ -31,6 +31,9 @@ erDiagram
     PROJECT ||--o{ COMPOUND : contains
     PROJECT ||--o{ WORKFLOW : owns
     PROJECT ||--o{ RUN : owns
+    PROJECT ||--o{ TARGET : owns
+    PROJECT ||--o{ STRUCTURE : owns
+    TARGET ||--o{ STRUCTURE : describes
     DATASET ||--o{ DATASET_ROW : logs
     DATASET ||--o{ COMPOUND : produces
     WORKFLOW ||--o{ RUN : snapshot_source
@@ -139,15 +142,29 @@ Paths are relative to the run directory and validated against traversal.
 Written for project create/delete, dataset import/delete, workflow save and run
 submission. There is no audit viewer in the UI yet.
 
+### Targets and structures
+
+`targets` and `structures` are exercised by the target service, the HTTP API
+(`/api/v1/projects/{id}/targets`, `/api/v1/projects/{id}/structures`) and the
+`hcs-discovery target` CLI family. A structure row stores the source label, the
+optional accession, the file format, the SHA-256 of the exact bytes that were
+imported and the inspection result (chains, residues, missing-residue gaps,
+ligands, waters, ions, alternate locations, warnings).
+
+The file itself lives under `<data_dir>/uploads/<project>/structures/`. Deleting
+a structure removes the row and the file; deleting a target keeps its structures
+and detaches them (`ON DELETE SET NULL`) rather than destroying evidence.
+
+Only the legacy PDB format is parsed. mmCIF raises `unsupported_format` instead
+of being partially read, because an incomplete structure silently downstream is
+worse than a refusal.
+
 ### Reserved tables
 
-- `targets` — target metadata (gene symbol, UniProt ID, organism, notes).
-- `structures` — structure files with source, accession, format and checksum.
-- `predictions` — endpoint predictions with method, version, unit, direction
+- `predictions` - endpoint predictions with method, version, unit, direction
   and warnings.
 
-These tables are migrated but have no service or UI workflow in 0.1.0. They are
-listed here so the schema is not mistaken for a shipped feature.
+This table is migrated but has no writer and no UI workflow yet.
 
 ## Files on disk
 

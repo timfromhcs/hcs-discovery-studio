@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import secrets
 import uuid
 from datetime import UTC, datetime
@@ -25,11 +26,21 @@ from ..database.base import dispose_engines, get_session_factory, init_db
 from ..workflow.registry import default_registry
 from ..workflow.templates import templates
 from .ratelimit import RateLimiter
-from .routes import agent, compounds, connectors, datasets, models, projects, runs, system, workflows
+from .routes import agent, compounds, connectors, datasets, models, projects, runs, system, targets, workflows
 
 
 def _resolve_web_dist() -> Path | None:
-    """Prefer the SPA bundled in the wheel; fall back to a repo checkout."""
+    """Locate the built single-page application.
+
+    Order: an explicit override, the copy bundled in the wheel, then a checkout.
+    The override exists because a non-editable install puts no ``apps/web/dist``
+    next to the package (for example on a serverless host that builds the frontend
+    separately), so guessing from ``__file__`` alone would silently serve nothing.
+    """
+    override = os.environ.get("HCS_WEB_DIST")
+    if override:
+        candidate = Path(override).expanduser().resolve()
+        return candidate if (candidate / "index.html").is_file() else None
     packaged = Path(__file__).resolve().parents[1] / "web"
     if (packaged / "index.html").is_file():
         return packaged
@@ -51,6 +62,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     configure_logging()
     settings.ensure_dirs()
     init_db(settings)
+    if settings.demo_mode:
+        # Hosted preview: build a real, disposable workspace instead of showing
+        # an empty shell. Failures degrade to an empty app, never to fake data.
+        from ..demo import ensure_demo_workspace
+
+        ensure_demo_workspace(settings)
 
     app = FastAPI(
         title=f"{PRODUCT_NAME} API",
@@ -172,6 +189,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         compounds.router,
         workflows.router,
         runs.router,
+        targets.router,
         models.router,
         connectors.router,
         agent.router,

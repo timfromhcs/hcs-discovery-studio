@@ -41,6 +41,7 @@ blob-report/
 bin/
 *.exe
 data/
+.vercel/
 .e2e-data/
 *.sqlite
 *.sqlite3

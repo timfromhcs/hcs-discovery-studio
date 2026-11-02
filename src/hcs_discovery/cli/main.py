@@ -31,19 +31,28 @@ from ..services import (
     create_project,
     create_run,
     create_run_from_saved_workflow,
+    create_target,
     dataset_rows,
     delete_dataset,
     delete_project,
+    delete_structure,
+    delete_target,
     delete_workflow,
     get_run,
     import_dataset,
+    import_structure,
     list_datasets,
     list_models,
     list_projects,
     list_runs,
+    list_structures,
+    list_targets,
     results_page,
     run_detail,
     save_workflow,
+    structure_detail,
+    target_detail,
+    update_target,
     validate_molecules,
 )
 from ..workflow.schema import validate_workflow
@@ -71,6 +80,7 @@ compounds_app = typer.Typer(help="Molecule utilities.", no_args_is_help=True)
 db_app = typer.Typer(help="Database maintenance.", no_args_is_help=True)
 fetch_app = typer.Typer(help="External public database search (PubChem & ChEMBL).", no_args_is_help=True)
 agent_app = typer.Typer(help="Safe research assistant (Ask, Plan, Run).", no_args_is_help=True)
+target_app = typer.Typer(help="Targets and structures.", no_args_is_help=True)
 
 for name, sub in (
     ("project", project_app),
@@ -85,6 +95,7 @@ for name, sub in (
     ("db", db_app),
     ("fetch", fetch_app),
     ("agent", agent_app),
+    ("target", target_app),
 ):
     app.add_typer(sub, name=name)
 
@@ -300,6 +311,199 @@ def project_delete(
         f"Deleted project {project_id}." if not keep_files else f"Deleted project {project_id}. Run files kept."
     )
     _print(ctx, {"id": project_id, "status": "deleted", "purged_files": not keep_files}, status_msg)
+
+
+# --------------------------------------------------------------------------- targets
+@target_app.command("create")
+def target_create(
+    ctx: typer.Context,
+    project: str = typer.Option(..., "--project", help="Project id."),
+    name: str = typer.Option(..., "--name"),
+    gene: str = typer.Option("", "--gene", help="Gene symbol."),
+    uniprot: str = typer.Option("", "--uniprot", help="UniProt accession."),
+    organism: str = typer.Option("", "--organism"),
+    notes: str = typer.Option("", "--notes"),
+) -> None:
+    """Create a target in a project."""
+    with get_session_factory()() as session:
+        target = _run_cli(
+            create_target,
+            session,
+            project_id=project,
+            name=name,
+            gene_symbol=gene,
+            uniprot_id=uniprot,
+            organism=organism,
+            notes=notes,
+        )
+        payload = target_detail(session, target.id)
+    _print(ctx, payload, f"Created target {payload['id']} ({payload['name']}).")
+
+
+@target_app.command("list")
+def target_list(ctx: typer.Context, project: str = typer.Option(..., "--project")) -> None:
+    with get_session_factory()() as session:
+        items = _run_cli(list_targets, session, project)
+    if _state(ctx).json:
+        typer.echo(json.dumps({"items": items}, indent=2))
+        return
+    if not items:
+        typer.echo("No targets in this project.")
+        return
+    for item in items:
+        accession = f" [{item['uniprot_id']}]" if item.get("uniprot_id") else ""
+        typer.echo(f"{item['id']}  {item['name']}{accession}  {item['structure_count']} structure(s)")
+
+
+@target_app.command("show")
+def target_show(ctx: typer.Context, target_id: str) -> None:
+    with get_session_factory()() as session:
+        payload = _run_cli(target_detail, session, target_id)
+    if _state(ctx).json:
+        typer.echo(json.dumps(payload, indent=2))
+        return
+    typer.echo(f"{payload['id']}  {payload['name']}")
+    for key in ("gene_symbol", "uniprot_id", "organism"):
+        if payload.get(key):
+            typer.echo(f"  {key}: {payload[key]}")
+    if payload.get("notes"):
+        typer.echo(f"  notes: {payload['notes']}")
+    if not payload["structures"]:
+        typer.echo("  no structures")
+    for structure in payload["structures"]:
+        summary = structure.get("summary") or {}
+        typer.echo(
+            f"  - {structure['id']}  {structure['source']}  "
+            f"{summary.get('atom_count')} atoms, {summary.get('waters')} waters  sha256={structure['sha256'][:12]}"
+        )
+
+
+@target_app.command("update")
+def target_update(
+    ctx: typer.Context,
+    target_id: str,
+    name: str = typer.Option(None, "--name"),
+    gene: str = typer.Option(None, "--gene"),
+    uniprot: str = typer.Option(None, "--uniprot"),
+    organism: str = typer.Option(None, "--organism"),
+    notes: str = typer.Option(None, "--notes"),
+) -> None:
+    with get_session_factory()() as session:
+        _run_cli(
+            update_target,
+            session,
+            target_id,
+            name=name,
+            gene_symbol=gene,
+            uniprot_id=uniprot,
+            organism=organism,
+            notes=notes,
+        )
+        payload = target_detail(session, target_id)
+    _print(ctx, payload, f"Updated target {target_id}.")
+
+
+@target_app.command("delete")
+def target_delete(
+    ctx: typer.Context,
+    target_id: str,
+    yes: bool = typer.Option(False, "--yes", help="Skip the confirmation prompt."),
+) -> None:
+    """Delete a target. Its structures are kept and detached."""
+    if not yes:
+        typer.confirm(f"Delete target {target_id}? Its structures are kept and detached.", abort=True)
+    with get_session_factory()() as session:
+        result = _run_cli(delete_target, session, target_id)
+    _print(ctx, result, f"Deleted target {target_id}; detached {result['detached_structures']} structure(s).")
+
+
+@target_app.command("import-structure")
+def target_import_structure(
+    ctx: typer.Context,
+    file: Path = typer.Argument(..., exists=True, dir_okay=False),
+    project: str = typer.Option(..., "--project"),
+    target_id: str = typer.Option("", "--target", help="Attach the structure to this target."),
+    source: str = typer.Option("upload", "--source", help="Where the file came from."),
+    accession: str = typer.Option("", "--accession", help="Source accession, e.g. a PDB id."),
+    license: str = typer.Option("unknown", "--license", help="License of the file."),
+) -> None:
+    """Import a PDB structure with its checksum and inspection report."""
+    with get_session_factory()() as session:
+        structure = _run_cli(
+            import_structure,
+            session,
+            project_id=project,
+            filename=file.name,
+            data=file.read_bytes(),
+            target_id=target_id or None,
+            source=source,
+            accession=accession or None,
+            license=license,
+        )
+        payload = structure_detail(session, structure.id)
+    inspection = payload["inspection"]
+    chains = ", ".join(chain["chain_id"] for chain in inspection["chains"]) or "-"
+    human = (
+        f"Imported {payload['id']} from {file.name}: {inspection['atom_count']} atoms, "
+        f"chains {chains}, {len(inspection['ligands'])} ligand type(s), {inspection['waters']} waters, "
+        f"sha256={payload['sha256'][:16]}."
+    )
+    if inspection["warnings"]:
+        human += "\nWarnings:\n" + "\n".join(f"  - {warning}" for warning in inspection["warnings"])
+    _print(ctx, payload, human)
+
+
+@target_app.command("structures")
+def target_structures(ctx: typer.Context, project: str = typer.Option(..., "--project")) -> None:
+    with get_session_factory()() as session:
+        items = _run_cli(list_structures, session, project)
+    if _state(ctx).json:
+        typer.echo(json.dumps({"items": items}, indent=2))
+        return
+    if not items:
+        typer.echo("No structures in this project.")
+        return
+    for item in items:
+        summary = item.get("summary") or {}
+        typer.echo(
+            f"{item['id']}  {item['source']}  {summary.get('atom_count')} atoms  "
+            f"ligands={len(summary.get('ligands') or [])}  sha256={item['sha256'][:12]}"
+        )
+
+
+@target_app.command("structure")
+def target_structure(ctx: typer.Context, structure_id: str) -> None:
+    with get_session_factory()() as session:
+        payload = _run_cli(structure_detail, session, structure_id)
+    if _state(ctx).json:
+        typer.echo(json.dumps(payload, indent=2))
+        return
+    inspection = payload["inspection"]
+    typer.echo(f"{payload['id']}  {inspection['filename']}  sha256={payload['sha256']}")
+    typer.echo(f"  models: {inspection['model_count']}  atoms: {inspection['atom_count']}")
+    for chain in inspection["chains"]:
+        gaps = f", {chain['missing_residue_count']} missing" if chain["missing_residue_count"] else ""
+        typer.echo(f"  chain {chain['chain_id']}: {chain['residue_count']} residues, {chain['atom_count']} atoms{gaps}")
+    if inspection["ligands"]:
+        typer.echo(f"  ligands: {', '.join(inspection['ligands'])}")
+    if inspection["ions"]:
+        typer.echo(f"  ions: {', '.join(inspection['ions'])}")
+    typer.echo(f"  waters: {inspection['waters']}")
+    for warning in inspection["warnings"]:
+        typer.echo(f"  warning: {warning}")
+
+
+@target_app.command("delete-structure")
+def target_delete_structure(
+    ctx: typer.Context,
+    structure_id: str,
+    yes: bool = typer.Option(False, "--yes", help="Skip the confirmation prompt."),
+) -> None:
+    if not yes:
+        typer.confirm(f"Delete structure {structure_id} and its stored file?", abort=True)
+    with get_session_factory()() as session:
+        result = _run_cli(delete_structure, session, structure_id)
+    _print(ctx, result, f"Deleted structure {structure_id}.")
 
 
 # --------------------------------------------------------------------------- datasets

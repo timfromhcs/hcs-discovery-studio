@@ -58,6 +58,31 @@ hcs-discovery project delete <project-id> --yes
 
 `project delete` removes database rows. Run directories remain on disk.
 
+## Targets and structures
+
+```bash
+hcs-discovery target create --project <project-id> --name EGFR \
+  --gene EGFR --uniprot P00533 --organism "Homo sapiens"
+hcs-discovery target list --project <project-id>
+hcs-discovery target show <target-id>
+hcs-discovery target update <target-id> --notes "Kinase domain construct"
+hcs-discovery target delete <target-id> --yes
+
+hcs-discovery target import-structure receptor.pdb --project <project-id> \
+  --target <target-id> --source rcsb-pdb --accession 1IEP --license "PDB public domain"
+hcs-discovery target structures --project <project-id>
+hcs-discovery target structure <structure-id>
+hcs-discovery target delete-structure <structure-id> --yes
+```
+
+`import-structure` stores the exact bytes, records their SHA-256 and prints the
+inspection: atom count, chains and residues, missing-residue gaps, ligand types,
+waters, ions, alternate locations and warnings. Only legacy PDB is accepted;
+mmCIF fails with `unsupported_format` rather than being half-parsed.
+
+`target delete` keeps its structures and detaches them; `delete-structure`
+removes the database row and the stored file.
+
 ## Datasets
 
 ```bash

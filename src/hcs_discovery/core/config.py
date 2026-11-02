@@ -51,6 +51,10 @@ class Settings(BaseSettings):
     # Required when binding to a non-loopback interface.
     api_token: str | None = None
 
+    # Hosted previews only: build a disposable synthetic workspace on first start.
+    # Off by default; it refuses to touch a data directory that already has projects.
+    demo_mode: bool = False
+
     # Docking receptors are read from ``<data_dir>/receptors``. Absolute paths
     # elsewhere on the host are refused unless a trusted local operator opts in, so
     # an HTTP client cannot make the server read arbitrary files.

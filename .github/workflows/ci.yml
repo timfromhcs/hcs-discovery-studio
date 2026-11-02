@@ -377,6 +377,8 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: Check relative Markdown links
         run: uv run --no-project python scripts/ci/check_links.py
+      - name: Check generated documentation numbers
+        run: uv run --no-project python scripts/ci/check_doc_claims.py
 
   secret-scan:
     name: Secret scanning

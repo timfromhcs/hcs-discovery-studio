@@ -8,6 +8,20 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **Targets and structures with provenance (API + CLI).** The reserved `targets`
+  and `structures` tables now have services, versioned routes
+  (`/api/v1/projects/{id}/targets`, `/api/v1/projects/{id}/structures`) and a
+  `hcs-discovery target` command family. Structure import stores the exact bytes,
+  records their SHA-256 and license, and reports an inspection built without new
+  dependencies: chains, residues, missing-residue gaps, ligand types, waters,
+  ions, alternate locations and warnings. mmCIF is refused with
+  `unsupported_format` instead of being partially parsed.
+  Additive migration `9f3c1a7d2b48` adds `structures.license`; an existing
+  database upgrades with its rows intact and `license='unknown'` rather than a
+  guess.
+  Deleting a target keeps its structures and detaches them; deleting a structure
+  removes the row and the file. No UI page yet, and no binding-site definition or
+  receptor preparation.
 - **HAEL adaptive scheduler (experimental, library only).**
   `src/hcs_discovery/hael/` implements the HCS Adaptive Evidence Ladder: typed
   evidence with unit/endpoint/calibration gates, an acquisition rule
