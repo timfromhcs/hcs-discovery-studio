@@ -81,6 +81,7 @@ db_app = typer.Typer(help="Database maintenance.", no_args_is_help=True)
 fetch_app = typer.Typer(help="External public database search (PubChem & ChEMBL).", no_args_is_help=True)
 agent_app = typer.Typer(help="Safe research assistant (Ask, Plan, Run).", no_args_is_help=True)
 target_app = typer.Typer(help="Targets and structures.", no_args_is_help=True)
+gpu_app = typer.Typer(help="GPU (Vulkan/WebGPU) similarity probe and benchmark.", no_args_is_help=True)
 
 for name, sub in (
     ("project", project_app),
@@ -96,6 +97,7 @@ for name, sub in (
     ("fetch", fetch_app),
     ("agent", agent_app),
     ("target", target_app),
+    ("gpu", gpu_app),
 ):
     app.add_typer(sub, name=name)
 
@@ -1310,6 +1312,31 @@ def agent_run_cmd(
         except AppError as exc:
             _fail(exc)
     _print(ctx, resp.model_dump(), resp.text)
+
+
+@gpu_app.command("probe")
+def gpu_probe() -> None:
+    """Print the GPU adapter the shared kernel would use (JSON)."""
+    from ..gpu.device import probe_gpu
+
+    typer.echo(json.dumps(probe_gpu(), indent=2))
+
+
+@gpu_app.command("bench")
+def gpu_bench(
+    n: int = typer.Option(100_000, "--n", min=64, help="Library size."),
+    repeats: int = typer.Option(5, "--repeats", min=1),
+    out: Path | None = typer.Option(None, "--out", help="Also write the JSON report here."),
+) -> None:
+    """Parity-first benchmark. Exit 1 only on parity failure; no GPU is 'skipped' (exit 0)."""
+    from ..gpu.bench import run_bench, write_report
+
+    report = run_bench(n_library=n, repeats=repeats)
+    if out is not None:
+        write_report(report, out)
+    typer.echo(json.dumps(report, indent=2))
+    if report["status"] == "failed":
+        raise typer.Exit(1)
 
 
 @app.command("version")

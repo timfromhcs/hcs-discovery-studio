@@ -43,6 +43,14 @@ def diagnostics(
     return run_diagnostics(settings, check_providers=check_providers, check_vulkan=check_vulkan)
 
 
+@router.get("/gpu")
+def gpu_probe() -> dict:
+    """Which hardware adapter the shared Tanimoto kernel would use (no benchmark)."""
+    from ...gpu.device import probe_gpu
+
+    return probe_gpu()
+
+
 @router.get("/settings")
 def settings_view(settings: Settings = Depends(settings_dep)) -> dict:
     runs_size = sum(path.stat().st_size for path in settings.runs_dir.rglob("*") if path.is_file())

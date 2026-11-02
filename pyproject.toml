@@ -34,6 +34,7 @@ dependencies = [
 
 [project.optional-dependencies]
 llm = ["httpx>=0.27"]
+gpu = ["wgpu>=0.32", "numpy>=2"]
 
 [project.scripts]
 hcs-discovery = "hcs_discovery.cli.main:cli"
@@ -47,6 +48,7 @@ dev = [
   "mypy>=1.10",
   "hypothesis>=6.100",
   "types-PyYAML>=6.0",
+  "wgpu>=0.32",
 ]
 
 [build-system]
@@ -106,6 +108,7 @@ markers = [
   "slow: long-running test",
   "scientific: scientific validation/benchmark, not a correctness proof",
   "e2e: browser end-to-end test",
+  "gpu: needs a hardware GPU adapter (auto-skipped without one)",
 ]
 filterwarnings = ["error::DeprecationWarning:hcs_discovery.*"]
 
