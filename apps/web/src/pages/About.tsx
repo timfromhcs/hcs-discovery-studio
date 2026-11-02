@@ -26,8 +26,16 @@ const LIMITS: Array<{ title: string; body: string }> = [
     body: "Composite scores and Pareto fronts order compounds according to the objectives and weights you chose. A high rank is not evidence of binding, selectivity, safety, efficacy, bioavailability or clinical utility.",
   },
   {
-    title: "No docking, ADMET or structure prediction",
-    body: "This release has no docking engine, no ADMET model, no protein structure prediction, no generative design and no 3D conformer generation. Model-registry entries for these are marked planned and cannot be queued.",
+    title: "Docking is a CPU baseline, not a benchmark",
+    body: "AutoDock Vina docking runs locally when the official binary is installed, and is reference-tested on one complex (PDB 1IEP). It is not benchmarked across targets and does not prove binding affinity.",
+  },
+  {
+    title: "Property estimates are approximations",
+    body: "A reduced ESOL logS equation and a CNS MPO approximation run locally. ESOL is weak on the independent challenge set (R² 0.07); CNS MPO is labelled an approximation, not a BBB probability.",
+  },
+  {
+    title: "No MD, learned ADMET or structure prediction",
+    body: "Molecular dynamics (OpenMM), learned ADMET (Chemprop) and structure prediction (Boltz-2, Chai-1) are marked planned in the model registry and cannot be queued in this release.",
   },
   {
     title: "Rules are explicitly yours",
@@ -135,7 +143,7 @@ export function AboutPage() {
       <section className="stats-grid" aria-label="Release facts">
         <Stat label="Workflow nodes" value={catalog.data?.items.length ?? "—"} icon="workflow" hint="Generated from the live registry" />
         <Stat label="Runnable engines" value={runnable ?? "—"} icon="models" hint="Passed local runtime checks" />
-        <Stat label="Remote connectors" value="0" icon="external" hint="By design in this release" />
+        <Stat label="Data connectors" value="2" icon="external" hint="PubChem + ChEMBL, policy-gated offline" />
         <Stat label="Data stays" value={about.data?.local_first === false ? "Remote" : "Local"} icon="shield" hint="SQLite, uploads and artifacts" />
       </section>
 
