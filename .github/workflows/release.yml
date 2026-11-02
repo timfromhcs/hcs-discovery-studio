@@ -114,7 +114,10 @@ jobs:
           cache: npm
           cache-dependency-path: apps/web/package-lock.json
       - name: Install dependencies
-        run: uv sync --frozen
+        run: |
+          uv sync --frozen
+          # Build-only tool; kept out of the lockfile (GPL bootloader exception).
+          uv pip install "pyinstaller==6.22.3"
       - name: Build and smoke-test the executable
         run: uv run python scripts/release/build_executable.py
       - name: Upload the executable

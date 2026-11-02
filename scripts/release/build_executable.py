@@ -12,6 +12,11 @@ Run from the repository root:
 
 Requires the frontend to be built first (``npm ci && npm run build`` in
 ``apps/web``) unless ``--skip-build`` is given.
+
+PyInstaller is a build-only tool and is deliberately kept out of the lockfile
+(its bootloader is GPL-with-exception). Install it into the environment first:
+
+    uv pip install "pyinstaller==6.22.3"
 """
 
 from __future__ import annotations
