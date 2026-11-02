@@ -85,9 +85,49 @@ jobs:
             exit 1
           fi
 
+  build-executable:
+    name: Build the one-file Windows executable
+    needs: verify
+    runs-on: windows-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      SHA: ${{ needs.verify.outputs.sha }}
+    steps:
+      - name: Check out the verified commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.verify.outputs.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+      - name: Install Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Install dependencies
+        run: uv sync --frozen
+      - name: Build and smoke-test the executable
+        run: uv run python scripts/release/build_executable.py
+      - name: Upload the executable
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: hcs-discovery-exe
+          path: build/exe-dist/hcs-discovery.exe
+          if-no-files-found: error
+          retention-days: 1
+
   publish:
     name: Build, smoke-test, attest and publish
-    needs: verify
+    needs: [verify, build-executable]
     runs-on: ubuntu-latest
     timeout-minutes: 40
     permissions:
@@ -163,6 +203,11 @@ jobs:
           curl -fsS http://127.0.0.1:8795/api/v1/health | grep -q "\"version\":\"$expected\""
           curl -fsS http://127.0.0.1:8795/api/v1/ready
           curl -fsS http://127.0.0.1:8795/ | grep -q 'id="root"'
+      - name: Download the one-file executable
+        uses: actions/download-artifact@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          name: hcs-discovery-exe
+          path: dist
       - name: Generate a CycloneDX SBOM
         run: |
           export SOURCE_DATE_EPOCH="$(git log -1 --format=%ct)"
@@ -174,12 +219,14 @@ jobs:
       - name: Write checksums
         run: |
           cd dist
-          sha256sum ./*.whl sbom.cdx.json > SHA256SUMS.txt
+          sha256sum ./*.whl ./*.exe sbom.cdx.json > SHA256SUMS.txt
           cat SHA256SUMS.txt
-      - name: Attest build provenance for the wheel
+      - name: Attest build provenance for the release artifacts
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
-          subject-path: dist/*.whl
+          subject-path: |
+            dist/*.whl
+            dist/*.exe
       - name: Upload assets to a draft release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -198,7 +245,7 @@ jobs:
             NOTES=(--generate-notes)
           fi
           gh release create "$RELEASE_TAG" \
-            dist/*.whl dist/sbom.cdx.json dist/SHA256SUMS.txt \
+            dist/*.whl dist/*.exe dist/sbom.cdx.json dist/SHA256SUMS.txt \
             --repo "$GITHUB_REPOSITORY" \
             --draft \
             --verify-tag \
