@@ -552,6 +552,62 @@ Worked through GEMINI.md again from the merged `main`.
 - Not done: target UI page, binding-site/box definition, receptor preparation,
   UniProt/RCSB metadata connectors, E2E journey.
 
+## 2026-11-02 — R0.1/R0.3/R0.5/R0.6: gate runner, generated numbers, preview smoke
+
+- Branch/SHA: `feat/target-explorer-api` @ `1efca60` after merging `origin/main`
+  (`4e5b625`, dependabot #12); worktree dirty with exactly the files below.
+- Hypothese (falsifizierbar): Ein einziger lokaler Gate-Runner, der `ci.yml`
+  spiegelt, und Zahlen, die aus dem Messbericht generiert werden, beenden die
+  Dokumentationsdrift aus F5 — und ein absichtlich veralteter Wert wird rot.
+- Geändert:
+  - `scripts/gates.py` — Gate-Runner mit G0–G14, Leveln `fast|full|science|release`,
+    `--only`, `--json`, `--keep-going`; schreibt `build/gate-report.json` mit SHA,
+    Dirty-Flag, Level, je Gate Befehl/Exit/Dauer/Kurzfassung. Gates, die ein
+    optionales Werkzeug brauchen (`gitleaks`), werden `skipped` mit Grund, nie
+    `passed`. Jede App-Gate bekommt ein Wegwerf-`HCS_DATA_DIR` (F6).
+  - `scripts/gates_wheel.py` — Wheel-Install/Smoke/Metadaten ohne Bash, damit G8
+    auch auf Windows dasselbe prüft wie der Linux-CI-Job.
+  - `scripts/ci/check_doc_claims.py` — generierte Blöcke
+    `<!-- gen:tests -->…<!-- /gen:tests -->` und `gen:coverage` in README,
+    `IMPLEMENTATION_STATUS.md`, `RELEASE_EVIDENCE.md`; `--write` rendert sie aus
+    `build/junit.xml` + `build/coverage.json`, ohne `--write` wird nur geprüft.
+  - `scripts/ci/smoke_preview.py` — liest Health/Ready/SPA, Projektliste,
+    Demo-Projekt, einen beendeten Run und das Wort „synthetic"; schreibt nichts.
+  - `docs/engineering/evidence.json` — die eine Quelle der Zahlen.
+  - `.github/workflows/ci.yml` — der Docs-Job ruft zusätzlich
+    `check_doc_claims.py` auf, damit die Drift auch in der Cloud auffällt.
+  - Tests: `tests/unit/test_gates_runner.py` (6), `tests/unit/test_doc_claims.py`
+    (5), `tests/unit/test_smoke_preview.py` (5).
+- Befehle und Ergebnis:
+  - `uv run python scripts/ci/check_doc_claims.py` → exit 1:
+    „gen:tests says '426 passed, 2 skipped', measured is '432 passed, 2 skipped'"
+    (der absichtlich stehen gelassene alte Wert), danach `--write` → exit 0. Das ist
+    die Abnahme aus R0.5, rot vor grün beobachtet.
+  - `uv run python scripts/gates.py --level fast` → exit 0 (G1–G4 grün).
+  - `uv run python scripts/gates.py --level full --keep-going` → erster Lauf exit 1:
+    G10 scheiterte, weil `pip-audit` lokal nicht installiert ist; Gate auf
+    `uvx --from pip-audit==2.10.1 … --strict` umgestellt (genau der CI-Befehl),
+    danach G10 grün. Zweiter Gesamtlauf: G0–G11 grün, G13 `skipped`
+    (`gitleaks` fehlt lokal), Laufzeit ≈ 2 min ohne G12.
+  - `uv run pytest -q tests/unit/test_gates_runner.py tests/unit/test_doc_claims.py
+    tests/unit/test_smoke_preview.py` → 16 passed.
+  - `uv run ruff format --check .` / `ruff check .` / `mypy` → grün über die
+    getrackten Dateien; `PLAN.md` und `AGENTS.md` bleiben bewusst untracked und
+    werden vom Runner ausgenommen, weil CI sie nie sieht.
+- Evidenz: `build/gate-report.json` (Level `full`, SHA `1efca60`),
+  `docs/engineering/evidence.json` (442 passed, 2 skipped, 81,4 % Branch-Coverage).
+- Nicht getan / Restrisiko:
+  - R0.2 (PR #10 schneiden) braucht Owner-Entscheidung D2.
+  - R0.4 (Vina lokal) nicht ausgeführt: kein Binary auf diesem Host, das
+    Wissenschafts-Gate bleibt `NOT RUN` und steht so in `RELEASE_EVIDENCE.md`.
+  - R0.6 ist als Skript fertig und getestet, aber gegen keine echte Preview-URL
+    gelaufen — die Verknüpfung des Vercel-Projekts ist D7.
+  - R0.7 (RC-Commit, Tags) ist vorbereitet, aber Tag und Release sind D1 und
+    werden nicht autonom ausgelöst.
+  - PR #11 (dependabot, Python-Minor) bleibt offen: der Release-Kandidat wird nach
+    Pfad A von `f023c70` geschnitten, das Lockfile dort ist stabil; die
+    Entscheidung darüber gehört zum Release-Termin.
+
 ## Blockers
 
 - None technical at the time of writing. The `v0.1.0` preview is published and

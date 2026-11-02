@@ -81,8 +81,11 @@ test or a recorded manual check; it does not mean validated science.
 
 - Self-contained wheel bundling the built SPA; smoke-tested locally on port 8793
   and by the CI wheel job.
-- 421 backend tests passing locally with a Vina binary installed (419 passed +
-  2 skipped without one, 1 network test deselected), and in CI.
+- <!-- gen:tests -->443 passed, 2 skipped<!-- /gen:tests --> backend tests on the
+  development host (the two skips are the live docking tests, which need a Vina
+  binary), and the same suite in CI on Linux with the binary installed.
+- <!-- gen:coverage -->81 % branch coverage<!-- /gen:coverage --> locally; the CI floor
+  is 70 %.
 - 3 Playwright end-to-end tests passing locally and in CI.
 - Ruff format/check and mypy clean locally and in CI.
 - Frontend typecheck and production build clean locally and in CI.
@@ -153,7 +156,7 @@ Evidence below was produced on `main` at commit `12febcf` and re-run locally on
 | Gate | Status | Evidence |
 |---|---|---|
 | Lint, format, types | Pass locally and in CI | Ruff, mypy (89 source files) |
-| Backend tests | Pass locally and in CI | 421 passed with a Vina binary (419 passed + 2 skipped without one, 1 network test deselected); 81% branch coverage; Hypothesis properties for ranking and joins; HAEL modules ≥94% |
+| Backend tests | Pass locally and in CI | <!-- gen:tests -->443 passed, 2 skipped<!-- /gen:tests --> on the development host (the skips are the live docking tests); <!-- gen:coverage -->81 % branch coverage<!-- /gen:coverage -->; Hypothesis properties for ranking and joins; HAEL modules ≥94% |
 | Frontend build and E2E | Pass locally and in CI | typecheck, build, 3 Playwright tests on isolated data |
 | Visual QA | Pass locally | `apps/web/scripts/visual_qa.mjs`: 18 routes × 6 widths (incl. 640 px = 200% zoom) × 2 themes = 192 captures, WCAG AA text contrast, heading order, keyboard focus; screenshots reviewed by hand |
 | Fresh migration and wheel | Pass locally and in CI | Wheel ships Alembic scripts and records a revision; wheel installed into a clean venv and completed db upgrade → project → import → run → results |

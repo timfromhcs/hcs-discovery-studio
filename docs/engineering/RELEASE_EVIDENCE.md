@@ -9,6 +9,22 @@ was **not** run.
 
 ---
 
+## Re-measurement 2026-11-02 (branch `feat/target-explorer-api` @ `76617ad`)
+
+Produced by the gate runner, not by hand: `uv run python scripts/gates.py --level fast
+--only G4` writes `build/junit.xml` and `build/coverage.json`, and
+`uv run python scripts/ci/check_doc_claims.py --write` renders the numbers below into
+every document that quotes them. The historical rows further down are kept as the record
+of that earlier run; they are not edited retroactively.
+
+| Measurement | Command | Observed |
+|---|---|---|
+| Tests (no docking binary on this host) | `uv run pytest -q` via G4 | <!-- gen:tests -->443 passed, 2 skipped<!-- /gen:tests --> |
+| Coverage | same run, `--cov-branch` | <!-- gen:coverage -->81 % branch coverage<!-- /gen:coverage --> |
+| Tests with the docking binary | `HCS_REQUIRE_VINA=1 uv run pytest tests/scientific/test_vina_adapter.py` | **NOT RUN** locally: no Vina binary is installed on this host (PLAN.md R0.4) |
+
+---
+
 ## v2.0.0 — Stable (unpublished as of 2026-11-01)
 
 ### Identity

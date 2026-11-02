@@ -204,8 +204,8 @@ never labels a model Vulkan-compatible unless that adapter has a real probe.
 
 | Gate | Command | Result |
 |---|---|---|
-| Backend tests | `uv run pytest -q` | 421 passed with a Vina binary installed; 419 passed + 2 skipped without one (the skips are the live docking tests). Same in CI |
-| Coverage | `uv run pytest --cov=hcs_discovery --cov-branch` | 81% branch coverage locally; CI floor 70%, HAEL modules ≥94% |
+| Backend tests | `uv run pytest -q` | <!-- gen:tests -->443 passed, 2 skipped<!-- /gen:tests --> on the development host, where the two skips are the live docking tests that need a Vina binary; CI runs them on Linux |
+| Coverage | `uv run pytest --cov=hcs_discovery --cov-branch` | <!-- gen:coverage -->81 % branch coverage<!-- /gen:coverage --> locally; CI floor 70%, HAEL modules ≥94% |
 | Python format/lint/type | `uv run ruff format --check .`, `uv run ruff check .`, `uv run mypy` | Clean locally and in CI |
 | Frontend typecheck/build | `npm run typecheck`, `npm run build` in `apps/web` | Clean locally and in CI |
 | End-to-end | `npm run test:e2e` in `apps/web` | 3 passed locally and in CI |
