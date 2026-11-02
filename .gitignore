@@ -67,3 +67,6 @@ Thumbs.db
 tmp/
 *.tmp
 *.log
+
+# Vercel CLI local link (the linked project is created with `vercel link`)
+.env.local
