@@ -35,6 +35,31 @@ All notable changes to this project are documented here. The format follows
   `docs/research/HAEL.md`.
 - **Research register.** `docs/research/RESEARCH_REGISTER.md` records each open or
   answered research question with its evidence, including negative results.
+- **Hosted preview on Vercel.** A `vercel.json` build, a root `app.py` entrypoint
+  and `src/hcs_discovery/demo.py` serve a disposable demo workspace
+  (`HCS_DEMO_MODE=true`): the instance imports the checked-in synthetic library
+  and runs the triage template through the real worker. State lives in `/tmp` and
+  is disposable by construction, and seeding refuses to overwrite a real project.
+  This is a preview, not a production service.
+- **Unified gate runner and generated documentation numbers.**
+  `scripts/gates.py` mirrors `.github/workflows/ci.yml` (gates G0–G14) and writes
+  `build/gate-report.json`, so "green locally" and "green in CI" mean the same
+  thing. `scripts/ci/check_doc_claims.py` owns the measured test and coverage
+  numbers (`docs/engineering/evidence.json`) so the README, implementation
+  ledger and release evidence can no longer drift from the build.
+- **Browser capability detection (WebGPU / WebAssembly).** The Settings page
+  reports, client-side, whether the browser exposes WebGPU and WebAssembly —
+  hardware presence only, mirroring the backend Vulkan probe. No scientific
+  engine executes through the browser in this release.
+
+### Fixed
+
+- The About page "Limitations register" claimed docking, ADMET and structure
+  prediction were all absent and that there were zero remote connectors. It now
+  distinguishes Vina docking (host-dependent) and the reduced ESOL / CNS-MPO
+  estimates (approximate) from the still-planned MD, learned ADMET and structure
+  prediction, and reports the two policy-gated data connectors (PubChem,
+  ChEMBL).
 
 ## [2.0.0] - 2026-10-29
 

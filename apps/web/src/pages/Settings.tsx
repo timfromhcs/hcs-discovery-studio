@@ -18,6 +18,8 @@ import {
   useToast,
 } from "../components/ui";
 import { formatBytes, formatDate } from "../lib/format";
+import { useBrowserCapabilities } from "../lib/browserCapabilities";
+import { BrowserChemistry } from "../components/BrowserChemistry";
 
 const ENV_VARS: Array<{ name: string; description: string }> = [
   { name: "HCS_DATA_DIR", description: "Database, uploads, artifacts and cache directory (default ./data)." },
@@ -43,6 +45,7 @@ export function SettingsPage() {
   const [providers, setProviders] = useState(false);
   const [vulkan, setVulkan] = useState(false);
   const diagnostics = useDiagnostics({ providers, vulkan });
+  const browser = useBrowserCapabilities();
   const clearCache = useClearCache();
   const { notify } = useToast();
   const [confirmClear, setConfirmClear] = useState(false);
@@ -224,6 +227,50 @@ export function SettingsPage() {
           </>
         ) : null}
       </Card>
+
+      <Card>
+        <CardHeader
+          title="Browser capabilities"
+          subtitle="Detected in this browser, not asserted. No scientific engine runs client-side in this release."
+          icon="cpu"
+        />
+        {browser ? (
+          <>
+            <KeyValue
+              items={[
+                { label: "WebAssembly", value: browser.webassembly ? "supported" : "not supported", mono: true },
+                { label: "WebGPU", value: browser.webgpu.supported ? "available" : "not available", mono: true },
+                {
+                  label: "WebGPU adapter",
+                  value:
+                    browser.webgpu.adapterName ??
+                    (browser.webgpu.adapterAvailable
+                      ? browser.webgpu.fallbackAdapter
+                        ? "software adapter"
+                        : "adapter found"
+                      : "none"),
+                  mono: true,
+                },
+                {
+                  label: "WebGPU compute",
+                  value: browser.webgpu.computeVerified
+                    ? `verified${browser.webgpu.maxComputeInvocations ? ` (${browser.webgpu.maxComputeInvocations}/workgroup)` : ""}`
+                    : "not verified",
+                  mono: true,
+                },
+              ]}
+            />
+            <InlineNotice tone="info" title="Capability detection only">
+              WebGPU and WebAssembly are probed as platform features. Scientific compute (RDKit, docking, property
+              estimates) still runs on the local backend CPU; no model executes through the browser in this release.
+            </InlineNotice>
+          </>
+        ) : (
+          <p className="muted small">Probing browser capabilities…</p>
+        )}
+      </Card>
+
+      <BrowserChemistry />
 
       <Card>
         <CardHeader title="Environment variables" subtitle="Set these before starting the service; the UI never writes them." icon="settings" />

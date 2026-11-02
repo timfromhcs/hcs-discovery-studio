@@ -1,16 +1,9 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "npm --prefix apps/web ci && npm --prefix apps/web run build",
-  "env": {
-    "HCS_DATA_DIR": "/tmp/hcs",
-    "HCS_DEMO_MODE": "true",
-    "HCS_WEB_DIST": "/var/task/apps/web/dist",
-    "HCS_NETWORK_POLICY": "local"
-  },
-  "functions": {
-    "app.py": {
-      "maxDuration": 60,
-      "excludeFiles": "{tests/**,docs/**,apps/web/node_modules/**,apps/web/src/**,apps/web/e2e/**,apps/web/scripts/**,apps/web/test-results/**,apps/web/playwright-report/**,.github/**,.git/**,data/**,dist/**,**/__pycache__/**,**/*.pyc}"
-    }
-  }
+  "outputDirectory": "apps/web/dist",
+  "framework": "vite",
+  "rewrites": [
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
+  ]
 }

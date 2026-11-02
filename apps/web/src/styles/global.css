@@ -3912,3 +3912,35 @@ svg {
     scroll-behavior: auto !important;
   }
 }
+
+/* ------------------------------------------------------- browser chemistry */
+.browser-chem {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  margin-top: 4px;
+}
+
+.browser-chem-svg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius, 10px);
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.browser-chem-svg svg {
+  max-width: 100%;
+  height: auto;
+}
+
+@media (min-width: 720px) {
+  .browser-chem {
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    align-items: start;
+  }
+}
