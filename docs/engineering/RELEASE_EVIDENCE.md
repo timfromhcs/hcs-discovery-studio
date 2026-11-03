@@ -40,8 +40,8 @@ of that earlier run; they are not edited retroactively.
 
 | Measurement | Command | Observed |
 |---|---|---|
-| Tests (no docking binary on this host) | `uv run pytest -q` via G4 | <!-- gen:tests -->554 passed, 0 skipped<!-- /gen:tests --> |
-| Coverage | same run, `--cov-branch` | <!-- gen:coverage -->82 % branch coverage<!-- /gen:coverage --> |
+| Tests (no docking binary on this host) | `uv run pytest -q` via G4 | <!-- gen:tests -->567 passed, 0 skipped<!-- /gen:tests --> |
+| Coverage | same run, `--cov-branch` | <!-- gen:coverage -->83 % branch coverage<!-- /gen:coverage --> |
 | Tests with the docking binary | `HCS_REQUIRE_VINA=1 uv run pytest tests/scientific/test_vina_adapter.py` | **NOT RUN** locally: no Vina binary is installed on this host (PLAN.md R0.4) |
 
 ---

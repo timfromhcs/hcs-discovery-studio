@@ -5,8 +5,8 @@ Do not edit by hand: re-run the script on the host you want to describe.
 
 | Item | Value |
 |---|---|
-| Date | 2026-11-03 01:35:14Z |
-| Commit | `5dc23cf` |
+| Date | 2026-11-03 06:35:32Z |
+| Commit | `064a7f4` |
 | Host | AMD64 Family 25 Model 68 Stepping 1, AuthenticAMD · Windows 11 AMD64 |
 | Adapter | AMD Radeon(TM) Graphics |
 | Backend | Vulkan |
@@ -19,10 +19,33 @@ Median of 5 repetitions, milliseconds, end-to-end (upload, dispatch,
 readback). "GPU resident" keeps the library in a storage buffer and moves only the
 256-byte query.
 
-| Library | numpy CPU | RDKit ms | GPU upload | GPU resident | GPU+CPU hybrid | hybrid vs upload | speed-up | Parity | err |
+| Library | numpy CPU | RDKit ms | GPU upload | GPU resident | GPU+CPU hybrid | vs upload | speed-up | Parity | err |
 |---|---|---|---|---|---|---|---|---|---|
-| 100,000 | 187.2 | 16.3 | 43.1 | 1.4 | 41.9 | 1.03x | 11.5x | exact | 0.0e+00 |
-| 500,000 | 1,238.5 | 93.5 | 233.1 | 6.5 | 213.9 | 1.09x | 14.4x | exact | 0.0e+00 |
+| 100,000 | 191.8 | 21.8 | 49.2 | 2.1 | 39.8 | 1.24x | 10.4x | exact | 0.0e+00 |
+| 500,000 | 1,220.8 | 131.4 | 232.8 | 5.6 | 223.2 | 1.04x | 23.4x | exact | 0.0e+00 |
+
+## Threshold search with the BitBound prefilter
+
+A query with `a` set bits and a library fingerprint with `b` bits has
+`Tanimoto ≤ min(a, b) / max(a, b)`, so fingerprints whose bound is below the
+threshold are skipped without a comparison. The remaining candidates are scored
+by the same kernel, and the hits are identical to a full scan (differential tests
+in `tests/unit/test_similarity_search.py`).
+
+| Library | Density | Threshold | Candidates scored | Share | Hits | ms |
+|---|---|---|---|---|---|---|
+| 100,000 | uniform | 0.4 | 100,000 | 100.00 % | 1 | 82.22 |
+| 100,000 | uniform | 0.7 | 100,000 | 100.00 % | 1 | 81.44 |
+| 100,000 | uniform | 0.9 | 99,755 | 99.76 % | 1 | 76.09 |
+| 100,000 | varied | 0.4 | 67,996 | 68.00 % | 1 | 54.92 |
+| 100,000 | varied | 0.7 | 34,618 | 34.62 % | 0 | 22.31 |
+| 100,000 | varied | 0.9 | 12,345 | 12.35 % | 0 | 9.58 |
+| 500,000 | uniform | 0.4 | 500,000 | 100.00 % | 1 | 476.93 |
+| 500,000 | uniform | 0.7 | 500,000 | 100.00 % | 1 | 478.26 |
+| 500,000 | uniform | 0.9 | 490,639 | 98.13 % | 1 | 465.78 |
+| 500,000 | varied | 0.4 | 332,689 | 66.54 % | 1 | 311.27 |
+| 500,000 | varied | 0.7 | 159,465 | 31.89 % | 0 | 160.19 |
+| 500,000 | varied | 0.9 | 44,139 | 8.83 % | 0 | 34.57 |
 
 ## What this does and does not establish
 
@@ -36,6 +59,17 @@ readback). "GPU resident" keeps the library in a storage buffer and moves only t
   on the host named above. It is not a comparison with CUDA implementations such as
   nvMolKit, and it says nothing about discrete GPUs, other vendors or larger than
   memory libraries.
+- **Hybrid is a small, measured win here.** Splitting the library between the GPU and
+  CPU threads (the `--boost hybrid` mode, or `auto` when a calibration says the CPU
+  share can keep up) is 1.03–1.09× faster than the same GPU upload path on this host.
+  It is reported as measured; it is not a promise, and on a fast discrete GPU the
+  calibration will keep `auto` on GPU-only.
+- **BitBound only pays when bit counts vary.** The prefilter skips fingerprints whose
+  popcount bound `min(a,b)/max(a,b)` is below the threshold. On this synthetic
+  uniform-density library almost nothing is pruned; on the density-varied one
+  (random prefix of words, standing in for molecule size) it prunes 32–88 % and the
+  search gets 1.5–8× faster. Both rows are synthetic and the report says so; the
+  differential tests prove the hits are identical to a full scan.
 - **Not benchmarked:** GPU fingerprint generation (RDKit computes fingerprints on the
   CPU), popcount-bound prefilters, and multi-query batches. The kernel scans the whole
   library per query.

@@ -301,3 +301,30 @@ def test_similarity_engines_endpoint_reports_the_kernel(client):
     assert payload["fingerprint"] == {"type": "morgan", "radius": 2, "bits": 2048}
     assert payload["boost_modes"] == ["auto", "gpu", "cpu", "hybrid"]
     assert payload["probe"]["status"] in {"available", "software_only", "unavailable"}
+
+
+def test_similarity_api_prefilter_reports_candidates(client, monkeypatch):
+    from hcs_discovery.similarity import clear_device_cache
+
+    monkeypatch.setattr(
+        "hcs_discovery.similarity.probe_gpu",
+        lambda: {"status": "software_only", "detail": "No hardware GPU adapter was found."},
+    )
+    clear_device_cache()
+    project = _create_project(client)
+    dataset = _import(client, project["id"])
+    response = client.post(
+        "/api/v1/similarity/search",
+        json={
+            "dataset_id": dataset["id"],
+            "query_smiles": "c1ccccc1",
+            "threshold": 0.5,
+            "engine": "cpu",
+        },
+    )
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["prefilter"]["enabled"] is True
+    assert payload["prefilter"]["candidates"] <= payload["prefilter"]["library"]
+    assert payload["hits"][0]["similarity"] == 1.0
+    clear_device_cache()

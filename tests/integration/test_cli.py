@@ -279,3 +279,55 @@ def test_sat_select_reports_selection_and_conflict(settings):
     )
     assert conflict.exit_code == 5
     assert json.loads(conflict.stdout)["satisfiable"] is False
+
+
+def test_similarity_search_uses_the_prefilter_only_without_full_scores(settings, tmp_path: Path):
+    library = tmp_path / "library.csv"
+    library.write_text(
+        "name,smiles\nBenzene,c1ccccc1\nAspirin,CC(=O)Oc1ccccc1C(=O)O\nEthanol,CCO\n",
+        encoding="utf-8",
+    )
+    pruned = _json(
+        runner.invoke(
+            app,
+            [
+                "--json",
+                "similarity",
+                "search",
+                "--query",
+                "c1ccccc1",
+                "--file",
+                str(library),
+                "--threshold",
+                "0.5",
+                "--engine",
+                "cpu",
+            ],
+        )
+    )
+    assert pruned["prefilter"]["enabled"] is True
+    assert pruned["prefilter"]["candidates"] <= pruned["prefilter"]["library"]
+    assert [hit["name"] for hit in pruned["hits"]] == ["Benzene"]
+
+    with_scores = _json(
+        runner.invoke(
+            app,
+            [
+                "--json",
+                "similarity",
+                "search",
+                "--query",
+                "c1ccccc1",
+                "--file",
+                str(library),
+                "--threshold",
+                "0.5",
+                "--engine",
+                "cpu",
+                "--output",
+                str(tmp_path / "scores.csv"),
+            ],
+        )
+    )
+    assert with_scores["prefilter"]["enabled"] is False
+    assert [hit["name"] for hit in with_scores["hits"]] == ["Benzene"]

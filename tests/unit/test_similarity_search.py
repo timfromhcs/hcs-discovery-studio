@@ -229,3 +229,76 @@ def test_hybrid_without_hardware_falls_back_to_cpu(monkeypatch):
     with TanimotoIndex(SMILES, prefer="auto", boost="hybrid") as index:
         assert index.engine.name == "cpu"
         assert "No hardware GPU adapter" in index.engine.detail
+
+
+# --------------------------------------------------------------------------- BitBound
+VARIED_LIBRARY = [
+    "c1ccccc1",
+    "Cc1ccccc1",
+    "Clc1ccccc1",
+    "Oc1ccccc1",
+    "Nc1ccccc1",
+    "CCO",
+    "CCN",
+    "CC(=O)Oc1ccccc1C(=O)O",
+    "CC(C)Cc1ccc(cc1)C(C)C(=O)O",
+    "CN1CCC[C@H]1c1cccnc1",
+    "CN1C=NC2=C1C(=O)N(C(=O)N2C)C",
+    "c1ccc2c(c1)cc[nH]2",
+    "COc1ccc2[nH]cc(CCNC(C)=O)c2c1",
+    "CC1=CC=C(C=C1)S(=O)(=O)N",
+    "O=C(O)c1ccccc1O",
+    "CC(=O)Nc1ccc(O)cc1",
+] * 2  # duplicates make the tie-breaking and the bound interesting
+
+
+@pytest.mark.parametrize("threshold", [0.0, 0.05, 0.2, 0.4, 0.7, 0.9, 1.0])
+def test_threshold_prefilter_returns_exactly_the_full_scan(threshold):
+    with TanimotoIndex(VARIED_LIBRARY, prefer="cpu") as index:
+        full = index.search(QUERY, threshold=threshold)
+        pruned = index.threshold_hits(QUERY, threshold)
+    assert [(hit.index, hit.similarity) for hit in pruned.hits] == [(hit.index, hit.similarity) for hit in full.hits]
+    assert pruned.candidates <= len(VARIED_LIBRARY)
+    assert pruned.prefiltered is (threshold > 0)
+
+
+def test_threshold_prefilter_can_skip_the_whole_library():
+    with TanimotoIndex(["CCO", "CCN", "CCC"], prefer="cpu") as index:
+        result = index.threshold_hits("c1ccccc1", 0.9)
+    assert result.hits == ()
+    assert result.candidates == 0
+    assert result.timings_ms["score"] == 0.0
+
+
+def test_threshold_zero_does_not_pretend_to_prune():
+    with TanimotoIndex(VARIED_LIBRARY, prefer="cpu") as index:
+        result = index.threshold_hits(QUERY, 0.0)
+    assert result.prefiltered is False
+    assert result.candidates == len(VARIED_LIBRARY)
+
+
+def test_the_bound_never_excludes_a_true_hit():
+    rng = np.random.default_rng(11)
+    for _ in range(15):
+        library = rng.integers(0, 2**32, size=(40, 64), dtype=np.uint64).astype(np.uint32)
+        index = TanimotoIndex.from_packed(library, prefer="cpu", verify=False)
+        query = library[rng.integers(0, 40)]
+        inter, union = index.counts_for(query)
+        actual = np.divide(inter, union, out=np.zeros(len(library)), where=union > 0)
+        a = int(np.unpackbits(query.view(np.uint8), bitorder="little").sum())
+        b = np.unpackbits(library.view(np.uint8), axis=1, bitorder="little").sum(axis=1)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            bound = np.where((a > 0) & (b > 0), np.minimum(a, b) / np.maximum(a, b), 0.0)
+        assert np.all(actual <= bound + 1e-12), "the BitBound must be an upper bound"
+        index.close()
+
+
+@pytest.mark.gpu
+def test_gpu_threshold_prefilter_matches_the_cpu_full_scan():
+    if select_adapter() is None:
+        pytest.skip("no hardware GPU adapter")
+    with TanimotoIndex(VARIED_LIBRARY, prefer="auto") as index:
+        gpu = index.threshold_hits(QUERY, 0.2)
+    with TanimotoIndex(VARIED_LIBRARY, prefer="cpu") as reference:
+        full = reference.search(QUERY, threshold=0.2)
+    assert [(hit.index, hit.similarity) for hit in gpu.hits] == [(hit.index, hit.similarity) for hit in full.hits]

@@ -77,10 +77,25 @@ def similarity_search(payload: SimilaritySearchRequest, session: Session = Depen
     if not rows:
         raise ValidationError("The dataset has no compounds to score.", details={"dataset_id": payload.dataset_id})
     smiles = [row.isomeric_smiles for row in rows]
+    prefiltered = False
+    candidates = len(smiles)
     try:
         with TanimotoIndex(smiles, prefer=payload.engine, boost=payload.boost) as index:
-            result = index.search(payload.query_smiles, k=payload.k, threshold=payload.threshold)
             resolved = index.engine
+            if payload.threshold is not None:
+                # BitBound only helps a threshold search; a k-nearest query needs the
+                # full score vector to know which k are nearest.
+                pruned = index.threshold_hits(payload.query_smiles, payload.threshold)
+                raw_hits = pruned.hits[: payload.k]
+                parity = pruned.parity_checked
+                timings = pruned.timings_ms
+                candidates = pruned.candidates
+                prefiltered = pruned.prefiltered
+            else:
+                result = index.search(payload.query_smiles, k=payload.k, threshold=None)
+                raw_hits = result.hits
+                parity = result.parity_checked
+                timings = result.timings_ms
     except GpuUnavailableError as exc:
         raise ValidationError(
             "A GPU engine was requested but no hardware GPU adapter is available.",
@@ -94,7 +109,7 @@ def similarity_search(payload: SimilaritySearchRequest, session: Session = Depen
             "smiles": rows[hit.index].isomeric_smiles,
             "similarity": round(hit.similarity, 6),
         }
-        for rank, hit in enumerate(result.hits, start=1)
+        for rank, hit in enumerate(raw_hits, start=1)
     ]
     return {
         "schema": SCHEMA,
@@ -110,9 +125,10 @@ def similarity_search(payload: SimilaritySearchRequest, session: Session = Depen
             "adapter_type": resolved.adapter_type,
             "detail": resolved.detail,
         },
-        "parity_checked": result.parity_checked,
+        "parity_checked": parity,
+        "prefilter": {"enabled": prefiltered, "candidates": candidates, "library": len(smiles)},
         "k": payload.k,
         "threshold": payload.threshold,
-        "timings_ms": {key: round(value, 3) for key, value in result.timings_ms.items()},
+        "timings_ms": {key: round(value, 3) for key, value in timings.items()},
         "hits": hits,
     }

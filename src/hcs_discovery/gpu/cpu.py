@@ -12,6 +12,14 @@ def _popcount_rows(words: np.ndarray) -> np.ndarray:
     return _POP8[as_bytes].reshape(words.shape[0], -1).sum(axis=1, dtype=np.uint32)
 
 
+def popcount_rows(words: np.ndarray) -> np.ndarray:
+    """Number of set bits per packed fingerprint row (uint32)."""
+    library = np.ascontiguousarray(words, dtype=np.uint32)
+    if library.ndim != 2:
+        library = library.reshape(1, -1)
+    return _popcount_rows(library)
+
+
 def cpu_counts(query: np.ndarray, library: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """Return ``(intersection, union)`` popcounts for each library row."""
     q = np.asarray(query, dtype=np.uint32).reshape(1, -1)

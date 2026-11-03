@@ -713,6 +713,30 @@ Worked through GEMINI.md again from the merged `main`.
 - Gates: ruff/mypy/tests wie zuvor; volle Suite unten erneut.
 - Nicht getan: UI-Übersetzung, veröffentlichte Pakete, BitBound-Prefilter.
 
+## 2026-11-03 (05:00) — BitBound-Prefilter + langfristiger Plan
+
+- Branch `main` @ `064a7f4`. Recherche (chemfp/BitBound, US-RSE/OSS-Nachhaltigkeit)
+  → neuer Plan `docs/engineering/ROADMAP_LONG_TERM.md` (Horizonte, Gates, Nicht-Ziele).
+- Umgesetzt (erste Zeile aus „Now"):
+  - `gpu/cpu.py`: öffentliche `popcount_rows`.
+  - `TanimotoIndex` berechnet die Popcounts der Bibliothek einmal bei `install`
+    und bietet `threshold_hits` / `threshold_hits_for` mit der BitBound
+    `T ≤ min(a,b)/max(a,b)`. Nur Kandidaten werden bewertet; `counts_for(indices)`
+    prüft die Parity weiterhin auf genau dieser Teilmenge. Kein Hybrid-Pfad für
+    Teilmengen (CPU-Anteil wäre bedeutungslos).
+  - `ThresholdResult` (hits, candidates, timings, `prefiltered`), `SearchResult`
+    trägt zusätzlich `prefiltered`/`candidates`.
+  - CLI/API/MCP nutzen den Prefilter nur, wenn keine vollständige Score-Liste
+    gebraucht wird (`--output` deaktiviert ihn); JSON `prefilter.{enabled,candidates,library}`.
+- Tests: Differential (7 Schwellen), Kanten (nichts prunebar, alles gepruned,
+  threshold=0), Property „Bound ist obere Schranke" über 15 Zufallsbibliotheken,
+  GPU-Differential. 26 Tests in `test_similarity_search.py`, 68 in CLI/API/MCP.
+- Messung (`docs/validation/gpu-tanimoto.md`): uniforme Dichte 98–100 % Kandidaten
+  (kein Gewinn), dichte-variierte Bibliothek 68 %/35 %/12 % Kandidaten bei 0.4/0.7/0.9
+  → 1,5–8× schneller; beide synthetisch, im Report benannt.
+- Gates: ruff/mypy grün, volle Suite + Gate-Runner folgen im selben Lauf.
+- Offen: Dataset-Fingerprint-Cache (nächste Zeile), Metriken, Lighthouse/axe.
+
 ## Blockers
 
 - None technical at the time of writing. The `v0.1.0` preview is published and

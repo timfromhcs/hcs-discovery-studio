@@ -119,8 +119,19 @@ def tool_similarity_search(arguments: dict[str, Any]) -> dict[str, Any]:
         raise ToolError("boost must be auto, gpu, cpu or hybrid.")
     try:
         with TanimotoIndex(structures, prefer=engine, boost=boost) as index:  # type: ignore[arg-type]
-            result = index.search(query, k=k, threshold=None if threshold is None else float(threshold))
             resolved = index.engine
+            if threshold is not None:
+                pruned = index.threshold_hits(query, float(threshold))
+                raw_hits = pruned.hits[:k]
+                parity = pruned.parity_checked
+                candidates = pruned.candidates
+                prefiltered = pruned.prefiltered
+            else:
+                result = index.search(query, k=k, threshold=None)
+                raw_hits = result.hits
+                parity = result.parity_checked
+                candidates = len(structures)
+                prefiltered = False
     except GpuUnavailableError as exc:
         raise ToolError(f"No hardware GPU adapter: {exc}") from exc
     except ParityError as exc:
@@ -136,10 +147,11 @@ def tool_similarity_search(arguments: dict[str, Any]) -> dict[str, Any]:
             "backend": resolved.backend,
             "detail": resolved.detail,
         },
-        "parity_checked": result.parity_checked,
+        "parity_checked": parity,
+        "prefilter": {"enabled": prefiltered, "candidates": candidates, "library": len(structures)},
         "hits": [
             {"rank": rank, "index": hit.index, "similarity": round(hit.similarity, 6)}
-            for rank, hit in enumerate(result.hits, start=1)
+            for rank, hit in enumerate(raw_hits, start=1)
         ],
     }
 

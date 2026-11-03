@@ -1395,10 +1395,27 @@ def similarity_search(
     if not imported:
         _fail(ValidationError("No structures could be read from the file.", details={"path": str(file)}))
     smiles = [canonical for _, canonical in imported]
+    scores_full = None
+    candidates = len(smiles)
+    prefiltered = False
     try:
         with TanimotoIndex(smiles, prefer=engine, boost=boost) as index:  # type: ignore[arg-type]
-            result = index.search(query, k=k, threshold=threshold)
             resolved = index.engine
+            if threshold is not None and output is None:
+                # BitBound: only candidates near the threshold are scored. A full
+                # per-row score list is not requested here, so nothing is invented.
+                pruned = index.threshold_hits(query, threshold)
+                raw_hits = pruned.hits[:k]
+                parity = pruned.parity_checked
+                timings = pruned.timings_ms
+                candidates = pruned.candidates
+                prefiltered = pruned.prefiltered
+            else:
+                result = index.search(query, k=k, threshold=threshold)
+                raw_hits = result.hits
+                parity = result.parity_checked
+                timings = result.timings_ms
+                scores_full = result.scores
     except GpuUnavailableError as exc:
         _fail(
             ValidationError(
@@ -1423,7 +1440,7 @@ def similarity_search(
             "source_id": imported[hit.index][0].row.source_id or "",
             "smiles": imported[hit.index][1],
         }
-        for rank, hit in enumerate(result.hits, start=1)
+        for rank, hit in enumerate(raw_hits, start=1)
     ]
     payload = {
         "schema": "hcs.similarity-search.v1",
@@ -1441,26 +1458,26 @@ def similarity_search(
             "backend": resolved.backend,
             "adapter_type": resolved.adapter_type,
         },
-        "parity_checked": result.parity_checked,
+        "parity_checked": parity,
+        "prefilter": {"enabled": prefiltered, "candidates": candidates, "library": len(imported)},
         "k": k,
         "threshold": threshold,
-        "timings_ms": {key: round(value, 3) for key, value in result.timings_ms.items()},
+        "timings_ms": {key: round(value, 3) for key, value in timings.items()},
         "hits": hits,
     }
     if output is not None:
+        assert scores_full is not None
         with output.open("w", encoding="utf-8", newline="") as handle:
             writer = csv.writer(handle)
             writer.writerow(["row_index", "name", "smiles", "similarity"])
-            for row_index, ((outcome, canonical), score) in enumerate(
-                zip(imported, result.scores, strict=True), start=1
-            ):
+            for row_index, ((outcome, canonical), score) in enumerate(zip(imported, scores_full, strict=True), start=1):
                 writer.writerow([row_index, outcome.row.name or "", canonical, f"{float(score):.6f}"])
         payload["output"] = str(output)
 
     lines = [
         f"engine {resolved.label} | {len(imported)} structures | "
-        f"{'parity verified' if result.parity_checked else 'CPU reference'} | "
-        f"{result.timings_ms['total']:.1f} ms"
+        f"{'parity verified' if parity else 'CPU reference'} | "
+        f"{timings['total']:.1f} ms" + (f" | BitBound: {candidates}/{len(imported)} candidates" if prefiltered else "")
     ]
     lines += [f"{hit['similarity']:.4f}  {hit['name'][:24]:<24}  {hit['smiles']}" for hit in hits]
     if not hits:

@@ -49,6 +49,21 @@ def _rdkit_fingerprints(packed: np.ndarray) -> list[Any]:
     return [DataStructs.CreateFromBitString(row.tobytes().translate(table).decode("ascii")) for row in bits]
 
 
+def _varied_density(lib: np.ndarray) -> np.ndarray:
+    """A library whose bit counts vary with 'molecule size' (like real ECFP).
+
+    Keeps a random prefix of each fingerprint's words, so a small molecule has a
+    small popcount. Used only to show what the BitBound can and cannot prune; it is
+    synthetic and the report says so.
+    """
+    rng = np.random.default_rng(1)
+    keep = rng.integers(8, 65, size=lib.shape[0])
+    out = lib.copy()
+    for index, words in enumerate(keep):
+        out[index, words:] = 0
+    return out
+
+
 def _median_ms(fn, repeats: int) -> float:
     timings = []
     for _ in range(repeats):
@@ -110,6 +125,38 @@ def measure(engine: Any, n: int, *, repeats: int, seed: int = 0) -> dict[str, An
         finally:
             index.close()
 
+    # BitBound: a threshold search only scores fingerprints whose popcount bound can
+    # still reach the threshold. It changes the amount of work, not the kernel, so it
+    # is reported separately. Two libraries are measured on purpose: the uniform one
+    # has near-identical bit counts (the bound cannot prune), the varied one mirrors
+    # real ECFP density variation with molecule size.
+    thresholds: dict[str, dict[str, float | int]] = {}
+    if n >= 20_000:
+        from hcs_discovery.similarity import TanimotoIndex
+
+        for label, library in (("uniform", lib), ("varied", _varied_density(lib))):
+            index = TanimotoIndex.from_packed(library, prefer="auto", boost="gpu", verify=False)
+            try:
+                for threshold in (0.4, 0.7, 0.9):
+                    index.threshold_hits_for(query, threshold)  # warm-up
+                    samples: list[float] = []
+                    pruned = None
+                    for _ in range(repeats):
+                        started = time.perf_counter()
+                        pruned = index.threshold_hits_for(query, threshold)
+                        samples.append((time.perf_counter() - started) * 1000.0)
+                    assert pruned is not None
+                    thresholds[f"{label}:{threshold:.1f}"] = {
+                        "density": label,
+                        "threshold": threshold,
+                        "candidates": pruned.candidates,
+                        "fraction": round(pruned.candidates / max(1, n), 6),
+                        "hits": pruned.n_hits,
+                        "ms": round(statistics.median(samples), 3),
+                    }
+            finally:
+                index.close()
+
     exact = bool(np.array_equal(uploaded.inter, inter_ref) and np.array_equal(uploaded.union, union_ref))
     if resident_counts is not None:
         exact = exact and bool(
@@ -140,6 +187,7 @@ def measure(engine: Any, n: int, *, repeats: int, seed: int = 0) -> dict[str, An
         "gpu_resident_ms": None if resident_ms is None else round(resident_ms, 2),
         "hybrid_ms": None if hybrid_ms is None else round(hybrid_ms, 2),
         "hybrid_vs_upload": None if hybrid_ms is None else round(upload_ms / hybrid_ms, 2),
+        "thresholds": thresholds,
         "throughput_million_s": {
             "numpy": throughput(numpy_ms),
             "rdkit": throughput(rdkit_ms),
@@ -173,6 +221,23 @@ def render(report: dict[str, Any]) -> str:
             )
         )
     table = "\n".join(rows)
+    threshold_rows = []
+    for item in measurements:
+        for data in (item.get("thresholds") or {}).values():
+            threshold_rows.append(
+                (
+                    "| {n:,} | {density} | {threshold:.1f} | {candidates:,} | {fraction:.2f} % | {hits} | {ms:.2f} |"
+                ).format(
+                    n=item["n"],
+                    density=data["density"],
+                    threshold=float(data["threshold"]),
+                    candidates=data["candidates"],
+                    fraction=float(data["fraction"]) * 100.0,
+                    hits=data["hits"],
+                    ms=float(data["ms"]),
+                )
+            )
+    threshold_table = "\n".join(threshold_rows) or "No threshold measurement."
     status = report["status"]
     if status != "passed":
         table = f"No measurement: {report['detail']}"
@@ -202,6 +267,18 @@ readback). "GPU resident" keeps the library in a storage buffer and moves only t
 |---|---|---|---|---|---|---|---|---|---|
 {table}
 
+## Threshold search with the BitBound prefilter
+
+A query with `a` set bits and a library fingerprint with `b` bits has
+`Tanimoto ≤ min(a, b) / max(a, b)`, so fingerprints whose bound is below the
+threshold are skipped without a comparison. The remaining candidates are scored
+by the same kernel, and the hits are identical to a full scan (differential tests
+in `tests/unit/test_similarity_search.py`).
+
+| Library | Density | Threshold | Candidates scored | Share | Hits | ms |
+|---|---|---|---|---|---|---|
+{threshold_table}
+
 ## What this does and does not establish
 
 - **Parity is exact.** The GPU computes integer intersections and unions; the table
@@ -219,6 +296,12 @@ readback). "GPU resident" keeps the library in a storage buffer and moves only t
   share can keep up) is 1.03–1.09× faster than the same GPU upload path on this host.
   It is reported as measured; it is not a promise, and on a fast discrete GPU the
   calibration will keep `auto` on GPU-only.
+- **BitBound only pays when bit counts vary.** The prefilter skips fingerprints whose
+  popcount bound `min(a,b)/max(a,b)` is below the threshold. On this synthetic
+  uniform-density library almost nothing is pruned; on the density-varied one
+  (random prefix of words, standing in for molecule size) it prunes 32–88 % and the
+  search gets 1.5–8× faster. Both rows are synthetic and the report says so; the
+  differential tests prove the hits are identical to a full scan.
 - **Not benchmarked:** GPU fingerprint generation (RDKit computes fingerprints on the
   CPU), popcount-bound prefilters, and multi-query batches. The kernel scans the whole
   library per query.

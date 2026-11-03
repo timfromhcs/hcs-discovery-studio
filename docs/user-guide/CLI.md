@@ -133,10 +133,16 @@ one query with Morgan/ECFP fingerprints and Tanimoto similarity. `--engine` is
 `auto` (a hardware GPU when present, otherwise the CPU), `cpu`, or `gpu`; `gpu`
 fails with exit code `3` when no hardware adapter exists instead of falling back.
 `--max-rows` (default 50,000) refuses larger files because standardisation holds
-every structure in memory — raise it deliberately for a bigger screen. The JSON
-payload (`hcs.similarity-search.v1`) names the adapter, the backend and whether
-the GPU counts were verified against the CPU reference. `--output` writes every
-scored row to CSV, including non-hits.
+every structure in memory — raise it deliberately for a bigger screen.
+
+With `--threshold`, the search uses the BitBound prefilter: a fingerprint whose
+popcount bound is below the threshold is skipped without a comparison, and the
+JSON says how many candidates were actually scored (`prefilter.enabled`,
+`prefilter.candidates`). Requesting `--output` (every scored row) disables the
+prefilter, because skipped rows have no score to write — the JSON says
+`"enabled": false` in that case. The payload (`hcs.similarity-search.v1`) also
+names the adapter, the backend and whether the GPU counts were verified against
+the CPU reference.
 
 ## Workflows
 

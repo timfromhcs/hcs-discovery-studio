@@ -52,6 +52,15 @@ All notable changes to this project are documented here. The format follows
   intercept the requests that loaded it. Verified by killing the static preview
   server and reloading: shell, bundle, WASM, IndexedDB copy and similarity all still
   work. A web app manifest makes it installable where the browser supports it.
+- **BitBound prefilter for threshold searches.** A fingerprint whose popcount bound
+  `min(a,b)/max(a,b)` cannot reach the requested threshold is skipped without a
+  comparison; only the candidates are scored. The hits are proven identical to a
+  full scan by differential tests (0.0–1.0 thresholds, ties, duplicates) plus a
+  bound-is-an-upper-bound property test. On the synthetic density-varied library it
+  skips 32–88 % of the rows; on a uniform-density library it skips almost nothing,
+  and the benchmark report states both. CLI, API and MCP expose the prefilter only
+  where no per-row score list is requested, and `prefilter.enabled` says which path
+  ran.
 
 - **Targets and structures with provenance (API + CLI).** The reserved `targets`
   and `structures` tables now have services, versioned routes

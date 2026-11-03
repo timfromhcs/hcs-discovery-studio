@@ -35,7 +35,7 @@ from typing import Any, Literal
 import numpy as np
 
 from hcs_discovery.core.errors import ValidationError
-from hcs_discovery.gpu.cpu import cpu_counts
+from hcs_discovery.gpu.cpu import cpu_counts, popcount_rows
 from hcs_discovery.gpu.device import probe_gpu
 from hcs_discovery.gpu.fingerprints import BITS, RADIUS, WORDS, pack_smiles
 
@@ -60,6 +60,7 @@ __all__ = [
     "ParityError",
     "SearchResult",
     "TanimotoIndex",
+    "ThresholdResult",
     "clear_device_cache",
     "device_probe",
     "resolve_engine",
@@ -111,6 +112,25 @@ class SearchResult:
     n: int
     parity_checked: bool
     timings_ms: dict[str, float]
+    prefiltered: bool = False
+    candidates: int = 0
+
+    @property
+    def n_hits(self) -> int:
+        return len(self.hits)
+
+
+@dataclass(frozen=True)
+class ThresholdResult:
+    """Hits from a pruned threshold search, plus how much work the pruning saved."""
+
+    hits: tuple[Hit, ...]
+    engine: Engine
+    n: int
+    candidates: int
+    parity_checked: bool
+    timings_ms: dict[str, float]
+    prefiltered: bool = True
 
     @property
     def n_hits(self) -> int:
@@ -229,6 +249,9 @@ class TanimotoIndex:
         self._packed = packed
         self._valid = valid
         self._n = int(packed.shape[0])
+        # Popcount per fingerprint: the BitBound prefilter needs it, and it never
+        # changes for a packed library, so it is computed once.
+        self._lib_pop = popcount_rows(packed) if self._n else np.zeros(0, dtype=np.uint32)
         self._verify = verify
         self._workers = workers
         self._engine = self._choose(prefer, bits, radius, boost)
@@ -340,23 +363,29 @@ class TanimotoIndex:
         """Exact intersection/union popcounts for every row (GPU when available)."""
         return self.counts_for(self._query_fingerprint(query_smiles))
 
-    def counts_for(self, query: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-        """Same as :meth:`counts`, for an already packed query fingerprint."""
+    def counts_for(self, query: np.ndarray, indices: np.ndarray | None = None) -> tuple[np.ndarray, np.ndarray]:
+        """Exact intersection/union popcounts, optionally for a subset of rows.
+
+        ``indices`` is the BitBound candidate set: scoring it alone is the whole point
+        of the prefilter, so a subset never takes the hybrid split (the CPU share
+        would be tiny) and the parity check compares the same subset.
+        """
         fingerprint = np.ascontiguousarray(query, dtype=np.uint32).reshape(-1)
         if fingerprint.shape[0] != WORDS:
             raise ValidationError(
                 "A query fingerprint must be 64 uint32 words.",
                 details={"words": int(fingerprint.shape[0])},
             )
-        if self._gpu is not None and self._engine.mode == "hybrid":
+        library = self._packed if indices is None else np.ascontiguousarray(self._packed[indices])
+        if self._gpu is not None and self._engine.mode == "hybrid" and indices is None:
             inter, union = self._hybrid_counts(fingerprint)
         elif self._gpu is not None:
-            result = self._gpu.counts(fingerprint, self._packed)
+            result = self._gpu.counts(fingerprint, library)
             inter, union = result.inter, result.union
         else:
-            return cpu_counts(fingerprint, self._packed)
+            return cpu_counts(fingerprint, library)
         if self._verify:
-            reference_inter, reference_union = cpu_counts(fingerprint, self._packed)
+            reference_inter, reference_union = cpu_counts(fingerprint, library)
             if not (np.array_equal(inter, reference_inter) and np.array_equal(union, reference_union)):
                 raise ParityError(
                     "GPU Tanimoto counts differ from the CPU reference; no result was returned.",
@@ -399,6 +428,96 @@ class TanimotoIndex:
 
     def scores(self, query_smiles: str) -> np.ndarray:
         return _scores_from_counts(*self.counts(query_smiles))
+
+    def threshold_hits(self, query_smiles: str, threshold: float) -> ThresholdResult:
+        """Threshold search with the BitBound prefilter.
+
+        For a query with ``a`` set bits and a library fingerprint with ``b`` bits,
+        Tanimoto ``T = c / (a + b - c)`` satisfies ``T <= min(a, b) / max(a, b)``, so a
+        fingerprint whose bound is below the threshold can be skipped without being
+        compared. Only the surviving candidates are scored; the returned hits are
+        exactly the hits a full scan would return (differential tests pin that).
+        """
+        return self.threshold_hits_for(self._query_fingerprint(query_smiles), threshold)
+
+    def threshold_hits_for(self, query: np.ndarray, threshold: float) -> ThresholdResult:
+        """Same as :meth:`threshold_hits`, for an already packed query fingerprint."""
+        if not 0.0 <= threshold <= 1.0:
+            raise ValidationError("threshold must be within 0-1.")
+        started = time.perf_counter()
+        fingerprint = np.ascontiguousarray(query, dtype=np.uint32).reshape(-1)
+        if fingerprint.shape[0] != WORDS:
+            raise ValidationError("A query fingerprint must be 64 uint32 words.")
+        query_pop = int(popcount_rows(fingerprint)[0])
+        if threshold == 0.0 or query_pop == 0 or self._n == 0:
+            # No pruning is possible (or everything matches): fall back to the full scan.
+            inter, union = self.counts_for(fingerprint)
+            scores = _scores_from_counts(inter, union)
+            candidates = np.flatnonzero(self._valid)
+            order = np.lexsort((candidates, -scores[candidates]))
+            hits = tuple(
+                Hit(int(candidates[position]), float(scores[candidates[position]]))
+                for position in order
+                if scores[candidates[position]] >= threshold
+            )
+            finished = time.perf_counter()
+            return ThresholdResult(
+                hits=hits,
+                engine=self._engine,
+                n=self._n,
+                candidates=int(candidates.size),
+                parity_checked=self._gpu is not None and self._verify,
+                timings_ms={
+                    "prefilter": 0.0,
+                    "score": (finished - started) * 1000.0,
+                    "total": (finished - started) * 1000.0,
+                },
+                prefiltered=False,
+            )
+        library_pop = self._lib_pop
+        upper = np.zeros(self._n, dtype=np.float64)
+        nonzero = library_pop > 0
+        high = np.maximum(query_pop, library_pop[nonzero]).astype(np.float64)
+        low = np.minimum(query_pop, library_pop[nonzero]).astype(np.float64)
+        upper[nonzero] = low / high
+        candidates = np.flatnonzero((upper >= threshold) & self._valid)
+        prefiltered_at = time.perf_counter()
+        if candidates.size == 0:
+            return ThresholdResult(
+                hits=(),
+                engine=self._engine,
+                n=self._n,
+                candidates=0,
+                parity_checked=False,
+                timings_ms={
+                    "prefilter": (prefiltered_at - started) * 1000.0,
+                    "score": 0.0,
+                    "total": (prefiltered_at - started) * 1000.0,
+                },
+                prefiltered=True,
+            )
+        inter, union = self.counts_for(fingerprint, candidates)
+        scores = _scores_from_counts(inter, union)
+        order = np.lexsort((candidates, -scores))
+        hits = tuple(
+            Hit(int(candidates[position]), float(scores[position]))
+            for position in order
+            if scores[position] >= threshold
+        )
+        finished = time.perf_counter()
+        return ThresholdResult(
+            hits=hits,
+            engine=self._engine,
+            n=self._n,
+            candidates=int(candidates.size),
+            parity_checked=self._gpu is not None and self._verify,
+            timings_ms={
+                "prefilter": (prefiltered_at - started) * 1000.0,
+                "score": (finished - prefiltered_at) * 1000.0,
+                "total": (finished - started) * 1000.0,
+            },
+            prefiltered=True,
+        )
 
     def search(
         self,
