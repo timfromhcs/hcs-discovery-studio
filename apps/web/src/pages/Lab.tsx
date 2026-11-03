@@ -198,8 +198,7 @@ export function LabPage() {
 
   const topHits = similarity
     ? ranked
-        .map((entry, index) => ({ entry, index }))
-        .filter(({ index }) => similarity.valid[index])
+        .filter((entry) => similarity.valid[entry.index])
         .sort((a, b) => similarity.scores[b.index] - similarity.scores[a.index])
         .slice(0, 10)
     : [];
@@ -395,11 +394,11 @@ export function LabPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {topHits.map(({ entry, index }, rank) => (
-                      <tr key={`${entry.row.smiles}-sim-${index}`}>
+                    {topHits.map((entry, rank) => (
+                      <tr key={`${entry.row.smiles}-sim-${entry.index}`}>
                         <td>{rank + 1}</td>
                         <td>{entry.row.name}</td>
-                        <td>{similarity.scores[index].toFixed(4)}</td>
+                        <td>{similarity.scores[entry.index].toFixed(4)}</td>
                       </tr>
                     ))}
                   </tbody>

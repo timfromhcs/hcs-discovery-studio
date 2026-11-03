@@ -46,7 +46,11 @@ test("offline lab imports, triages, scores and persists without a backend", asyn
   // Similarity runs through the shared kernel or its CPU reference.
   await page.getByRole("button", { name: "Score library" }).click();
   await expect(page.getByText("Parity")).toBeVisible({ timeout: 90_000 });
-  await expect(page.getByText("1.0000")).toBeVisible();
+  // The top hit must be the query molecule itself, not whichever row ranks highest
+  // by composite score: similarity scores are indexed by import order.
+  const topSimilarityRow = page.locator("table").last().locator("tbody tr").first();
+  await expect(topSimilarityRow).toContainText("Benzene");
+  await expect(topSimilarityRow).toContainText("1.0000");
 
   // The stored copy survives a reload: IndexedDB, not a server session.
   await page.reload();

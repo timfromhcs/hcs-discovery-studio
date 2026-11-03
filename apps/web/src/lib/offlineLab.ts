@@ -152,11 +152,20 @@ export function compositeScores(rows: LabRow[]): Array<number | null> {
   });
 }
 
-export function rankByScore(rows: LabRow[]): Array<{ row: LabRow; score: number | null; passed: boolean; reasons: string[] }> {
+export interface RankedRow {
+  row: LabRow;
+  score: number | null;
+  passed: boolean;
+  reasons: string[];
+  /** Position in the imported array: similarity scores are indexed by this, not by rank. */
+  index: number;
+}
+
+export function rankByScore(rows: LabRow[]): RankedRow[] {
   const { passed, reasons } = triage(rows);
   const scores = compositeScores(rows);
   return rows
-    .map((row, index) => ({ row, score: scores[index], passed: passed[index], reasons: reasons[index] }))
+    .map((row, index) => ({ row, score: scores[index], passed: passed[index], reasons: reasons[index], index }))
     .sort((a, b) => (b.score ?? -1) - (a.score ?? -1) || a.row.name.localeCompare(b.row.name));
 }
 
