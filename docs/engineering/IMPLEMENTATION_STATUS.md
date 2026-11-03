@@ -1,7 +1,8 @@
 # Implementation status
 
-Last updated: 2026-11-01. Version: `2.0.0` release candidate merged to `main`
-(commit `12febcf`, PR #7); not tagged or published yet.
+Last updated: 2026-11-03. Version: `2.0.0` release candidate merged to `main`
+(commit `12febcf`, PR #7); not tagged or published yet. The GPU similarity path
+and the browser-compute verification landed on 2026-11-03.
 
 This document is the honest feature ledger. It distinguishes what has been
 exercised end-to-end from what is scaffolded, planned or deliberately absent.
