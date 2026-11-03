@@ -916,3 +916,26 @@ still regenerable files and object storage remains a follow-up.
 - `vercel promote` rebuilt from the git HEAD instead of moving the alias, so the
   production alias pointed at the pre-change commit until a CLI production deploy
   of the verified tree replaced it.
+
+## 2026-11-03 - Release outcome (2.2.0 -> 2.2.1)
+
+- PR #14 (20 checks green) squash-merged as `d9bad1a`; review response as
+  `56fda4f`; the release pipeline fix as `b44c3d8`.
+- `v2.2.0` was tagged on `56fda4f` with CI and CodeQL green. Verify, wheel and
+  the one-file executable all passed; the publish job failed before creating
+  anything with `Unable to resolve action actions/download-artifact@3d3c42e5`.
+  That commit does not exist in the action repository - the v7 line only has
+  `v7.0.0`. Nothing was published for 2.2.0 and the tag was **not** moved.
+- `release.yml` now pins `actions/download-artifact` to
+  `37930b1c` (v7.0.0), matching the `upload-artifact` v7 line already in use.
+  Version bumped to 2.2.1, tagged as `v2.2.1` on `b44c3d8` (CI + CodeQL green)
+  and the release published: `hcs_discovery_studio-2.2.1-py3-none-any.whl`
+  (2.7 MB), `hcs-discovery.exe` (75.4 MB), `sbom.cdx.json`,
+  `SHA256SUMS.txt`, with the SLSA build-provenance attestation.
+- Production `https://hcs-discovery-studio.vercel.app` reports version 2.2.1,
+  `/api/v1/ready` is ready with `database: ok`, one demo project is present
+  and `/` serves the SPA shell. The deployment stayed behind Vercel
+  Authentication throughout.
+- Open follow-ups: object storage for uploads/artifacts, a real worker
+  (Vercel Queues/Daemons) instead of inline execution for long runs, a PostgreSQL
+  deployment exercised against a real server, and the stale-tag note for 2.2.0.
