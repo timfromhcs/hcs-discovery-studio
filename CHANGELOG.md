@@ -10,6 +10,21 @@ All notable changes to this project are documented here. The format follows
 
 - Nothing yet. The next change starts here.
 
+## [2.2.1] - 2026-11-03
+
+No application code changed. `v2.2.0` was tagged after its gates were green, but
+the release workflow failed before publishing anything: the publish job pinned
+`actions/download-artifact` to a commit that does not exist in that repository
+(`3d3c42e5…`, labelled v7.0.1; the v7 line has no such tag), so GitHub could not
+resolve the action. No release, draft or asset was created for `v2.2.0`, and the
+tag is left in place rather than moved — this repository never reuses a tag.
+
+### Fixed
+
+- `release.yml` pins `actions/download-artifact` to the resolvable v7.0.0 commit
+  (`37930b1c…`) matching the `actions/upload-artifact` v7 line the workflow
+  already uses.
+
 ## [2.2.0] - 2026-11-03
 
 The hosted deployment now runs the whole workbench: the SPA **and** `/api/v1`

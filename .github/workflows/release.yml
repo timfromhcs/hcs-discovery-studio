@@ -207,7 +207,7 @@ jobs:
           curl -fsS http://127.0.0.1:8795/api/v1/ready
           curl -fsS http://127.0.0.1:8795/ | grep -q 'id="root"'
       - name: Download the one-file executable
-        uses: actions/download-artifact@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
           name: hcs-discovery-exe
           path: dist
