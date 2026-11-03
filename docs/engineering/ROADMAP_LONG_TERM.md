@@ -35,7 +35,7 @@ degradation, local first, no invented SOTA.
 |---|---|---|
 | **BitBound prefilter** (done 2026-11-03) | The kernel scans everything; the bound is proven and cheap | `threshold_hits` returns exactly the full-search hits (differential test), candidate fraction and time reported in `docs/validation/gpu-tanimoto.md` |
 | **Dataset fingerprint cache** | Similarity re-fingerprints on every call; the dominant cost at library scale | Packed fingerprints stored once per dataset (content-hashed), reused across runs; cache hit measured |
-| **Metric and audit endpoints** | Operators cannot see queue depth, cache hit rate or run latency today | `/api/v1/metrics` (Prometheus text) + a test for each series; no external dependency |
+| **Metric and audit endpoints** (metrics done 2026-11-03) | Operators cannot see queue depth, cache hit rate or run latency today | `/api/v1/metrics` (Prometheus text) + a test for each series; no external dependency |
 | **Lighthouse/CLI budgets** | The SPA bundle is ~550 kB and unmonitored | A CI budget gate that fails on regressions above an agreed size and LCP/CLS thresholds on the static build |
 | **Accessibility audit of the new pages** | The lab and the SEO pages shipped after the 192-capture QA | axe-core run over every route, zero serious/critical findings, documented exceptions |
 

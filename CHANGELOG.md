@@ -63,6 +63,11 @@ container image and the service worker described below.
   intercept the requests that loaded it. Verified by killing the static preview
   server and reloading: shell, bundle, WASM, IndexedDB copy and similarity all still
   work. A web app manifest makes it installable where the browser supports it.
+- **Observability.** `GET /api/v1/metrics` exposes a small Prometheus text
+  exposition (build info, uptime, projects/datasets/compounds, runs by status,
+  queue depth, node-cache entries and bytes, GPU availability). No dependency, no
+  paths, no tokens, no per-request labels; it follows the same bearer-token rule as
+  the rest of `/api/v1`. Traces and dashboards are still absent and listed as such.
 - **BitBound prefilter for threshold searches.** A fingerprint whose popcount bound
   `min(a,b)/max(a,b)` cannot reach the requested threshold is skipped without a
   comparison; only the candidates are scored. The hits are proven identical to a

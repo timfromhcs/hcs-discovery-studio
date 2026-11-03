@@ -772,6 +772,22 @@ Worked through GEMINI.md again from the merged `main`.
   fehlen `data-testid="lab-import-result"` und `scroll-padding-top`. Nächster
   Versuch nach dem Reset des Limits oder mit einem bezahlten Plan.
 
+## 2026-11-03 (08:40) — Metriken-Endpoint (erste Zeile der „Now"-Liste nach BitBound)
+
+- Branch `main` @ `4bbfe90`.
+- `GET /api/v1/metrics` (Prometheus text 0.0.4, `include_in_schema=False`):
+  `hcs_build_info`, `hcs_uptime_seconds`, `hcs_projects`, `hcs_datasets`,
+  `hcs_compounds`, `hcs_runs{status=…}`, `hcs_queue_depth{status=…}`,
+  `hcs_node_cache_entries`, `hcs_node_cache_bytes`, `hcs_gpu_available`.
+  Bewusst klein: keine Per-Request-Labels (Kardinalität), keine Pfade, keine Tokens,
+  keine Nutzerdaten; gleiche Bearer-Token-Regel wie der Rest von `/api/v1`.
+  Der GPU-Probe-Fehler kann einen Scrape nicht brechen (`except` → 0).
+- Tests: Format/Serien, Zähler wachsen nach Projekt+Import (16 Compounds),
+  keine Pfade/Secrets, jede Zeile ist eine gültige Prometheus-Zeile.
+- Grenze bleibt ehrlich: keine Traces, keine Dashboards, kein Alerting — so im
+  Ledger vermerkt.
+- Gates: ruff/mypy grün, API-Suite 20 passed, voller Lauf unten.
+
 ## Blockers
 
 - None technical at the time of writing. The `v0.1.0` preview is published and

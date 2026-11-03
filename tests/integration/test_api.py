@@ -328,3 +328,32 @@ def test_similarity_api_prefilter_reports_candidates(client, monkeypatch):
     assert payload["prefilter"]["candidates"] <= payload["prefilter"]["library"]
     assert payload["hits"][0]["similarity"] == 1.0
     clear_device_cache()
+
+
+def test_metrics_endpoint_exposes_local_counters(client):
+    response = client.get("/api/v1/metrics")
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/plain")
+    body = response.text
+    assert 'hcs_build_info{version="2.1.0"' in body
+    assert "hcs_projects 0" in body
+    assert 'hcs_queue_depth{status="queued"} 0' in body
+    assert "hcs_node_cache_entries 0" in body
+    assert "hcs_gpu_available 0" in body or "hcs_gpu_available 1" in body
+    # No paths, no secrets, no per-request labels.
+    assert "/data" not in body and "d:\\" not in body.lower()
+    assert "token" not in body.lower()
+    for line in body.splitlines():
+        assert not line.startswith("#") or line.startswith("# ")
+        if line and not line.startswith("#"):
+            name, _, value = line.rpartition(" ")
+            assert name and value.replace(".", "", 1).isdigit()
+
+
+def test_metrics_counts_grow_with_data(client):
+    project = _create_project(client)
+    _import(client, project["id"])
+    body = client.get("/api/v1/metrics").text
+    assert "hcs_projects 1" in body
+    assert "hcs_datasets 1" in body
+    assert "hcs_compounds 16" in body

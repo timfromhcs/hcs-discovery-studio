@@ -251,7 +251,7 @@ are using. Hardware presence alone is never reported as a speed claim.
 
 | Gate | Command | Result |
 |---|---|---|
-| Backend tests | `uv run pytest -q` | <!-- gen:tests -->567 passed, 0 skipped<!-- /gen:tests --> on the development host; the two live docking tests are deselected there because no Vina binary is installed, and CI runs them on Linux |
+| Backend tests | `uv run pytest -q` | <!-- gen:tests -->569 passed, 0 skipped<!-- /gen:tests --> on the development host; the two live docking tests are deselected there because no Vina binary is installed, and CI runs them on Linux |
 | Coverage | `uv run pytest --cov=hcs_discovery --cov-branch` | <!-- gen:coverage -->83 % branch coverage<!-- /gen:coverage --> locally; CI floor 70%, HAEL modules ≥94% |
 | Python format/lint/type | `uv run ruff format --check .`, `uv run ruff check .`, `uv run mypy` | Clean locally and in CI |
 | Frontend typecheck/build | `npm run typecheck`, `npm run build` in `apps/web` | Clean locally and in CI |
@@ -276,6 +276,8 @@ methodology and how to reproduce each result.
 
 - Loopback-only binding by default; non-loopback binding requires a bearer token.
 - Local-only network policy blocks remote providers and connectors by default.
+- `GET /api/v1/metrics` exposes local counters (no paths, tokens or user data) for
+  a Prometheus scrape; it follows the same bearer-token rule as the rest of the API.
 - CSP, security headers, request IDs, payload limits, rate limiting and redacted
   error envelopes. The CSP allows no remote script source; it grants
   `'wasm-unsafe-eval'` and `'unsafe-eval'` because RDKit's WebAssembly build is
