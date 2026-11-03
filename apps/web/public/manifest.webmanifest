@@ -1,0 +1,18 @@
+{
+  "name": "HCS Discovery Studio",
+  "short_name": "HCS Studio",
+  "description": "Local-first drug-discovery workbench with an offline browser lab.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0b1114",
+  "theme_color": "#0b1114",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

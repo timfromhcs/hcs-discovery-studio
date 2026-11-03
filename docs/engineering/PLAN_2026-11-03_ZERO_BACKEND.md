@@ -266,9 +266,10 @@ P8 (scheduler) runs in parallel, independent of the code
 - [x] Browser workspace imports, triages, ranks and scores similarity with no
       backend, at 360 px, and persists after reload.
       (`apps/web/e2e/offline.spec.ts` against `vite preview`, no API.)
-- [ ] Offline after the first visit (service worker caching the shell + WASM).
-      **Not done**: the lab works without a backend but still needs its assets from
-      the network on first load.
+- [x] Offline after the first visit (service worker caching the shell + WASM).
+      Verified by killing a static preview server and reloading: the shell, the
+      bundle and the RDKit WebAssembly module come from the cache, the IndexedDB
+      copy is restored and similarity runs again.
 - [x] API and CLI share the similarity payload; API tests cover 404, invalid SMILES
       and engine=gpu without an adapter.
 - [x] MCP server exposes five working tools with a scripted stdio session test.

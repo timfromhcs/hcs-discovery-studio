@@ -44,6 +44,14 @@ All notable changes to this project are documented here. The format follows
 - **Hourly autonomous wake-up.** `scripts/ops/hourly_wakeup.ps1` continues this
   session with a timestamped prompt under a lock, refusing to start with unmerged
   paths; `install_hourly_task.ps1` registers the Windows scheduled task.
+- **Offline after the first visit.** A dependency-free service worker caches the
+  shell and, on first use, the RDKit WebAssembly module. Navigations are
+  network-first (a deployment is picked up immediately, an offline reload falls back
+  to the cached shell), hashed assets are cache-first, and `/api/` is never cached.
+  The first visit hands the worker its own boot URLs, because a worker cannot
+  intercept the requests that loaded it. Verified by killing the static preview
+  server and reloading: shell, bundle, WASM, IndexedDB copy and similarity all still
+  work. A web app manifest makes it installable where the browser supports it.
 
 - **Targets and structures with provenance (API + CLI).** The reserved `targets`
   and `structures` tables now have services, versioned routes

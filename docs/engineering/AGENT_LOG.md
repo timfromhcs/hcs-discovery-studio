@@ -689,6 +689,30 @@ Worked through GEMINI.md again from the merged `main`.
 - Nicht getan / bewusst offen: Service-Worker-Offline-Cache, veröffentlichte
   npm-/PyPI-Pakete, UI-Übersetzung (nur Guides), BitBound-Prefilter.
 
+## 2026-11-03 (04:00) — Offline nach dem ersten Besuch (Service Worker)
+
+- Branch `main`, Ausgangspunkt `5577cb8`. Nächste offene Phase aus dem Plan: P1.7
+  (Offline-Cache). npm-/PyPI-Veröffentlichung bleibt offen (Credentials/Freigabe).
+- Gebaut: `apps/web/public/sw.js` — Navigationen network-first (Deploy sofort
+  sichtbar, Offline-Reload fällt auf die gecachte Shell zurück), gehashte Assets
+  cache-first, `/api/` wird nie gecacht; Cache-Version im Namen, `activate` löscht
+  fremde Caches; `skipWaiting` + `clients.claim`.
+- Erstbesuch-Problem gelöst: Ein Worker kontrolliert die Seite erst nach der
+  Aktivierung, also wurden JS/CSS des ersten Ladevorgangs nie gecacht. `main.tsx`
+  schickt dem Worker nach `ready` die eigenen Boot-URLs (`CACHE_URLS`), der Worker
+  legt sie ab (Fehler pro URL werden ignoriert).
+- `manifest.webmanifest` + Link in `index.html` (installierbar, wo der Browser es
+  unterstützt).
+- Test: `e2e/offline-cache.spec.ts` startet einen statischen Preview-Server auf
+  8793, benutzt das Labor, **killt den Server** (echtes Verbindungs-aus, nicht
+  Playwright-Offline-Emulation), lädt neu und prüft Shell, IndexedDB-Kopie und
+  Similarity. Erster Lauf rot, Ursache per Diagnose im Worker gefunden:
+  `cache.match(request)` verfehlte die Einträge wegen `Vary`-Headern
+  (`TypeError: Failed to fetch`). Fix: `{ ignoreVary: true }` für unveränderliche
+  Shell-/Asset-Einträge. Danach 1 passed, ganze Suite 12 passed.
+- Gates: ruff/mypy/tests wie zuvor; volle Suite unten erneut.
+- Nicht getan: UI-Übersetzung, veröffentlichte Pakete, BitBound-Prefilter.
+
 ## Blockers
 
 - None technical at the time of writing. The `v0.1.0` preview is published and

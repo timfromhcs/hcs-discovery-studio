@@ -61,7 +61,7 @@ prioritisation signals. Read
 | Deb's Fast Non-dominated Sorting & Pareto ranking | **Available** | Multi-objective sorting invariant tests |
 | GPU similarity search (Vulkan / D3D12 / Metal, one WGSL kernel) | **Available** on a hardware adapter, exact CPU fallback | Bit-identical to RDKit on every measured library; resident-library throughput â‰ˆ100 M Tanimoto/s at 500k fingerprints on this host's integrated GPU ([benchmark](docs/validation/gpu-tanimoto.md)) |
 | Browser compute (RDKit WebAssembly + WebGPU Tanimoto) | **Available**, opt-in on the Settings page | Self-test and bit-exact WebGPU parity tests run against the served app |
-| Offline lab (no backend at all) | **Available** | Import CSV/SDF/SMI, RDKit descriptors, triage, ranking, GPU/CPU similarity and IndexedDB persistence, verified against a static build at 360 px |
+| Offline lab (no backend at all) | **Available** | Import CSV/SDF/SMI, RDKit descriptors, triage, ranking, GPU/CPU similarity and IndexedDB persistence, verified against a static build at 360 px; a service worker makes it work offline after the first visit (verified with the server killed) |
 | Constraint selection (SAT) | **Available** | Dependency-free DPLL with watched literals; brute-force differential tests, pigeonhole UNSAT, `sat solve` and `sat select` |
 | MCP server | **Available** | `hcs-discovery mcp serve`: five read-only tools over JSON-RPC 2.0, scripted stdio session test |
 | Container image | **Builds and runs** | Multi-stage Dockerfile; health, SPA and a similarity search verified in the container on this host |
@@ -255,7 +255,7 @@ are using. Hardware presence alone is never reported as a speed claim.
 | Coverage | `uv run pytest --cov=hcs_discovery --cov-branch` | <!-- gen:coverage -->82 % branch coverage<!-- /gen:coverage --> locally; CI floor 70%, HAEL modules â‰¥94% |
 | Python format/lint/type | `uv run ruff format --check .`, `uv run ruff check .`, `uv run mypy` | Clean locally and in CI |
 | Frontend typecheck/build | `npm run typecheck`, `npm run build` in `apps/web` | Clean locally and in CI |
-| End-to-end | `npm run test:e2e` in `apps/web` | 11 passed locally (studio journey, planned engines, unknown runs, browser WebAssembly self-test, WebGPU parity, offline lab x3, SEO/404 x3) |
+| End-to-end | `npm run test:e2e` in `apps/web` | 12 passed locally (studio journey, planned engines, unknown runs, browser WebAssembly self-test, WebGPU parity, offline lab x3, offline cache with the server killed, SEO/404 x3) |
 | Visual and a11y QA | `node apps/web/scripts/visual_qa.mjs` against a running app | 192 captures (18 routes Ã— 6 widths Ã— 2 themes), 0 automatic findings |
 | License policy | `uv run python scripts/ci/check_licenses.py`, `node scripts/ci/check_licenses.mjs` | Pass locally and in CI |
 | Dependency audit | `pip-audit`, `npm audit --omit=dev` | No known vulnerabilities at release time |
@@ -399,4 +399,5 @@ No third-party model weights or proprietary datasets are bundled.
 
 **Status:** `2.0.0` release candidate in preparation; it is published only after
 the local gates and cloud CI pass for the tagged commit. See `IMPLEMENTATION_STATUS.md` for the full feature ledger and `CHANGELOG.md` for the change list.
+
 
