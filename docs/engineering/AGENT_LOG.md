@@ -643,10 +643,10 @@ Worked through GEMINI.md again from the merged `main`.
     echten Server, `e2e/gpu.spec.ts` die WebGPU-Parität.
   - `scripts/science/benchmark_gpu_similarity.py` → erzeugt
     `docs/validation/gpu-tanimoto.md` und `build/gpu-similarity.json`.
-- Messung (AMD Radeon 680M, Vulkan, 5 Wiederholungen, Median):
-  100k Fingerprints resident 1,5 ms (65,0M/s, 10,5× RDKit), 500k resident 5,2 ms
-  (96,0M/s, 17,7× RDKit), Counts exakt, Top-10 identisch, max. Abweichung zu
-  RDKit 0,0.
+- Messung (AMD Radeon 680M, Vulkan, 5 Wiederholungen, Median, veröffentlicht in
+  `docs/validation/gpu-tanimoto.md`): 100k Fingerprints resident 1,6 ms
+  (60,9 M/s, 12,3× RDKit), 500k resident 5,0 ms (99,2 M/s, 19,1× RDKit), Counts
+  exakt, Top-10 identisch, max. Abweichung zu RDKit 0,0.
 - Befehle und Ergebnis: `similarity search` über `examples/datasets/demo_library.csv`
   → 17 Strukturen, `engine gpu (Vulkan, AMD Radeon(TM) Graphics)`, Parity
   verifiziert; `HCS_E2E_WEBGPU=1 npx playwright test e2e/gpu.spec.ts` → 1 passed;

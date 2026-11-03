@@ -102,7 +102,7 @@ Its first real execution will be the release-candidate run.
 | [`validation/ligand-prep-meeko.md`](../validation/ligand-prep-meeko.md) | Ligand PDBQT matches Meeko 0.8.0 on 48/51 fixture ligands; 3 macrocycles kept rigid on purpose. |
 | [`validation/esol-solubility.md`](../validation/esol-solubility.md) | Reduced ESOL on 45 independent measured compounds: RMSE 0.968, R² 0.072, bootstrap 95 % CI [0.708, 1.260]; mean baseline RMSE 1.004. **Weak.** |
 | [`research/HAEL.md`](../research/HAEL.md) | Synthetic matched-budget ablation only. HAEL is `experimental`, not the default, not wired into a workflow. |
-| [`validation/gpu-tanimoto.md`](../validation/gpu-tanimoto.md) | Shared WGSL Tanimoto kernel on one integrated AMD GPU: exact counts against the numpy reference and bit-identical scores to RDKit; 100k fingerprints 1.5 ms, 500k 5.2 ms resident (≈96 M Tanimoto/s). Not a comparison with CUDA libraries. |
+| [`validation/gpu-tanimoto.md`](../validation/gpu-tanimoto.md) | Shared WGSL Tanimoto kernel on one integrated AMD GPU: exact counts against the numpy reference and bit-identical scores to RDKit; 500k fingerprints in about 5 ms resident (roughly 100 M Tanimoto/s, 19x RDKit's bulk call). Not a comparison with CUDA libraries. |
 
 ### Known limitations at this commit
 

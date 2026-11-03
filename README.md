@@ -59,7 +59,7 @@ prioritisation signals. Read
 | DAG branching & table joins | **Available** | Kahn topological sort, fan-out, and `table.join` |
 | Targets & structures with provenance | **Available** (API + CLI, no UI page yet) | Target CRUD, PDB import with SHA-256 and chain/ligand/missing-residue inspection; mmCIF refused explicitly |
 | Deb's Fast Non-dominated Sorting & Pareto ranking | **Available** | Multi-objective sorting invariant tests |
-| GPU similarity search (Vulkan / D3D12 / Metal, one WGSL kernel) | **Available** on a hardware adapter, exact CPU fallback | Bit-identical to RDKit on every measured library; 96 M Tanimoto/s resident on this host's integrated GPU ([benchmark](docs/validation/gpu-tanimoto.md)) |
+| GPU similarity search (Vulkan / D3D12 / Metal, one WGSL kernel) | **Available** on a hardware adapter, exact CPU fallback | Bit-identical to RDKit on every measured library; resident-library throughput ≈100 M Tanimoto/s at 500k fingerprints on this host's integrated GPU ([benchmark](docs/validation/gpu-tanimoto.md)) |
 | Browser compute (RDKit WebAssembly + WebGPU Tanimoto) | **Available**, opt-in on the Settings page | Self-test and bit-exact WebGPU parity tests run against the served app |
 | Safe local research assistant | **Available** | Ask, Plan, Run modes with strict allowlisted tools |
 | Persistent lease-based queue & restart recovery | **Available** | Queue/worker integration tests |
@@ -213,7 +213,7 @@ RDKit or dependency versions. See
 |---|---|---|
 | CPU x86-64, Windows 11 | **Verified locally** | Ryzen 7 7735HS, 19.8 GB RAM, Python 3.12 |
 | CPU x86-64, Linux | **Verified in CI** | Ubuntu runner, Python 3.12 |
-| Vulkan (similarity search) | **Verified locally** | AMD Radeon 680M integrated GPU, Vulkan via `wgpu-py`; GPU counts are bit-exact against the CPU reference. 100k fingerprints in 1.5 ms, 500k in 5.2 ms ([benchmark](docs/validation/gpu-tanimoto.md)) |
+| Vulkan (similarity search) | **Verified locally** | AMD Radeon 680M integrated GPU, Vulkan via `wgpu-py`; GPU counts are bit-exact against the CPU reference. 500k fingerprints in ≈5 ms with the library resident (≈100 M Tanimoto/s), ≈19× RDKit's bulk call ([benchmark](docs/validation/gpu-tanimoto.md)) |
 | WebGPU (browser) | **Verified locally in Chrome** | Same WGSL kernel, parity checked against JavaScript before any timing; opt-in on the Settings page |
 | CUDA | **Not required, not used** | No CUDA dependency in the base install; CUDA-only libraries such as nvMolKit are not a comparison point here |
 | GPU acceleration | **Available for similarity search only** | Docking, descriptors, property estimates and docking stay on the CPU; no other engine claims GPU execution |

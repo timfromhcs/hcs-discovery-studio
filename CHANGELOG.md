@@ -65,8 +65,8 @@ All notable changes to this project are documented here. The format follows
   scores `.smi`/`.csv`/`.sdf` files from the CLI. `scripts/science/
   benchmark_gpu_similarity.py` generates
   [`docs/validation/gpu-tanimoto.md`](docs/validation/gpu-tanimoto.md): exact
-  parity, 100k fingerprints in 1.5 ms and 500k in 5.2 ms (≈96 M Tanimoto/s) on
-  this host's integrated AMD GPU, versus RDKit's single-call bulk path.
+  parity, 500k fingerprints in ≈5 ms with the library resident (≈100 M
+  Tanimoto/s, ≈19× RDKit's bulk call) on this host's integrated AMD GPU.
   Scope is stated in the same document: whole-library scan, radius-2/2048-bit
   Morgan fingerprints only, no GPU fingerprint generation.
 - **Browser compute is exercised, not just detected.** The Settings page runs
