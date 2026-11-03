@@ -766,6 +766,11 @@ Worked through GEMINI.md again from the merged `main`.
   `--level full` grün, G15 grün, Wheel-Smoke (G8) grün, `verify_version.py v2.1.0`
   grün.
 - Offen (owner-gated): Tag, GitHub Release, PyPI-Upload, DOI.
+- **Blockiert, nicht erledigt:** Der Produktions-Deploy des neuen Builds scheitert am
+  Tageslimit des Vercel-Free-Plans (`api-deployments-free-per-day`, 100/Tag). Die
+  Produktion läuft weiter auf dem Stand von `064a7f4`: im ausgelieferten `/lab`
+  fehlen `data-testid="lab-import-result"` und `scroll-padding-top`. Nächster
+  Versuch nach dem Reset des Limits oder mit einem bezahlten Plan.
 
 ## Blockers
 

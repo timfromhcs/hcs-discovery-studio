@@ -87,8 +87,10 @@ header, and touch targets need 24×24 CSS px minimum (we aim for 44).
   verified GPU search inside the frozen binary).
 - Wheel build + install smoke (part of `--level full`, G8).
 - Docker image build and a health/SPA/similarity smoke.
-- Production deploy only if the owner asks for it in this round; otherwise the
-  previously verified deployment stays.
+- Production deploy: **blocked on 2026-11-03** by the Vercel free-plan daily
+  deployment limit (`api-deployments-free-per-day`). The hosted build still serves
+  the previous commit; the release notes say so instead of claiming the new UI is
+  live.
 
 ### R6 — Release gate
 
