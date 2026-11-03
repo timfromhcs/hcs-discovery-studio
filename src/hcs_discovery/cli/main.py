@@ -1352,6 +1352,12 @@ def similarity_search(
     threshold: float | None = typer.Option(None, "--threshold", min=0.0, max=1.0, help="Minimum similarity."),
     engine: str = typer.Option("auto", "--engine", help="auto, cpu or gpu. 'gpu' fails instead of falling back."),
     output: Path | None = typer.Option(None, "--output", help="Write every scored row to this CSV file."),
+    max_rows: int = typer.Option(
+        50_000,
+        "--max-rows",
+        min=1,
+        help="Refuse larger files. Standardisation keeps every structure in memory; raise this deliberately.",
+    ),
 ) -> None:
     """Rank a structure file by Tanimoto similarity to one query.
 
@@ -1367,7 +1373,7 @@ def similarity_search(
 
     if engine not in {"auto", "cpu", "gpu"}:
         _fail(ValidationError("engine must be one of auto, cpu or gpu.", details={"engine": engine}))
-    parsed = _run_cli(parse_file, file, file.name, "auto", ImportOptions())
+    parsed = _run_cli(parse_file, file, file.name, "auto", ImportOptions(max_rows=max_rows))
     if parsed is None:
         return
     imported = [

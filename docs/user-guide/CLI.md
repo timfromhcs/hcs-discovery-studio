@@ -132,9 +132,11 @@ Structures are standardised exactly as `dataset import` does, then scored agains
 one query with Morgan/ECFP fingerprints and Tanimoto similarity. `--engine` is
 `auto` (a hardware GPU when present, otherwise the CPU), `cpu`, or `gpu`; `gpu`
 fails with exit code `3` when no hardware adapter exists instead of falling back.
-The JSON payload (`hcs.similarity-search.v1`) names the adapter, the backend and
-whether the GPU counts were verified against the CPU reference. `--output` writes
-every scored row to CSV, including non-hits.
+`--max-rows` (default 50,000) refuses larger files because standardisation holds
+every structure in memory — raise it deliberately for a bigger screen. The JSON
+payload (`hcs.similarity-search.v1`) names the adapter, the backend and whether
+the GPU counts were verified against the CPU reference. `--output` writes every
+scored row to CSV, including non-hits.
 
 ## Workflows
 
