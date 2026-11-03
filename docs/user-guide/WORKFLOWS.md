@@ -91,6 +91,7 @@ warning event; the row is not silently removed.
     radius: 2
     bits: 2048
     metric: tanimoto
+    engine: auto
 ```
 
 | Field | Default | Range |
@@ -100,6 +101,16 @@ warning event; the row is not silently removed.
 | `radius` | 2 | 1–4 |
 | `bits` | 2048 | 256–8192 |
 | `metric` | `tanimoto` | only `tanimoto` |
+| `engine` | `auto` | `auto`, `cpu`, `gpu` |
+
+`engine: auto` scores the whole column through the shared Tanimoto kernel when the
+host has a hardware GPU adapter (Vulkan, D3D12 or Metal) and falls back to the CPU
+reference otherwise. `cpu` always uses RDKit; `gpu` fails the node instead of
+falling back when no hardware adapter exists. The default radius and bit width are
+the kernel's; other values always use the CPU. Every GPU run is checked against
+the CPU reference, and both the engine and the parity result appear in the run
+events and in the cache key, so a CPU result is never reused as a GPU result.
+Measured parity and throughput: [`docs/validation/gpu-tanimoto.md`](../validation/gpu-tanimoto.md).
 
 Morgan/ECFP fingerprint similarity is a structural heuristic. It is not a
 measure of biological activity.

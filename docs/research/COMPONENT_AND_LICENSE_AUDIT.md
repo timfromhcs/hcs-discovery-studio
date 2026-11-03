@@ -27,6 +27,9 @@ install time.
 | SQLAlchemy | 2.1.6 | MIT | ORM | Retain notice |
 | Alembic | 1.20.1 | MIT | Migrations | Retain notice |
 | RDKit | 2026.9.1 | BSD-3-Clause | Chemistry | Retain notice; cite RDKit in research outputs |
+| numpy | 2.5.4 | BSD-3-Clause | Arrays for the similarity reference and kernel buffers | Retain notice |
+| wgpu-py | 0.32.0 | BSD-2-Clause | Vulkan/D3D12/Metal compute for the Tanimoto kernel | Retain notice; `pip install 'hcs-discovery[gpu]'` |
+| rendercanvas | 2.7.2 | BSD-2-Clause | Transitive dependency of wgpu-py | Retain notice; no canvas is created by the CLI or API |
 | Typer | 0.27.3 | MIT | CLI | Retain notice |
 | Click | 8.5.0 | BSD-3-Clause | CLI runtime | Retain notice |
 | PyYAML | 6.0.3 | MIT | Workflow parsing | Retain notice |

@@ -303,6 +303,47 @@ jobs:
         if: failure()
         run: cat "$RUNNER_TEMP/wheel-server.log" || true
 
+  exe:
+    name: One-file executable build and smoke test (Windows)
+    runs-on: windows-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+      - name: Install Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Install dependencies
+        run: |
+          uv sync --frozen
+          # PyInstaller is a build-only tool, kept out of the lockfile so the
+          # GPL-with-bootloader-exception dependency never enters the shipped
+          # dependency graph (see the license policy).
+          uv pip install "pyinstaller==6.22.3"
+      - name: Build and smoke-test the one-file executable
+        run: uv run python scripts/release/build_executable.py
+      - name: Upload the executable
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: hcs-discovery-exe
+          path: build/exe-dist/hcs-discovery.exe
+          if-no-files-found: error
+          retention-days: 7
+
   licenses:
     name: License policy
     runs-on: ubuntu-latest
@@ -428,6 +469,7 @@ jobs:
       - science-vina
       - migrations
       - wheel
+      - exe
       - licenses
       - dependency-audit
       - docs
@@ -444,6 +486,7 @@ jobs:
             science-vina=${{ needs.science-vina.result }}
             migrations=${{ needs.migrations.result }}
             wheel=${{ needs.wheel.result }}
+            exe=${{ needs.exe.result }}
             licenses=${{ needs.licenses.result }}
             dependency-audit=${{ needs.dependency-audit.result }}
             docs=${{ needs.docs.result }}

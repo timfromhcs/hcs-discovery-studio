@@ -81,6 +81,8 @@ db_app = typer.Typer(help="Database maintenance.", no_args_is_help=True)
 fetch_app = typer.Typer(help="External public database search (PubChem & ChEMBL).", no_args_is_help=True)
 agent_app = typer.Typer(help="Safe research assistant (Ask, Plan, Run).", no_args_is_help=True)
 target_app = typer.Typer(help="Targets and structures.", no_args_is_help=True)
+gpu_app = typer.Typer(help="GPU (Vulkan/WebGPU) similarity probe and benchmark.", no_args_is_help=True)
+similarity_app = typer.Typer(help="Similarity search over a structure file.", no_args_is_help=True)
 
 for name, sub in (
     ("project", project_app),
@@ -96,6 +98,8 @@ for name, sub in (
     ("fetch", fetch_app),
     ("agent", agent_app),
     ("target", target_app),
+    ("gpu", gpu_app),
+    ("similarity", similarity_app),
 ):
     app.add_typer(sub, name=name)
 
@@ -1310,6 +1314,138 @@ def agent_run_cmd(
         except AppError as exc:
             _fail(exc)
     _print(ctx, resp.model_dump(), resp.text)
+
+
+@gpu_app.command("probe")
+def gpu_probe() -> None:
+    """Print the GPU adapter the shared kernel would use (JSON)."""
+    from ..gpu.device import probe_gpu
+
+    typer.echo(json.dumps(probe_gpu(), indent=2))
+
+
+@gpu_app.command("bench")
+def gpu_bench(
+    n: int = typer.Option(100_000, "--n", min=64, help="Library size."),
+    repeats: int = typer.Option(5, "--repeats", min=1),
+    out: Path | None = typer.Option(None, "--out", help="Also write the JSON report here."),
+) -> None:
+    """Parity-first benchmark. Exit 1 only on parity failure; no GPU is 'skipped' (exit 0)."""
+    from ..gpu.bench import run_bench, write_report
+
+    report = run_bench(n_library=n, repeats=repeats)
+    if out is not None:
+        write_report(report, out)
+    typer.echo(json.dumps(report, indent=2))
+    if report["status"] == "failed":
+        raise typer.Exit(1)
+
+
+@similarity_app.command("search")
+def similarity_search(
+    ctx: typer.Context,
+    query: str = typer.Option(..., "--query", help="Query SMILES."),
+    file: Path = typer.Option(
+        ..., "--file", exists=True, dir_okay=False, readable=True, help="Library file: .smi, .csv or .sdf."
+    ),
+    k: int = typer.Option(10, "--k", min=1, max=10_000, help="Number of nearest neighbours to show."),
+    threshold: float | None = typer.Option(None, "--threshold", min=0.0, max=1.0, help="Minimum similarity."),
+    engine: str = typer.Option("auto", "--engine", help="auto, cpu or gpu. 'gpu' fails instead of falling back."),
+    output: Path | None = typer.Option(None, "--output", help="Write every scored row to this CSV file."),
+) -> None:
+    """Rank a structure file by Tanimoto similarity to one query.
+
+    Structures are standardised exactly as `dataset import` does. With a hardware GPU
+    adapter the shared WGSL kernel scores the library, and every count is verified
+    against the CPU reference before a value is reported.
+    """
+    import csv
+
+    from ..core.errors import RunFailedError
+    from ..datasets.readers import ImportOptions, parse_file
+    from ..similarity import GpuUnavailableError, ParityError, TanimotoIndex
+
+    if engine not in {"auto", "cpu", "gpu"}:
+        _fail(ValidationError("engine must be one of auto, cpu or gpu.", details={"engine": engine}))
+    parsed = _run_cli(parse_file, file, file.name, "auto", ImportOptions())
+    if parsed is None:
+        return
+    imported = [
+        (outcome, outcome.molecule.canonical_smiles)
+        for outcome in parsed.outcomes
+        if outcome.status == "imported" and outcome.molecule is not None
+    ]
+    if not imported:
+        _fail(ValidationError("No structures could be read from the file.", details={"path": str(file)}))
+    smiles = [canonical for _, canonical in imported]
+    try:
+        with TanimotoIndex(smiles, prefer=engine) as index:  # type: ignore[arg-type]
+            result = index.search(query, k=k, threshold=threshold)
+            resolved = index.engine
+    except GpuUnavailableError as exc:
+        _fail(
+            ValidationError(
+                "A GPU engine was requested but no hardware GPU adapter is available.",
+                details={"reason": str(exc)},
+            )
+        )
+        return
+    except ParityError as exc:
+        _fail(
+            RunFailedError(
+                "The GPU result did not match the CPU reference; nothing was reported.", details={"reason": str(exc)}
+            )
+        )
+        return
+
+    hits = [
+        {
+            "rank": rank,
+            "similarity": round(hit.similarity, 6),
+            "name": imported[hit.index][0].row.name or "",
+            "source_id": imported[hit.index][0].row.source_id or "",
+            "smiles": imported[hit.index][1],
+        }
+        for rank, hit in enumerate(result.hits, start=1)
+    ]
+    payload = {
+        "schema": "hcs.similarity-search.v1",
+        "query": query,
+        "file": str(file),
+        "format": parsed.format,
+        "n_library": len(imported),
+        "n_rejected": parsed.record_count - len(imported),
+        "engine": {
+            "name": resolved.name,
+            "detail": resolved.detail,
+            "adapter": resolved.adapter,
+            "backend": resolved.backend,
+        },
+        "parity_checked": result.parity_checked,
+        "k": k,
+        "threshold": threshold,
+        "timings_ms": {key: round(value, 3) for key, value in result.timings_ms.items()},
+        "hits": hits,
+    }
+    if output is not None:
+        with output.open("w", encoding="utf-8", newline="") as handle:
+            writer = csv.writer(handle)
+            writer.writerow(["row_index", "name", "smiles", "similarity"])
+            for row_index, ((outcome, canonical), score) in enumerate(
+                zip(imported, result.scores, strict=True), start=1
+            ):
+                writer.writerow([row_index, outcome.row.name or "", canonical, f"{float(score):.6f}"])
+        payload["output"] = str(output)
+
+    lines = [
+        f"engine {resolved.label} | {len(imported)} structures | "
+        f"{'parity verified' if result.parity_checked else 'CPU reference'} | "
+        f"{result.timings_ms['total']:.1f} ms"
+    ]
+    lines += [f"{hit['similarity']:.4f}  {hit['name'][:24]:<24}  {hit['smiles']}" for hit in hits]
+    if not hits:
+        lines.append("No structure reached the threshold.")
+    _print(ctx, payload, "\n".join(lines))
 
 
 @app.command("version")

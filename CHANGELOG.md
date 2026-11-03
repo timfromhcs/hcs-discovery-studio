@@ -51,9 +51,42 @@ All notable changes to this project are documented here. The format follows
   reports, client-side, whether the browser exposes WebGPU and WebAssembly —
   hardware presence only, mirroring the backend Vulkan probe. No scientific
   engine executes through the browser in this release.
+- **GPU similarity search with an exact CPU reference.** The shared WGSL kernel
+  (`src/hcs_discovery/gpu/kernels/tanimoto.wgsl`, the same file the browser uses)
+  is now reachable from the product:
+  `hcs_discovery.similarity.TanimotoIndex` scores a query against a library with
+  k-nearest and threshold semantics, chunking above the storage-buffer limit and
+  a resident-library mode. Integer popcounts are compared against the CPU
+  reference on every verified search, so an accelerated run cannot silently
+  differ; similarity is `intersection / union` in float64, bit-identical to
+  RDKit's `TanimotoSimilarity`.
+  `chem.similarity` gains `engine: auto | cpu | gpu` (recorded in a run event and
+  in the cache runtime fingerprint), and `hcs-discovery similarity search`
+  scores `.smi`/`.csv`/`.sdf` files from the CLI. `scripts/science/
+  benchmark_gpu_similarity.py` generates
+  [`docs/validation/gpu-tanimoto.md`](docs/validation/gpu-tanimoto.md): exact
+  parity, 500k fingerprints in ≈5 ms with the library resident (≈100 M
+  Tanimoto/s, ≈19× RDKit's bulk call) on this host's integrated AMD GPU.
+  Scope is stated in the same document: whole-library scan, radius-2/2048-bit
+  Morgan fingerprints only, no GPU fingerprint generation.
+- **Browser compute is exercised, not just detected.** The Settings page runs
+  RDKit WebAssembly (parse, descriptors, SVG depiction) and the WebGPU Tanimoto
+  kernel against a JavaScript CPU reference. Both are covered by Playwright
+  against the served application, and the WebGPU path reports parity before any
+  timing.
+- **SOTA gap analysis.** `docs/research/SOTA_GAP_ANALYSIS.md` records what the
+  public state of the art does in similarity search, ADMET, structure prediction
+  and browser compute, what this repository actually does, and what remains
+  missing.
 
 ### Fixed
 
+- **The application CSP blocked its own browser chemistry.** `script-src 'self'`
+  rejected both `WebAssembly.instantiate` and Emscripten embind's generated
+  bindings, so the RDKit WebAssembly panel could never have run in the served
+  app. The CSP now grants `'wasm-unsafe-eval'` and `'unsafe-eval'` with no remote
+  script source, and a Playwright test runs the self-test against the real
+  server so the regression cannot return unnoticed.
 - The About page "Limitations register" claimed docking, ADMET and structure
   prediction were all absent and that there were zero remote connectors. It now
   distinguishes Vina docking (host-dependent) and the reduced ESOL / CNS-MPO

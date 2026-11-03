@@ -1,0 +1,247 @@
+"""Measure the shared Tanimoto kernel on this host and write the published report.
+
+    uv run python scripts/science/benchmark_gpu_similarity.py
+    uv run python scripts/science/benchmark_gpu_similarity.py --sizes 100000 500000
+
+Order of claims: **parity first**. The GPU counts must equal the numpy reference bit
+for bit before any timing is printed, and the resulting similarities are compared with
+RDKit's ``BulkTanimotoSimilarity``. Timings are median wall time on the named adapter,
+never a promise, and a host without a hardware adapter is reported as ``skipped``.
+
+Outputs:
+    docs/validation/gpu-tanimoto.md   (the report below is generated from it)
+    build/gpu-similarity.json         (raw measurements)
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import platform
+import statistics
+import subprocess
+import sys
+import time
+from pathlib import Path
+from typing import Any
+
+import numpy as np
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+REPORT = REPO_ROOT / "docs" / "validation" / "gpu-tanimoto.md"
+RAW = REPO_ROOT / "build" / "gpu-similarity.json"
+SCHEMA = "hcs.gpu-similarity-bench.v1"
+
+
+def _git_commit() -> str:
+    try:
+        out = subprocess.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True, timeout=5)
+        return out.stdout.strip() or "unknown"
+    except (OSError, subprocess.SubprocessError):
+        return "unknown"
+
+
+def _rdkit_fingerprints(packed: np.ndarray) -> list[Any]:
+    from rdkit import DataStructs
+
+    bits = np.unpackbits(packed.view(np.uint8), axis=1, bitorder="little")
+    table = bytes.maketrans(b"\x00\x01", b"01")
+    return [DataStructs.CreateFromBitString(row.tobytes().translate(table).decode("ascii")) for row in bits]
+
+
+def _median_ms(fn, repeats: int) -> float:
+    timings = []
+    for _ in range(repeats):
+        started = time.perf_counter()
+        fn()
+        timings.append((time.perf_counter() - started) * 1000.0)
+    return statistics.median(timings)
+
+
+def measure(engine: Any, n: int, *, repeats: int, seed: int = 0) -> dict[str, Any]:
+    from rdkit import DataStructs
+
+    from hcs_discovery.gpu.bench import synthetic_library
+    from hcs_discovery.gpu.cpu import cpu_counts, ratio
+
+    lib = synthetic_library(n, seed)
+    query = lib[0].copy()
+
+    inter_ref, union_ref = cpu_counts(query, lib)
+    numpy_ms = _median_ms(lambda: cpu_counts(query, lib), repeats)
+    reference = ratio(inter_ref, union_ref)
+
+    fingerprints = _rdkit_fingerprints(lib)
+    rdkit_ms = _median_ms(lambda: DataStructs.BulkTanimotoSimilarity(fingerprints[0], fingerprints), repeats)
+    rdkit_scores = np.asarray(DataStructs.BulkTanimotoSimilarity(fingerprints[0], fingerprints), dtype=np.float32)
+
+    engine.counts(query, lib[: min(n, 64)])  # warm-up: pipeline and driver caches
+    upload_ms = statistics.median([engine.counts(query, lib).total_ms for _ in range(repeats)])
+    uploaded = engine.counts(query, lib)
+
+    resident_ms: float | None = None
+    resident_counts = None
+    if n <= engine.max_chunk:
+        engine.load_library(lib)
+        engine.query_resident(query)  # warm-up
+        resident_ms = statistics.median([engine.query_resident(query).total_ms for _ in range(repeats)])
+        resident_counts = engine.query_resident(query)
+        engine.release_library()
+
+    exact = bool(np.array_equal(uploaded.inter, inter_ref) and np.array_equal(uploaded.union, union_ref))
+    if resident_counts is not None:
+        exact = exact and bool(
+            np.array_equal(resident_counts.inter, inter_ref) and np.array_equal(resident_counts.union, union_ref)
+        )
+    max_abs_err = float(np.max(np.abs(reference - rdkit_scores)))
+
+    top10_cpu = np.argsort(-reference, kind="stable")[:10]
+    top10_gpu = np.argsort(-ratio(uploaded.inter, uploaded.union), kind="stable")[:10]
+    top10_equal = bool(np.array_equal(top10_cpu, top10_gpu))
+
+    def throughput(milliseconds: float | None) -> float | None:
+        return None if not milliseconds else round(n / (milliseconds / 1000.0) / 1e6, 2)
+
+    return {
+        "n": n,
+        "parity_exact_counts": exact,
+        "max_abs_err_vs_rdkit": max_abs_err,
+        "top10_identical": top10_equal,
+        "numpy_ms": round(numpy_ms, 2),
+        "rdkit_ms": round(rdkit_ms, 2),
+        "gpu_upload_ms": round(upload_ms, 2),
+        "gpu_resident_ms": None if resident_ms is None else round(resident_ms, 2),
+        "throughput_million_s": {
+            "numpy": throughput(numpy_ms),
+            "rdkit": throughput(rdkit_ms),
+            "gpu_upload": throughput(upload_ms),
+            "gpu_resident": throughput(resident_ms),
+        },
+    }
+
+
+def render(report: dict[str, Any]) -> str:
+    measurements = report["measurements"]
+    rows = []
+    for item in measurements:
+        speedup = None
+        if item["gpu_resident_ms"]:
+            speedup = f"{item['rdkit_ms'] / item['gpu_resident_ms']:.1f}x"
+        rows.append(
+            "| {n:,} | {numpy_ms:,.1f} | {rdkit_ms:,.1f} | {gpu_upload_ms:,.1f} | {resident} | {rdkit_rate} | "
+            "{rate} | {speedup} | {parity} | {err:.1e} |".format(
+                n=item["n"],
+                numpy_ms=item["numpy_ms"],
+                rdkit_ms=item["rdkit_ms"],
+                gpu_upload_ms=item["gpu_upload_ms"],
+                resident="n/a" if item["gpu_resident_ms"] is None else f"{item['gpu_resident_ms']:,.1f}",
+                rdkit_rate=item["throughput_million_s"]["rdkit"],
+                rate=item["throughput_million_s"]["gpu_resident"],
+                speedup=speedup or "n/a",
+                parity="exact" if item["parity_exact_counts"] else "**FAILED**",
+                err=item["max_abs_err_vs_rdkit"],
+            )
+        )
+    table = "\n".join(rows)
+    status = report["status"]
+    if status != "passed":
+        table = f"No measurement: {report['detail']}"
+
+    return f"""# GPU similarity benchmark — Tanimoto on Vulkan
+
+Generated by `uv run python scripts/science/{Path(__file__).name}`.
+Do not edit by hand: re-run the script on the host you want to describe.
+
+| Item | Value |
+|---|---|
+| Date | {report["generated_at"]} |
+| Commit | `{report["commit"]}` |
+| Host | {report["host"]["cpu"]} · {report["host"]["platform"]} |
+| Adapter | {report["adapter"] or "—"} |
+| Backend | {report["backend"] or "—"} |
+| Kernel | `src/hcs_discovery/gpu/kernels/tanimoto.wgsl` (2048-bit Morgan/ECFP r=2, little-endian u32 popcounts) |
+| Status | **{status}** |
+
+## Measurements
+
+Median of {report["repeats"]} repetitions, milliseconds, end-to-end (upload, dispatch,
+readback). "GPU resident" keeps the library in a storage buffer and moves only the
+256-byte query.
+
+| Library | numpy CPU | RDKit ms | GPU upload | GPU resident | RDKit M/s | GPU M/s | speed-up | Parity | err |
+|---|---|---|---|---|---|---|---|---|---|
+{table}
+
+## What this does and does not establish
+
+- **Parity is exact.** The GPU computes integer intersections and unions; the table
+  reports "exact" only when every count equals the numpy reference and the top-10
+  neighbours are identical. Similarity is `intersection / union` in float64, the same
+  double division RDKit performs, so the values agree with RDKit to the last bit
+  (the residual column above is the float32 storage used by the comparison, not a GPU
+  error).
+- **The speed-up is device-specific.** One integrated GPU against one CPU thread pool
+  on the host named above. It is not a comparison with CUDA implementations such as
+  nvMolKit, and it says nothing about discrete GPUs, other vendors or larger than
+  memory libraries.
+- **Not benchmarked:** GPU fingerprint generation (RDKit computes fingerprints on the
+  CPU), popcount-bound prefilters, and multi-query batches. The kernel scans the whole
+  library per query.
+- **No scientific claim.** Tanimoto similarity over Morgan fingerprints is a
+  prioritisation signal, not evidence of binding, safety or efficacy.
+"""
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--sizes", nargs="+", type=int, default=[100_000, 500_000])
+    parser.add_argument("--repeats", type=int, default=3)
+    parser.add_argument("--report", type=Path, default=REPORT)
+    parser.add_argument("--raw", type=Path, default=RAW)
+    args = parser.parse_args(argv)
+
+    from hcs_discovery.gpu.device import probe_gpu
+
+    probe = probe_gpu()
+    report: dict[str, Any] = {
+        "schema": SCHEMA,
+        "generated_at": time.strftime("%Y-%m-%d %H:%M:%SZ", time.gmtime()),
+        "commit": _git_commit(),
+        "status": "skipped",
+        "detail": probe["detail"],
+        "adapter": probe.get("adapter"),
+        "backend": probe.get("backend"),
+        "repeats": args.repeats,
+        "host": {
+            "platform": f"{platform.system()} {platform.release()} {platform.machine()}",
+            "cpu": platform.processor() or platform.machine(),
+            "python": sys.version.split()[0],
+        },
+        "measurements": [],
+    }
+    if probe["status"] != "available":
+        report["detail"] = f"No hardware GPU adapter: {probe['detail']}"
+    else:
+        from hcs_discovery.gpu.engine import GpuEngine
+
+        engine = GpuEngine()
+        report["adapter"] = engine.adapter_name
+        report["backend"] = engine.backend
+        for n in args.sizes:
+            report["measurements"].append(measure(engine, n, repeats=args.repeats))
+        failed = [
+            item for item in report["measurements"] if not item["parity_exact_counts"] or not item["top10_identical"]
+        ]
+        report["status"] = "failed" if failed else "passed"
+        report["detail"] = "GPU counts are bit-exact against the CPU reference." if not failed else "Parity violated."
+
+    args.raw.parent.mkdir(parents=True, exist_ok=True)
+    args.raw.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    args.report.parent.mkdir(parents=True, exist_ok=True)
+    args.report.write_text(render(report), encoding="utf-8")
+    print(json.dumps({"status": report["status"], "adapter": report["adapter"], "report": str(args.report)}, indent=2))
+    return 0 if report["status"] in {"passed", "skipped"} else 1
+
+
+if __name__ == "__main__":  # pragma: no cover - measurement entry point
+    raise SystemExit(main())

@@ -88,13 +88,21 @@ reports device names and the instance version. It deliberately reports
 
 A Vulkan device does **not** mean:
 
-- a scientific model supports Vulkan,
+- every scientific model supports Vulkan,
 - the model will be faster,
 - the model has been validated on that device,
 - CUDA is available.
 
-No CUDA dependency is required or tested. No GPU acceleration is claimed for
-RDKit or any planned engine.
+One engine does run on the GPU: the Tanimoto similarity kernel
+(`src/hcs_discovery/gpu/kernels/tanimoto.wgsl`) through `wgpu-py`, used by
+`hcs-discovery similarity search` and by `chem.similarity` with `engine: auto`
+or `engine: gpu`. It refuses software adapters, compares every count with the CPU
+reference, and reports the adapter it used. `hcs-discovery gpu probe` shows the
+adapter, `hcs-discovery gpu bench` re-measures parity and throughput, and
+`docs/validation/gpu-tanimoto.md` records one measured host.
+
+No CUDA dependency is required or tested. Docking, descriptors, property
+estimates and every planned engine stay on the CPU.
 
 ## Adding a real local model
 

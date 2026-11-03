@@ -27,6 +27,8 @@ test or a recorded manual check; it does not mean validated science.
 | PubChem / ChEMBL connectors | Done | Policy-gated; mocked-transport tests; blocked by default |
 | DAG Workflows | Done | Multi-branch DAGs, Kahn topological sort, and table.join with strict-key checks |
 | HAEL adaptive scheduler | Experimental, library only | Typed evidence gates, cost model, deterministic trace, 94 property/guard tests ([design](../research/HAEL.md)); no workflow node, API, CLI or UI yet |
+| GPU similarity search | Done (Tanimoto only) | Shared WGSL kernel via `wgpu-py`; `hcs_discovery.similarity` with k/threshold, resident library, exact CPU reference; `chem.similarity` engine option; `similarity search` CLI; bit-identical to RDKit; measured in [gpu-tanimoto.md](../validation/gpu-tanimoto.md) |
+| Browser compute | Done (opt-in) | RDKit WebAssembly self-test and WebGPU Tanimoto benchmark on the Settings page, both covered by Playwright against the served app |
 | GitHub CI | Pass on `main` | CI 40947455326 and CodeQL 40947455914 passed on commit `12febcf` |
 | Public release | Pending | [`v1.0.0`](https://github.com/timfromhcs/hcs-discovery-studio/releases/tag/v1.0.0) published; `v2.0.0` not yet tagged or published |
 | v2.0.0 Stable | Awaiting release candidate run and owner approval | Local gates pass on the merged SHA; tag/publication not performed |
@@ -81,12 +83,14 @@ test or a recorded manual check; it does not mean validated science.
 
 - Self-contained wheel bundling the built SPA; smoke-tested locally on port 8793
   and by the CI wheel job.
-- <!-- gen:tests -->443 passed, 2 skipped<!-- /gen:tests --> backend tests on the
-  development host (the two skips are the live docking tests, which need a Vina
-  binary), and the same suite in CI on Linux with the binary installed.
-- <!-- gen:coverage -->81 % branch coverage<!-- /gen:coverage --> locally; the CI floor
+- <!-- gen:tests -->476 passed, 0 skipped<!-- /gen:tests --> backend tests on the
+  development host (the live docking tests are deselected there because no Vina
+  binary is installed), and the same suite in CI on Linux with the binary
+  installed.
+- <!-- gen:coverage -->83 % branch coverage<!-- /gen:coverage --> locally; the CI floor
   is 70 %.
-- 3 Playwright end-to-end tests passing locally and in CI.
+- 5 Playwright end-to-end tests passing locally and in CI, including the RDKit
+  WebAssembly self-test and the WebGPU parity benchmark against the served app.
 - Ruff format/check and mypy clean locally and in CI.
 - Frontend typecheck and production build clean locally and in CI.
 - Visual and accessibility QA: 18 routes × 6 widths (incl. 640 px = 200% zoom) ×
@@ -137,7 +141,10 @@ test or a recorded manual check; it does not mean validated science.
 - Molecular dynamics (OpenMM).
 - Learned ADMET/activity prediction (Chemprop or any other model).
 - Structure prediction (Boltz-2, Chai-1).
-- GPU or Vulkan execution of any scientific engine.
+- GPU execution of any scientific engine other than the Tanimoto similarity kernel
+  (descriptors, docking and property estimates run on the CPU).
+- Popcount-bound prefiltering (BitBound), ANN indexes and GPU fingerprint
+  generation for similarity search.
 - Target explorer UI, pocket detection, binding-site definition and receptor preparation.
 - Loops, conditionals, sub-workflow composition or parameter sweeps.
 - Distributed workers, Redis/Celery, multi-tenant hosting.
@@ -156,7 +163,7 @@ Evidence below was produced on `main` at commit `12febcf` and re-run locally on
 | Gate | Status | Evidence |
 |---|---|---|
 | Lint, format, types | Pass locally and in CI | Ruff, mypy (89 source files) |
-| Backend tests | Pass locally and in CI | <!-- gen:tests -->443 passed, 2 skipped<!-- /gen:tests --> on the development host (the skips are the live docking tests); <!-- gen:coverage -->81 % branch coverage<!-- /gen:coverage -->; Hypothesis properties for ranking and joins; HAEL modules ≥94% |
+| Backend tests | Pass locally and in CI | <!-- gen:tests -->476 passed, 0 skipped<!-- /gen:tests --> on the development host (the skips are the live docking tests); <!-- gen:coverage -->83 % branch coverage<!-- /gen:coverage -->; Hypothesis properties for ranking and joins; HAEL modules ≥94% |
 | Frontend build and E2E | Pass locally and in CI | typecheck, build, 3 Playwright tests on isolated data |
 | Visual QA | Pass locally | `apps/web/scripts/visual_qa.mjs`: 18 routes × 6 widths (incl. 640 px = 200% zoom) × 2 themes = 192 captures, WCAG AA text contrast, heading order, keyboard focus; screenshots reviewed by hand |
 | Fresh migration and wheel | Pass locally and in CI | Wheel ships Alembic scripts and records a revision; wheel installed into a clean venv and completed db upgrade → project → import → run → results |

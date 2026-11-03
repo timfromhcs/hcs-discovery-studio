@@ -24,6 +24,9 @@ Python runtime and backend
   - SQLAlchemy                       MIT
   - Alembic                          MIT
   - RDKit                            BSD-3-Clause
+  - numpy                            BSD-3-Clause
+  - wgpu-py                          BSD-2-Clause
+  - rendercanvas                     BSD-2-Clause
   - Typer                            MIT
   - Click                            BSD-3-Clause
   - PyYAML                           MIT

@@ -120,7 +120,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             response.headers["Referrer-Policy"] = "no-referrer"
             response.headers["X-Frame-Options"] = "DENY"
             response.headers["Content-Security-Policy"] = (
-                "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+                # RDKit's WebAssembly build is compiled with Emscripten embind, which builds
+                # its JavaScript bindings with `new Function`. That needs 'unsafe-eval' in
+                # addition to 'wasm-unsafe-eval'; no remote script source is allowed, so the
+                # only code that can run is first-party and the bundled WASM module. The
+                # panel is opt-in and nothing leaves the browser.
+                "default-src 'self'; script-src 'self' 'wasm-unsafe-eval' 'unsafe-eval'; "
+                "style-src 'self' 'unsafe-inline'; "
                 "img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'; "
                 "base-uri 'self'; form-action 'self'"
             )

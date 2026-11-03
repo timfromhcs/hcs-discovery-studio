@@ -29,6 +29,14 @@ from ..plugins.science.properties.adapter import (
     run_property_prediction,
 )
 from ..plugins.science.properties.models import get_property_model
+from ..similarity import (
+    SUPPORTED_BITS,
+    SUPPORTED_RADIUS,
+    GpuUnavailableError,
+    ParityError,
+    TanimotoIndex,
+    similarity_runtime_fingerprint,
+)
 from .registry import NodeContext, NodeDefinition, NodeRegistry
 from .table import FILTER_COLUMNS, Column, Table
 
@@ -95,6 +103,9 @@ class SimilarityConfig(BaseModel):
     radius: int = Field(default=2, ge=1, le=4)
     bits: int = Field(default=2048, ge=256, le=8192)
     metric: Literal["tanimoto"] = "tanimoto"
+    # "auto" uses a hardware GPU when the host has one and the CPU reference otherwise.
+    # "gpu" fails instead of falling back, so an explicit request is never silently ignored.
+    engine: Literal["auto", "cpu", "gpu"] = "auto"
 
     @field_validator("query_smiles")
     @classmethod
@@ -118,6 +129,52 @@ def _run_similarity(table: Table, config: SimilarityConfig, ctx: NodeContext) ->
         method=f"Morgan/ECFP r={config.radius} {config.bits} bits, Tanimoto",
         description="Fingerprint similarity to the configured query structure.",
     )
+    if config.engine != "cpu" and (config.radius, config.bits) == (SUPPORTED_RADIUS, SUPPORTED_BITS):
+        values = _similarity_values_vectorised(table, config, ctx)
+    else:
+        values = _similarity_values_per_row(table, config, query, ctx)
+    result = table.copy().add_values(column, values)
+    ctx.report_progress(1.0)
+    return result
+
+
+def _similarity_values_vectorised(table: Table, config: SimilarityConfig, ctx: NodeContext) -> list[float | None]:
+    """Score the whole column with the shared kernel (GPU when available, else numpy)."""
+    smiles = [row["smiles"] for row in table.rows]
+    try:
+        with TanimotoIndex(smiles, prefer=config.engine) as index:
+            result = index.search(config.query_smiles)
+            engine = index.engine
+            valid = index.valid.copy()
+    except GpuUnavailableError as exc:
+        raise ValidationError(
+            "A GPU similarity engine was requested, but no hardware GPU adapter is available.",
+            details={"reason": str(exc)},
+        ) from exc
+    except ParityError as exc:
+        raise ValidationError(
+            "The GPU similarity result did not match the CPU reference, so no values were written.",
+            details={"reason": str(exc)},
+        ) from exc
+    ctx.log(
+        f"Similarity engine: {engine.label} over {len(smiles)} rows"
+        + ("; counts verified against the CPU reference" if result.parity_checked else ""),
+        data={
+            "engine": engine.name,
+            "backend": engine.backend,
+            "adapter": engine.adapter,
+            "parity_checked": result.parity_checked,
+            "n": len(smiles),
+            "timings_ms": {key: round(value, 3) for key, value in result.timings_ms.items()},
+        },
+    )
+    ctx.report_progress(1.0)
+    return [float(score) if ok else None for score, ok in zip(result.scores, valid, strict=True)]
+
+
+def _similarity_values_per_row(
+    table: Table, config: SimilarityConfig, query: Chem.Mol, ctx: NodeContext
+) -> list[float | None]:
     values: list[float | None] = []
     total = len(table.rows)
     for index, row in enumerate(table.rows, start=1):
@@ -126,9 +183,7 @@ def _run_similarity(table: Table, config: SimilarityConfig, ctx: NodeContext) ->
         if index % 250 == 0 or index == total:
             ctx.report_progress(index / total if total else None)
             ctx.check_cancel()
-    result = table.copy().add_values(column, values)
-    ctx.report_progress(1.0)
-    return result
+    return values
 
 
 # --------------------------------------------------------------------------- filters
@@ -819,6 +874,7 @@ def register_builtin_nodes(registry: NodeRegistry) -> None:
             handler=_run_similarity,
             requires=("smiles",),
             extra_requires=lambda _config: (),
+            runtime_fingerprint=lambda config: similarity_runtime_fingerprint(config.engine),
             outputs=lambda config: [
                 Column(
                     config.column,

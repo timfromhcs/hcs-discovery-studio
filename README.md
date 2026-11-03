@@ -59,6 +59,8 @@ prioritisation signals. Read
 | DAG branching & table joins | **Available** | Kahn topological sort, fan-out, and `table.join` |
 | Targets & structures with provenance | **Available** (API + CLI, no UI page yet) | Target CRUD, PDB import with SHA-256 and chain/ligand/missing-residue inspection; mmCIF refused explicitly |
 | Deb's Fast Non-dominated Sorting & Pareto ranking | **Available** | Multi-objective sorting invariant tests |
+| GPU similarity search (Vulkan / D3D12 / Metal, one WGSL kernel) | **Available** on a hardware adapter, exact CPU fallback | Bit-identical to RDKit on every measured library; resident-library throughput ≈100 M Tanimoto/s at 500k fingerprints on this host's integrated GPU ([benchmark](docs/validation/gpu-tanimoto.md)) |
+| Browser compute (RDKit WebAssembly + WebGPU Tanimoto) | **Available**, opt-in on the Settings page | Self-test and bit-exact WebGPU parity tests run against the served app |
 | Safe local research assistant | **Available** | Ask, Plan, Run modes with strict allowlisted tools |
 | Persistent lease-based queue & restart recovery | **Available** | Queue/worker integration tests |
 | Bounded cache lifecycle & cascade deletion | **Available** | Size/age pruning and orphan cleanup tests |
@@ -116,6 +118,25 @@ hcs-discovery serve
 
 Verify release assets with `SHA256SUMS.txt` and the GitHub build-provenance
 attestation (commands are in the release notes).
+
+### Option C — one-file executable (build it yourself)
+
+The repository ships a PyInstaller spec that bundles the CLI, the API, RDKit, the
+built SPA, the Alembic migrations and the GPU kernel into a single binary. It is
+built and smoke-tested by the release gate (`G15`), and it is not published as a
+download until `v2.0.0` ships:
+
+```bash
+uv pip install "pyinstaller==6.22.3"        # build-only, deliberately not in the lockfile
+uv run python scripts/release/build_executable.py
+build/exe-dist/hcs-discovery.exe doctor     # Windows; the Linux build drops the .exe
+build/exe-dist/hcs-discovery.exe serve
+```
+
+The smoke test runs `version`, `db upgrade`, `doctor`, a served `/api/v1/ready`
+check, and — when the host has a hardware GPU — a verified GPU similarity search
+inside the frozen binary, so a missing kernel file cannot silently fall back to
+the CPU.
 
 ### Run the demo workflow from the CLI
 
@@ -192,23 +213,26 @@ RDKit or dependency versions. See
 |---|---|---|
 | CPU x86-64, Windows 11 | **Verified locally** | Ryzen 7 7735HS, 19.8 GB RAM, Python 3.12 |
 | CPU x86-64, Linux | **Verified in CI** | Ubuntu runner, Python 3.12 |
-| Vulkan | **Probed only** | Vulkan 1.4.357 device detected; no scientific model claims Vulkan execution |
-| CUDA | **Not required, not used** | No CUDA dependency in the base install |
-| GPU acceleration | **Not claimed** | CPU is the dependable baseline |
+| Vulkan (similarity search) | **Verified locally** | AMD Radeon 680M integrated GPU, Vulkan via `wgpu-py`; GPU counts are bit-exact against the CPU reference. 500k fingerprints in ≈5 ms with the library resident (≈100 M Tanimoto/s), ≈19× RDKit's bulk call ([benchmark](docs/validation/gpu-tanimoto.md)) |
+| WebGPU (browser) | **Verified locally in Chrome** | Same WGSL kernel, parity checked against JavaScript before any timing; opt-in on the Settings page |
+| CUDA | **Not required, not used** | No CUDA dependency in the base install; CUDA-only libraries such as nvMolKit are not a comparison point here |
+| GPU acceleration | **Available for similarity search only** | Docking, descriptors, property estimates and docking stay on the CPU; no other engine claims GPU execution |
 | macOS / ARM64 | **Untested** | No release claim |
 
 `hcs-discovery doctor` reports what the current machine can actually do. It
-never labels a model Vulkan-compatible unless that adapter has a real probe.
+never labels an engine GPU-compatible unless that adapter has a real probe, and
+`hcs-discovery gpu bench` re-measures parity and throughput on the machine you
+are using. Hardware presence alone is never reported as a speed claim.
 
 ## Testing and CI
 
 | Gate | Command | Result |
 |---|---|---|
-| Backend tests | `uv run pytest -q` | <!-- gen:tests -->443 passed, 2 skipped<!-- /gen:tests --> on the development host, where the two skips are the live docking tests that need a Vina binary; CI runs them on Linux |
-| Coverage | `uv run pytest --cov=hcs_discovery --cov-branch` | <!-- gen:coverage -->81 % branch coverage<!-- /gen:coverage --> locally; CI floor 70%, HAEL modules ≥94% |
+| Backend tests | `uv run pytest -q` | <!-- gen:tests -->476 passed, 0 skipped<!-- /gen:tests --> on the development host; the two live docking tests are deselected there because no Vina binary is installed, and CI runs them on Linux |
+| Coverage | `uv run pytest --cov=hcs_discovery --cov-branch` | <!-- gen:coverage -->83 % branch coverage<!-- /gen:coverage --> locally; CI floor 70%, HAEL modules ≥94% |
 | Python format/lint/type | `uv run ruff format --check .`, `uv run ruff check .`, `uv run mypy` | Clean locally and in CI |
 | Frontend typecheck/build | `npm run typecheck`, `npm run build` in `apps/web` | Clean locally and in CI |
-| End-to-end | `npm run test:e2e` in `apps/web` | 3 passed locally and in CI |
+| End-to-end | `npm run test:e2e` in `apps/web` | 5 passed locally and in CI (studio journey, planned engines, unknown runs, browser WebAssembly self-test, WebGPU parity) |
 | Visual and a11y QA | `node apps/web/scripts/visual_qa.mjs` against a running app | 192 captures (18 routes × 6 widths × 2 themes), 0 automatic findings |
 | License policy | `uv run python scripts/ci/check_licenses.py`, `node scripts/ci/check_licenses.mjs` | Pass locally and in CI |
 | Dependency audit | `pip-audit`, `npm audit --omit=dev` | No known vulnerabilities at release time |
@@ -230,7 +254,10 @@ methodology and how to reproduce each result.
 - Loopback-only binding by default; non-loopback binding requires a bearer token.
 - Local-only network policy blocks remote providers and connectors by default.
 - CSP, security headers, request IDs, payload limits, rate limiting and redacted
-  error envelopes.
+  error envelopes. The CSP allows no remote script source; it grants
+  `'wasm-unsafe-eval'` and `'unsafe-eval'` because RDKit's WebAssembly build is
+  compiled with Emscripten embind, which generates its bindings with
+  `new Function`. Only first-party code and the bundled WASM module can run.
 - Secrets are read from environment variables only and are never written to the
   database, logs, reports or screenshots.
 - No telemetry or analytics.
@@ -259,6 +286,14 @@ threat model and residual risks are in
   tools; Ask uses a configured local LLM when available and says so when it
   falls back to built-in rules.
 - **SQLite on one machine.** Writers are serialised; no distributed workers.
+- **GPU similarity is a scanner, not a search index.** The kernel scores every
+  fingerprint in the library for one query; there is no popcount-bound prefilter,
+  no ANN index and no GPU fingerprint generation (RDKit computes fingerprints on
+  the CPU). It only supports radius-2/2048-bit Morgan fingerprints; other widths
+  use the CPU reference. The published speed-up is one integrated GPU against one
+  CPU thread pool on the host named in
+  [the benchmark](docs/validation/gpu-tanimoto.md), not a comparison with CUDA
+  implementations such as nvMolKit.
 - **No TLS or reverse proxy.** Put a hardened proxy in front of any non-local
   deployment.
 - **Node cache entries outlive projects.** They are content-addressed and
@@ -299,6 +334,8 @@ More help: [Windows install](docs/user-guide/INSTALL_WINDOWS.md),
   [Agent log](docs/engineering/AGENT_LOG.md)
 - **Research and validation:** [Component/license audit](docs/research/COMPONENT_AND_LICENSE_AUDIT.md) ·
   [Validation protocol](docs/scientific-validation/VALIDATION_PROTOCOL.md) ·
+  [SOTA gap analysis](docs/research/SOTA_GAP_ANALYSIS.md) ·
+  [GPU Tanimoto benchmark](docs/validation/gpu-tanimoto.md) ·
   [HAEL (experimental)](docs/research/HAEL.md) ·
   [Research register](docs/research/RESEARCH_REGISTER.md)
 - **Security:** [Threat model](docs/security/THREAT_MODEL.md) · [SECURITY.md](SECURITY.md)

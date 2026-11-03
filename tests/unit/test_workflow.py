@@ -153,6 +153,45 @@ def test_similarity_config_validates_query():
         SimilarityConfig(query_smiles="not-a-smiles")
 
 
+def test_similarity_node_auto_and_cpu_agree_and_match_rdkit():
+    from rdkit import Chem, DataStructs
+    from rdkit.Chem import rdFingerprintGenerator
+
+    from hcs_discovery.workflow.nodes import _run_similarity
+
+    table = _table()
+    ctx = DummyContext()
+    cpu = _run_similarity(table, SimilarityConfig(query_smiles="c1ccccc1", engine="cpu"), ctx)
+    auto = _run_similarity(table, SimilarityConfig(query_smiles="c1ccccc1"), ctx)
+    generator = rdFingerprintGenerator.GetMorganGenerator(radius=2, fpSize=2048)
+    query = Chem.MolFromSmiles("c1ccccc1")
+    assert query is not None
+    reference = [
+        float(DataStructs.TanimotoSimilarity(generator.GetFingerprint(query), generator.GetFingerprint(mol)))
+        for mol in (Chem.MolFromSmiles(row["smiles"]) for row in table.rows)
+    ]
+    values = [row["similarity_query"] for row in cpu.rows]
+    assert values == reference
+    # The engine may differ, the numbers may not.
+    assert [row["similarity_query"] for row in auto.rows] == values
+
+
+def test_similarity_node_reports_missing_gpu_instead_of_falling_back(monkeypatch):
+    from hcs_discovery.similarity import clear_device_cache
+    from hcs_discovery.workflow.nodes import _run_similarity
+
+    clear_device_cache()
+    monkeypatch.setattr(
+        "hcs_discovery.similarity.probe_gpu",
+        lambda: {"status": "software_only", "detail": "No hardware GPU adapter was found."},
+    )
+    with pytest.raises(ValidationError) as excinfo:
+        _run_similarity(_table(), SimilarityConfig(query_smiles="c1ccccc1", engine="gpu"), DummyContext())
+    assert excinfo.value.code == "validation_error"
+    assert "hardware GPU adapter" in excinfo.value.details["reason"]
+    clear_device_cache()
+
+
 def test_filter_flags_and_preserves_rejected_rows():
     table = _table()
     config = FilterConfig(rules=[{"column": "mw", "op": "le", "value": 100}])
