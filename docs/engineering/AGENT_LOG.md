@@ -608,6 +608,53 @@ Worked through GEMINI.md again from the merged `main`.
     Pfad A von `f023c70` geschnitten, das Lockfile dort ist stabil; die
     Entscheidung darüber gehört zum Release-Termin.
 
+## 2026-11-03 — GPU similarity as a product path (local → browser → Vercel → exe)
+
+- Branch/SHA: `feat/v2-stable-readiness`, Ausgangspunkt `2758178` (WGSL-Kernel,
+  Vulkan-Engine, PyInstaller-Exe, statisches Vercel-SPA), Arbeitsbaum mit den
+  unfertigen Browser-Dateien (`GpuBenchmark.tsx`, `gpuTanimoto.ts`, `gpu.spec.ts`).
+- Recherche: `docs/research/SOTA_GAP_ANALYSIS.md`. Kurzfassung — SOTA bei
+  Ähnlichkeitssuche heißt GPU-Kernel für Morgan/Tanimoto plus BitBound (nvMolKit:
+  CUDA-only, H100-Zahlen; chemfp: ~130M 1024-bit-Tanimotos/s auf einem Kern,
+  k=1000 über 1.8M ChEMBL in 27 ms). Unser Kernel war vorhanden, aber nur als
+  Benchmark erreichbar. Genau diese Lücke wird geschlossen; ADMET (Chemprop/TDC),
+  Strukturvorhersage und MD bleiben offen und dokumentiert.
+- Geändert:
+  - `src/hcs_discovery/similarity.py` — `TanimotoIndex` / `tanimoto_search` mit
+    k-NN und Threshold, residenter Bibliothek, Chunking über der
+    Storage-Buffer-Grenze, CPU-Referenz und `verify=True`: die GPU-Popcounts
+    werden gegen `gpu.cpu.cpu_counts` geprüft, ein Unterschied wirft `ParityError`
+    statt eine Zahl zu liefern. Ähnlichkeit ist `inter/union` in float64, also
+    bit-identisch zu `DataStructs.TanimotoSimilarity`. `prefer="gpu"` ohne
+    Hardware wirft `GpuUnavailableError` statt still auf CPU zu fallen.
+  - `workflow/nodes.py` — `chem.similarity` bekommt `engine: auto|cpu|gpu`,
+    loggt Engine/Adapter/Parity als Run-Event und nimmt die Engine in den
+    Cache-Runtime-Fingerprint auf. Standard-Radius/-Bits nutzen den Kernel,
+    andere Breiten bleiben beim CPU-Pfad (und sagen das im Engine-Detail).
+  - `cli/main.py` — `hcs-discovery similarity search --query … --file … [-k]
+    [--threshold] [--engine] [--output]`, Schema `hcs.similarity-search.v1`,
+    Standardisierung wie `dataset import`.
+  - `api/app.py` — CSP: `'wasm-unsafe-eval'` und `'unsafe-eval'`, kein Remote-
+    Script-Source. Grund: RDKit MinimalLib ist mit Emscripten embind gebaut und
+    generiert Bindings per `new Function`; ohne das lief das Browser-Panel nie.
+  - Browser: `GpuBenchmark.tsx` / `gpuTanimoto.ts` melden Durchsatz (M/s),
+    prüfen die Storage-Buffer-Grenze und fangen Kernel-Fehler als Fehlerzustand;
+    `e2e/browser-compute.spec.ts` testet den RDKit-WASM-Selbsttest gegen den
+    echten Server, `e2e/gpu.spec.ts` die WebGPU-Parität.
+  - `scripts/science/benchmark_gpu_similarity.py` → erzeugt
+    `docs/validation/gpu-tanimoto.md` und `build/gpu-similarity.json`.
+- Messung (AMD Radeon 680M, Vulkan, 5 Wiederholungen, Median):
+  100k Fingerprints resident 1,5 ms (65,0M/s, 10,5× RDKit), 500k resident 5,2 ms
+  (96,0M/s, 17,7× RDKit), Counts exakt, Top-10 identisch, max. Abweichung zu
+  RDKit 0,0.
+- Befehle und Ergebnis: `similarity search` über `examples/datasets/demo_library.csv`
+  → 17 Strukturen, `engine gpu (Vulkan, AMD Radeon(TM) Graphics)`, Parity
+  verifiziert; `HCS_E2E_WEBGPU=1 npx playwright test e2e/gpu.spec.ts` → 1 passed;
+  volle E2E-Suite → 5 passed; ruff format/check und mypy grün.
+- Nicht getan: BitBound-Prefilter, persistente gepackte Fingerprints pro Dataset,
+  API-Route für die Suche, GPU-Fingerprint-Generierung, Vergleich mit nvMolKit
+  (CUDA-only, andere Hardware).
+
 ## Blockers
 
 - None technical at the time of writing. The `v0.1.0` preview is published and

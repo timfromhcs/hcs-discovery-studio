@@ -120,6 +120,22 @@ hcs-discovery compounds validate library.sdf --output validation.json
 
 This does not write to the database. It exits `1` if any row fails.
 
+## Similarity search
+
+```bash
+hcs-discovery similarity search --query "CC(=O)Oc1ccccc1C(=O)O" --file library.smi --k 10
+hcs-discovery similarity search --query "c1ccccc1" --file library.csv \
+  --threshold 0.7 --engine gpu --output scores.csv --json
+```
+
+Structures are standardised exactly as `dataset import` does, then scored against
+one query with Morgan/ECFP fingerprints and Tanimoto similarity. `--engine` is
+`auto` (a hardware GPU when present, otherwise the CPU), `cpu`, or `gpu`; `gpu`
+fails with exit code `3` when no hardware adapter exists instead of falling back.
+The JSON payload (`hcs.similarity-search.v1`) names the adapter, the backend and
+whether the GPU counts were verified against the CPU reference. `--output` writes
+every scored row to CSV, including non-hits.
+
 ## Workflows
 
 ```bash

@@ -20,6 +20,7 @@ import {
 import { formatBytes, formatDate } from "../lib/format";
 import { useBrowserCapabilities } from "../lib/browserCapabilities";
 import { BrowserChemistry } from "../components/BrowserChemistry";
+import { GpuBenchmark } from "../components/GpuBenchmark";
 
 const ENV_VARS: Array<{ name: string; description: string }> = [
   { name: "HCS_DATA_DIR", description: "Database, uploads, artifacts and cache directory (default ./data)." },
@@ -231,7 +232,7 @@ export function SettingsPage() {
       <Card>
         <CardHeader
           title="Browser capabilities"
-          subtitle="Detected in this browser, not asserted. No scientific engine runs client-side in this release."
+          subtitle="Detected in this browser, not asserted. Two opt-in engines run client-side; the local backend remains the dependable path."
           icon="cpu"
         />
         {browser ? (
@@ -260,9 +261,10 @@ export function SettingsPage() {
                 },
               ]}
             />
-            <InlineNotice tone="info" title="Capability detection only">
-              WebGPU and WebAssembly are probed as platform features. Scientific compute (RDKit, docking, property
-              estimates) still runs on the local backend CPU; no model executes through the browser in this release.
+            <InlineNotice tone="info" title="What runs in this browser">
+              Two opt-in engines run here, both with a reference path: RDKit WebAssembly for parse, descriptors and
+              depiction, and the WebGPU Tanimoto kernel, whose counts must match a JavaScript reference exactly before
+              any timing is shown. Docking, property estimates and workflow runs still execute on the local backend.
             </InlineNotice>
           </>
         ) : (
@@ -271,6 +273,8 @@ export function SettingsPage() {
       </Card>
 
       <BrowserChemistry />
+
+      <GpuBenchmark />
 
       <Card>
         <CardHeader title="Environment variables" subtitle="Set these before starting the service; the UI never writes them." icon="settings" />

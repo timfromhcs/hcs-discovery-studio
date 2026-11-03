@@ -1,12 +1,12 @@
 {
   "coverage": {
-    "branch_percent": 81.4
+    "branch_percent": 82.7
   },
   "schema": "hcs.evidence.v1",
   "tests": {
     "failed": 0,
-    "passed": 443,
-    "skipped": 2
+    "passed": 476,
+    "skipped": 0
   },
   "version": "2.0.0"
 }

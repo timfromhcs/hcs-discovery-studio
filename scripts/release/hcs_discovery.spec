@@ -34,6 +34,13 @@ web_dist = ROOT / "apps" / "web" / "dist"
 if web_dist.is_dir():
     datas += [(str(web_dist), "hcs_discovery/web")]
 
+# GPU kernels are data files read at runtime (gpu.KERNEL_PATH). Without them the
+# frozen executable would probe the adapter successfully and then fail to build
+# the pipeline, silently dropping to the CPU reference.
+kernels = ROOT / "src" / "hcs_discovery" / "gpu" / "kernels"
+if kernels.is_dir():
+    datas += [(str(kernels), "hcs_discovery/gpu/kernels")]
+
 # Alembic migration scripts (same layout the wheel uses via force-include).
 migrations = ROOT / "migrations"
 if migrations.is_dir():

@@ -9,7 +9,29 @@ was **not** run.
 
 ---
 
-## Re-measurement 2026-11-02 (branch `feat/target-explorer-api` @ `76617ad`)
+## Browser compute on Vercel — verified 2026-11-03
+
+The static SPA (no backend) was deployed to the `hcs-discovery-studio` project and
+verified in a real browser session against the deployed URL, not locally:
+
+| Item | Value |
+|---|---|
+| Deployment | `https://hcs-discovery-studio-g7i0jm3zf-hcsmediacorp.vercel.app` (preview, Ready) |
+| Production alias | `https://hcs-discovery-studio.vercel.app` (pointing at an earlier production deployment) |
+| Protection | Vercel Authentication is enabled; automated access used the CLI's development OIDC token as `x-vercel-trusted-oidc-idp-token`. Nothing was made public for the test. |
+| Browser | system Chrome 141 with `--enable-unsafe-webgpu` |
+| RDKit WebAssembly self-test | **verified** — canonical SMILES `CC(=O)Oc1ccccc1C(=O)O`, descriptors and SVG rendered client-side |
+| WebGPU Tanimoto | **parity: bit-exact** over 100,000 fingerprints against the JavaScript reference; 10.5× measured speed-up on the visitor GPU |
+| Page errors | none |
+| Backend | **absent by design** — every `/api/v1` call fails in the static preview; this deployment demonstrates the client-side compute path only |
+
+Reproduce: `vercel deploy`, then run the same Playwright journey used by
+`apps/web/e2e/gpu.spec.ts` and `apps/web/e2e/browser-compute.spec.ts` against the
+deployment URL with the OIDC header from `vercel env pull`.
+
+---
+
+## Re-measurement 2026-11-03 (branch `feat/v2-stable-readiness`)
 
 Produced by the gate runner, not by hand: `uv run python scripts/gates.py --level fast
 --only G4` writes `build/junit.xml` and `build/coverage.json`, and
@@ -19,8 +41,8 @@ of that earlier run; they are not edited retroactively.
 
 | Measurement | Command | Observed |
 |---|---|---|
-| Tests (no docking binary on this host) | `uv run pytest -q` via G4 | <!-- gen:tests -->443 passed, 2 skipped<!-- /gen:tests --> |
-| Coverage | same run, `--cov-branch` | <!-- gen:coverage -->81 % branch coverage<!-- /gen:coverage --> |
+| Tests (no docking binary on this host) | `uv run pytest -q` via G4 | <!-- gen:tests -->476 passed, 0 skipped<!-- /gen:tests --> |
+| Coverage | same run, `--cov-branch` | <!-- gen:coverage -->83 % branch coverage<!-- /gen:coverage --> |
 | Tests with the docking binary | `HCS_REQUIRE_VINA=1 uv run pytest tests/scientific/test_vina_adapter.py` | **NOT RUN** locally: no Vina binary is installed on this host (PLAN.md R0.4) |
 
 ---
@@ -80,12 +102,14 @@ Its first real execution will be the release-candidate run.
 | [`validation/ligand-prep-meeko.md`](../validation/ligand-prep-meeko.md) | Ligand PDBQT matches Meeko 0.8.0 on 48/51 fixture ligands; 3 macrocycles kept rigid on purpose. |
 | [`validation/esol-solubility.md`](../validation/esol-solubility.md) | Reduced ESOL on 45 independent measured compounds: RMSE 0.968, R² 0.072, bootstrap 95 % CI [0.708, 1.260]; mean baseline RMSE 1.004. **Weak.** |
 | [`research/HAEL.md`](../research/HAEL.md) | Synthetic matched-budget ablation only. HAEL is `experimental`, not the default, not wired into a workflow. |
+| [`validation/gpu-tanimoto.md`](../validation/gpu-tanimoto.md) | Shared WGSL Tanimoto kernel on one integrated AMD GPU: exact counts against the numpy reference and bit-identical scores to RDKit; 100k fingerprints 1.5 ms, 500k 5.2 ms resident (≈96 M Tanimoto/s). Not a comparison with CUDA libraries. |
 
 ### Known limitations at this commit
 
 - Docking is regression-checked on one complex, not benchmarked.
 - Property estimates are weak and have no calibrated uncertainty.
-- No MD, no learned ADMET model, no structure prediction, no GPU execution.
+- No MD, no learned ADMET model, no structure prediction. GPU execution exists for
+  the Tanimoto similarity kernel only.
 - No target UI page; targets/structures exist as service + API + CLI.
 - Single machine: SQLite queue, no distributed workers, no multi-tenant hosting.
 - No TLS; any non-loopback deployment needs a hardened proxy.

@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 import os
 import shutil
 import subprocess
@@ -38,9 +39,15 @@ WORK = REPO_ROOT / "build" / "exe-build"
 
 
 def run(argv: list[str], *, cwd: Path | None = None, check: bool = True) -> subprocess.CompletedProcess[str]:
-    print("+ " + " ".join(argv), flush=True)
+    # Windows resolves npm/npx through .cmd shims, which CreateProcess does not
+    # find from a bare name. CI runs on Linux; a developer on Windows must not get
+    # a FileNotFoundError for a script that is otherwise correct.
+    resolved = list(argv)
+    if sys.platform == "win32" and resolved and resolved[0] in {"npm", "npx"}:
+        resolved[0] = f"{resolved[0]}.cmd"
+    print("+ " + " ".join(resolved), flush=True)
     return subprocess.run(
-        argv, cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace", check=check
+        resolved, cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace", check=check
     )
 
 
@@ -93,7 +100,10 @@ def smoke_test(exe: Path) -> None:
         raise SystemExit(f"executable not found: {exe}")
 
     env = dict(os.environ)
-    with tempfile.TemporaryDirectory(prefix="hcs-exe-smoke-") as data_dir:
+    # ignore_cleanup_errors: Windows can keep a handle on the SQLite file for a
+    # moment after the server process exits; the directory is under the temporary
+    # directory either way and the smoke assertions have already run.
+    with tempfile.TemporaryDirectory(prefix="hcs-exe-smoke-", ignore_cleanup_errors=True) as data_dir:
         env["HCS_DATA_DIR"] = data_dir
 
         def call(*args: str) -> subprocess.CompletedProcess[str]:
@@ -114,6 +124,26 @@ def smoke_test(exe: Path) -> None:
         if "RDKit 2026" not in doctor.stdout:
             raise SystemExit(f"exe doctor failed to load RDKit:\n{doctor.stdout}\n{doctor.stderr}")
 
+        # The GPU path is optional on the host, never on the bundle: if the frozen
+        # executable can see an adapter, the WGSL kernel must be inside it and the
+        # verified GPU search must actually run there (a missing kernel data file
+        # used to fall back to the CPU without saying so).
+        probe = json.loads(call("gpu", "probe").stdout or "{}")
+        if probe.get("status") == "available":
+            library = REPO_ROOT / "examples" / "datasets" / "demo_library.csv"
+            gpu_run = call(
+                "similarity", "search", "--query", "c1ccccc1", "--file", str(library), "--engine", "gpu", "--json"
+            )
+            try:
+                payload = json.loads(gpu_run.stdout)
+            except json.JSONDecodeError as exc:
+                raise SystemExit(f"exe GPU search produced no JSON:\n{gpu_run.stdout}\n{gpu_run.stderr}") from exc
+            if payload.get("engine", {}).get("name") != "gpu" or not payload.get("parity_checked"):
+                raise SystemExit(
+                    "exe GPU similarity search did not run on the adapter, although the adapter is available:\n"
+                    + json.dumps(payload, indent=2)[:1000]
+                )
+
         server = subprocess.Popen(
             [str(exe), "serve", "--port", "8807"], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
         )
@@ -122,6 +152,11 @@ def smoke_test(exe: Path) -> None:
                 raise SystemExit("exe server did not become ready")
         finally:
             server.terminate()
+            try:
+                server.wait(timeout=30)
+            except subprocess.TimeoutExpired:  # pragma: no cover - defensive
+                server.kill()
+                server.wait(timeout=10)
 
     print(f"smoke test passed for {exe.name}")
 

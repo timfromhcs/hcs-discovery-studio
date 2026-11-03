@@ -7,8 +7,8 @@ import { useEffect, useState } from "react";
  * do, never imply scientific compute that does not exist. WebGPU is probed with a
  * real, trivial compute-pipeline self-test (one storage buffer incremented once)
  * so "compute verified" means the GPU pipeline ran, not that an adapter exists.
- * No scientific engine executes through WebGPU in this release; the self-test
- * only proves the pipeline is usable.
+ * The probe itself proves only that the pipeline is usable; the opt-in similarity
+ * benchmark is what runs a scientific kernel through it, parity-checked.
  */
 
 export interface WebGpuInfo {

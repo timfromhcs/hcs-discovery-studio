@@ -26,8 +26,10 @@ flowchart LR
 ```
 
 There is no required network hop. In the default `local` network policy, remote
-LLM endpoints and remote data connectors are blocked. Vulkan is probed for
-hardware presence only and is never reported as model support.
+LLM endpoints and remote data connectors are blocked. One scientific kernel does
+run on the GPU (`gpu/`, the shared WGSL Tanimoto kernel via `wgpu-py`, with an
+exact CPU reference); every other engine is CPU-only and hardware presence alone
+is never reported as model support.
 
 ## Repository layout
 

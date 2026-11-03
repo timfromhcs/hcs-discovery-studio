@@ -188,3 +188,58 @@ def test_cli_on_uninitialized_database(tmp_path: Path):
     finally:
         dispose_engines()
         reset_settings(None)
+
+
+def test_similarity_search_reports_engine_and_hits(settings, tmp_path: Path):
+    library = tmp_path / "library.smi"
+    library.write_text(
+        "c1ccccc1 benzene\nCCO ethanol\nCC(=O)Oc1ccccc1C(=O)O aspirin\nnot-a-smiles broken\n",
+        encoding="utf-8",
+    )
+    payload = _json(
+        runner.invoke(
+            app,
+            [
+                "--json",
+                "similarity",
+                "search",
+                "--query",
+                "c1ccccc1",
+                "--file",
+                str(library),
+                "--k",
+                "2",
+                "--engine",
+                "cpu",
+            ],
+        )
+    )
+    assert payload["schema"] == "hcs.similarity-search.v1"
+    assert payload["engine"]["name"] == "cpu"
+    assert payload["parity_checked"] is False
+    assert payload["n_library"] == 3 and payload["n_rejected"] == 1
+    assert payload["hits"][0]["similarity"] == 1.0
+    assert payload["hits"][0]["name"] == "benzene"
+    assert [hit["rank"] for hit in payload["hits"]] == [1, 2]
+
+    scores = tmp_path / "scores.csv"
+    result = runner.invoke(
+        app,
+        [
+            "similarity",
+            "search",
+            "--query",
+            "c1ccccc1",
+            "--file",
+            str(library),
+            "--engine",
+            "cpu",
+            "--output",
+            str(scores),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    rows = scores.read_text(encoding="utf-8").splitlines()
+    assert rows[0] == "row_index,name,smiles,similarity"
+    assert len(rows) == 4
+    assert rows[1].endswith("1.000000")

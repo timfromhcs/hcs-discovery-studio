@@ -27,6 +27,7 @@ ALLOWED_SPDX = {
     "CC0-1.0",
     "ISC",
     "MIT",
+    "MIT-0",
     "MIT-CMU",
     "MPL-2.0",
     "PSF-2.0",
@@ -65,7 +66,32 @@ CLASSIFIER_ALIASES = {
     "License :: OSI Approved :: zlib/libpng License": "Zlib",
 }
 
+# Build-only tools that are never imported by the application and never part of
+# the wheel. PyInstaller's bootloader is GPL-2.0-with-exception, which is why it is
+# deliberately kept out of the lockfile (see scripts/release/build_executable.py).
+# They are listed as `build-only` rows so the report stays complete instead of
+# silently ignoring them.
+BUILD_ONLY_TOOLS = {
+    "altgraph",
+    "pefile",
+    "pyinstaller",
+    "pyinstaller-hooks-contrib",
+    "pywin32-ctypes",
+}
+
 TOKEN_RE = re.compile(r"[A-Za-z0-9.+\-]+")
+
+# Some distributions ship a license file but no SPDX identifier in their metadata
+# (an embedded full license text is a common, non-machine-readable variant). The
+# first line of the declared License-File must match one of these titles exactly;
+# a substring anywhere else is never accepted.
+LICENSE_FILE_TITLES = {
+    "BSD 2-Clause License": "BSD-2-Clause",
+    "BSD 3-Clause License": "BSD-3-Clause",
+    "ISC License": "ISC",
+    "MIT License": "MIT",
+    "The Unlicense": "Unlicense",
+}
 
 
 def _split_expression(expression: str) -> list[str]:
@@ -83,6 +109,35 @@ def _normalise(value: str) -> str | None:
         return alias
     if cleaned in ALLOWED_SPDX:
         return cleaned
+    return None
+
+
+def _license_file_title(dist: metadata.Distribution) -> tuple[str, str] | None:
+    """Resolve a license from the *first line* of a declared license file.
+
+    This is the last resort for distributions that embed the full license text in
+    their metadata and therefore expose neither a ``License-Expression`` nor a
+    usable classifier. Only an exact title match on line 1 is accepted.
+    """
+
+    declared = dist.metadata.get_all("License-File") or []
+    files = [str(item).replace("\\", "/") for item in (dist.files or [])]
+    for name in declared:
+        suffix = name.replace("\\", "/")
+        for candidate in files:
+            if not candidate.endswith(suffix):
+                continue
+            path = dist.locate_file(candidate)
+            try:
+                lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+            except OSError:
+                continue
+            if not lines:
+                continue
+            title = lines[0].strip()
+            mapped = LICENSE_FILE_TITLES.get(title)
+            if mapped:
+                return mapped, f"License-File: {name} ({title})"
     return None
 
 
@@ -111,6 +166,11 @@ def resolve_license(dist: metadata.Distribution) -> tuple[set[str], str]:
     if identifiers:
         return identifiers, "Classifier: " + "; ".join(classifiers)
 
+    from_file = _license_file_title(dist)
+    if from_file:
+        identifier, source = from_file
+        return {identifier}, source
+
     return set(), "unresolved"
 
 
@@ -130,6 +190,18 @@ def main() -> int:
         if name.lower() == "hcs-discovery-studio":
             continue
         identifiers, source = resolve_license(dist)
+        if name.lower() in BUILD_ONLY_TOOLS:
+            rows.append(
+                {
+                    "name": name,
+                    "version": dist.version,
+                    "license": " AND ".join(sorted(identifiers)) or "build-only",
+                    "source": source,
+                    "allowed": True,
+                    "build_only": True,
+                }
+            )
+            continue
         allowed = bool(identifiers) and identifiers <= ALLOWED_SPDX
         if not allowed:
             failures.append(f"{name} {dist.version}: {source}")
@@ -149,7 +221,7 @@ def main() -> int:
         print(json.dumps({"packages": rows, "failures": failures}, indent=2))
     else:
         for row in rows:
-            status = "ok" if row["allowed"] else "FAIL"
+            status = "skip" if row.get("build_only") else "ok" if row["allowed"] else "FAIL"
             print(f"{status:4}  {row['name']:<28} {row['version']:<12} {row['license']}")
         print(f"\n{len(rows)} packages checked; {len(failures)} outside policy.")
 

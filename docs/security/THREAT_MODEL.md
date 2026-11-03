@@ -56,6 +56,13 @@ node runs with the user's privileges. This is a deliberate 0.1.0 limitation.
 - Rate limiting applies to expensive POSTs on non-loopback binds.
 - Security headers include CSP, `X-Frame-Options: DENY`, `nosniff` and
   `Referrer-Policy: no-referrer`.
+- The CSP allows no remote script source. It does grant `'wasm-unsafe-eval'` and
+  `'unsafe-eval'`, because RDKit's WebAssembly build is compiled with Emscripten
+  embind, which creates its JavaScript bindings with `new Function`. Without both
+  tokens the bundled WASM module cannot instantiate, so the browser-chemistry
+  panel fails closed with a visible error. The trade-off is stated here rather
+  than hidden: script *sources* stay first-party, but string-to-code evaluation
+  inside those first-party scripts is permitted. See §5 for the residual risk.
 
 **Residual:** No TLS, no user accounts, no per-project authorization, no token
 rotation or expiry. A shared token grants full access. Use a reverse proxy with
@@ -128,9 +135,16 @@ an exported report.
 
 **Mitigations:**
 
-- React escapes text by default; the UI does not use `dangerouslySetInnerHTML`.
+- React escapes text by default. The UI has exactly one
+  `dangerouslySetInnerHTML` use: the SVG depiction produced by RDKit WebAssembly
+  for an already-parsed molecule. It renders a generated drawing, not input text,
+  and no imported string is injected as HTML.
 - Report Markdown and HTML escape imported values.
-- CSP restricts scripts to `self` and blocks framing.
+- CSP restricts script sources to `self` and blocks framing. `'wasm-unsafe-eval'`
+  and `'unsafe-eval'` are granted for RDKit's embind bindings only; the residual
+  risk is that a same-origin script injection would also be able to evaluate
+  strings. No remote script source is allowed, so such an injection would have to
+  come from first-party code or a compromised dependency.
 - Uploaded files are never served as HTML from the SPA mount.
 
 **Residual:** A user who opens a downloaded report outside the app trusts that
