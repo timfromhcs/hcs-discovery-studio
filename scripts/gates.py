@@ -251,6 +251,7 @@ GATES: tuple[Gate, ...] = (
             Step("npm ci", ("npm", "ci"), cwd="apps/web"),
             Step("npm run typecheck", ("npm", "run", "typecheck"), cwd="apps/web"),
             Step("npm run build", ("npm", "run", "build"), cwd="apps/web"),
+            Step("node scripts/ci/check_bundle_budget.mjs", ("node", "scripts/ci/check_bundle_budget.mjs")),
         ),
         levels=("full", "science", "release"),
         requires="npm",

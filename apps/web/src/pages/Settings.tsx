@@ -278,7 +278,7 @@ export function SettingsPage() {
 
       <Card>
         <CardHeader title="Environment variables" subtitle="Set these before starting the service; the UI never writes them." icon="settings" />
-        <div className="table-wrap">
+        <div className="table-wrap" tabIndex={0} role="region" aria-label="Environment variables">
           <table className="data-table env-table">
             <thead>
               <tr>

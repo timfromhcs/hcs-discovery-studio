@@ -833,6 +833,30 @@ Worked through GEMINI.md again from the merged `main`.
 - Verifikation: Dry-Runs beider Skripte, laufender Turn wird als „already running
   (pid …)" erkannt; Tasks `HCS-OpenCode-Hourly` und `HCS-OpenCode-Watchdog` sichtbar.
 
+## 2026-11-03 (19:00) — axe-Gate + Bundle-Budget (WCAG 2.2)
+
+- Branch `main` @ `a3d7be9`. Nächste „Now"-Zeile: Accessibility-Audit und Budgets.
+- Neu: Dev-Dependency `@axe-core/playwright@4.11.0` (MPL-2.0, dev-only; der npm-
+  Lizenzcheck prüft nur Produktionspakete) und `apps/web/e2e/a11y.spec.ts`: axe-core
+  mit `wcag2a/2aa/21a/21aa/22aa` über 7 Routen gegen den echten Server; `serious`
+  und `critical` schlagen fehl, `moderate/minor` werden geloggt.
+- Dabei drei echte Defekte gefunden und behoben:
+  1. `link-in-text-block` (About): Inline-Links nur per Farbe unterscheidbar →
+     `.text-link` und Links in Prosa sind jetzt dauerhaft unterstrichen (WCAG 1.4.1).
+  2. `scrollable-region-focusable` (Settings, Umgebungstabelle): `tabIndex=0`,
+     `role="region"`, `aria-label`.
+  3. dito (About, Zitatblock `<pre>`): gleiche Behandlung mit `aria-label`
+     „Citation in BibTeX format".
+- `scripts/ci/check_bundle_budget.mjs`: gzip-Budget JS 210 kB / CSS 16 kB / total
+  235 kB; aktuell 167/10/177 kB. Läuft im Gate-Runner (G5) und im CI-Frontend-Job.
+  Bewusst ohne Lighthouse: LCP/CLS auf einem statischen Host ohne Backend wären
+  nicht vergleichbar; die Zahlen sind als offen markiert.
+- Verifikation: 19 E2E-Tests grün (7 davon axe), `npm run build` grün,
+  Bundle-Budget grün. Zwischenfälle: `npm ci` scheiterte an einem gesperrten
+  `node_modules` (laufende Vite/Playwright-Prozesse beendet), und ein CSS-Edit hatte
+  verwaiste Deklarationen hinterlassen (lightningcss-Fehler) — beides behoben.
+- Offen: Lighthouse-LCP/CLS-Budget; Tag/PyPI/DOI (owner-gated).
+
 ## Blockers
 
 - None technical at the time of writing. The `v0.1.0` preview is published and

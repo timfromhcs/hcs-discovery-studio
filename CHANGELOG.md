@@ -63,11 +63,19 @@ container image and the service worker described below.
   intercept the requests that loaded it. Verified by killing the static preview
   server and reloading: shell, bundle, WASM, IndexedDB copy and similarity all still
   work. A web app manifest makes it installable where the browser supports it.
-- **Observability.** `GET /api/v1/metrics` exposes a small Prometheus text
+- **Accessibility gate and bundle budget.** `e2e/a11y.spec.ts` runs axe-core
+  (WCAG 2.0/2.1/2.2 A+AA) over seven routes; serious and critical violations fail
+  the suite. It found three real defects, now fixed: inline links that relied on
+  colour alone (1.4.1), and two scrollable regions without keyboard access (the
+  environment table and the citation block). `scripts/ci/check_bundle_budget.mjs`
+  fails the build when the gzipped JS/CSS exceeds 210/16 kB, and runs in the gate
+  runner and CI.
+- **Metrics endpoint.** `GET /api/v1/metrics` exposes a small Prometheus text
   exposition (build info, uptime, projects/datasets/compounds, runs by status,
-  queue depth, node-cache entries and bytes, GPU availability). No dependency, no
-  paths, no tokens, no per-request labels; it follows the same bearer-token rule as
-  the rest of `/api/v1`. Traces and dashboards are still absent and listed as such.
+  queue depth, cache entries and bytes, fingerprint-cache size, GPU availability).
+  No dependency, no paths, no tokens, no per-request labels; it follows the same
+  bearer-token rule as the rest of `/api/v1`. Traces and dashboards are still
+  absent and listed as such.
 - **Dataset fingerprint cache.** Packed Morgan fingerprints are stored once per
   dataset (`dataset_fingerprints`, migration `b7d21c4f9a03`) with a checksum over
   the compound set and one over the packed bytes. A repeated similarity search no

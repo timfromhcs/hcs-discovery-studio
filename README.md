@@ -1,4 +1,4 @@
-﻿<p align="center">
+<p align="center">
   <img src="docs/assets/branding/hcs-discovery-wordmark.svg" alt="HCS Discovery Studio" width="580">
 </p>
 
@@ -256,7 +256,9 @@ are using. Hardware presence alone is never reported as a speed claim.
 | Coverage | `uv run pytest --cov=hcs_discovery --cov-branch` | <!-- gen:coverage -->83 % branch coverage<!-- /gen:coverage --> locally; CI floor 70%, HAEL modules ≥94% |
 | Python format/lint/type | `uv run ruff format --check .`, `uv run ruff check .`, `uv run mypy` | Clean locally and in CI |
 | Frontend typecheck/build | `npm run typecheck`, `npm run build` in `apps/web` | Clean locally and in CI |
-| End-to-end | `npm run test:e2e` in `apps/web` | 12 passed locally (studio journey, planned engines, unknown runs, browser WebAssembly self-test, WebGPU parity, offline lab x3, offline cache with the server killed, SEO/404 x3) |
+| End-to-end | `npm run test:e2e` in `apps/web` | 19 passed locally (studio journey, planned engines, unknown runs, browser WebAssembly self-test, WebGPU parity, offline lab x3, offline cache with the server killed, SEO/404 x3, axe accessibility x7) |
+| Accessibility | `npx playwright test e2e/a11y.spec.ts` | axe-core WCAG 2.0/2.1/2.2 A+AA over 7 routes; serious and critical violations fail the build |
+| Bundle budget | `node scripts/ci/check_bundle_budget.mjs` | JS 167 kB gzip (budget 210), CSS 10 kB (budget 16); checked in the gate runner and CI |
 | Visual and a11y QA | `node apps/web/scripts/visual_qa.mjs` against a running app | 192 captures (18 routes × 6 widths × 2 themes), 0 automatic findings |
 | License policy | `uv run python scripts/ci/check_licenses.py`, `node scripts/ci/check_licenses.mjs` | Pass locally and in CI |
 | Dependency audit | `pip-audit`, `npm audit --omit=dev` | No known vulnerabilities at release time |

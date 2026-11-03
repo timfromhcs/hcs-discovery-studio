@@ -214,7 +214,9 @@ export function AboutPage() {
 
         <Card>
           <CardHeader title="Citation" subtitle="Cite the software version you actually used." icon="library" />
-          <pre className="citation-block">{citation}</pre>
+          <pre className="citation-block" tabIndex={0} role="region" aria-label="Citation in BibTeX format">
+            {citation}
+          </pre>
           <div className="row-actions">
             <CopyButton value={citation} label="Copy BibTeX" />
             <CopyButton value="hcs-discovery version" label="Copy version command" />

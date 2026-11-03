@@ -257,6 +257,17 @@ svg {
   font-size: 0.75rem;
 }
 
+/* WCAG 1.4.1: links inside prose must be distinguishable without colour. The
+   product palette is low-contrast by design, so an underline is the honest fix. */
+p a,
+li a,
+.tiny a,
+small a,
+.table-note a {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .tabular {
   font-variant-numeric: tabular-nums;
 }
@@ -318,6 +329,11 @@ svg {
   align-items: center;
   gap: 4px;
   text-align: left;
+  /* WCAG 1.4.1: inline links must not rely on colour alone; underline at rest, not
+     only on hover. */
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
 }
 
 .text-link:hover {
