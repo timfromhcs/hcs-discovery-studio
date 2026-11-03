@@ -65,9 +65,10 @@ prioritisation signals. Read
 | Persistent lease-based queue & restart recovery | **Available** | Queue/worker integration tests |
 | Bounded cache lifecycle & cascade deletion | **Available** | Size/age pruning and orphan cleanup tests |
 | Report export & table truncation disclosures | **Available** | Markdown/HTML truncation notices & full CSV/JSON/SDF export |
-| React UI for project → import → workflow → run → results | **Available** | 3 Playwright E2E tests |
+| React UI for project → import → workflow → run → results | **Available** | 5 Playwright E2E tests |
 | CLI and versioned HTTP API | **Available** | Shared domain services; CLI integration tests |
-| Self-contained wheel with bundled SPA | **Available** | Built and smoke-tested without Node runtime |
+| Self-contained wheel with bundled SPA | **Available** | Built and smoke-tested without Node runtime; ships the GPU kernel |
+| One-file executable (PyInstaller) | **Builds and smoke-tests** | Gate G15: `version`, `db upgrade`, `doctor`, served `/api/v1/ready` and a verified GPU similarity search inside the frozen binary |
 | HAEL adaptive scheduler (experimental, library only) | **Experimental** | Typed evidence gates, pinned acquisition properties and a synthetic ablation ([design and results](docs/research/HAEL.md)); not wired to a workflow, not the default |
 | OpenMM, Boltz-2, Chai-1 | **Planned** | Tracked honestly in model registry |
 
