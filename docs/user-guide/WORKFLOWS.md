@@ -184,6 +184,39 @@ Output columns: `composite_score`, `pareto_rank`, `rank`.
 Writes `summary.md` and `summary.html` as node artifacts. `top_n` is 1–100.
 The summary includes column definitions and the scientific caveat.
 
+### `select.sat` — coverage selection under a budget
+
+```yaml
+- id: selection
+  type: select.sat
+  config:
+    group_column: filter_pass   # or any string column produced earlier
+    id_column: compound_id
+    k_max: 24
+    min_per_group: 1
+    on_infeasible: fail
+```
+
+Chooses at most `k_max` rows so that every group value is represented at least
+`min_per_group` times. This is a constraint problem, not a ranking: when the budget
+cannot cover the groups, the node fails with the solver's reason instead of writing
+a plausible-looking subset. `on_infeasible: mark` writes all rows as not selected
+with that reason and lets the run continue.
+
+| Field | Default | Notes |
+|---|---|---|
+| `group_column` | required | any string-valued column, e.g. `filter_pass`, a property band or a scaffold |
+| `id_column` | `compound_id` | must be unique per row; duplicates would be selected together |
+| `k_max` | required | 1–100 000 |
+| `min_per_group` | 1 | 0–1 000 |
+| `output_column` | `sat_selected` | boolean, appended |
+| `reason_column` | `sat_reason` | `selected`, `not selected within the budget`, `no group value`, or the solver's reason |
+| `on_infeasible` | `fail` | or `mark` |
+
+The solver is the dependency-free DPLL implementation in `hcs_discovery.sat`
+(watched literals, unit propagation, Sinz cardinality encoding). It is deterministic:
+the same table and configuration produce the same selection.
+
 ## Templates
 
 The UI and CLI expose three templates:

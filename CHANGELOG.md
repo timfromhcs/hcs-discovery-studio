@@ -8,7 +8,13 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
-- Nothing yet. The next change starts here.
+- **`select.sat` workflow node.** Chooses at most `k_max` rows so every group value
+  is covered at least `min_per_group` times, using the dependency-free DPLL solver.
+  It is a constraint decision, not a ranking: with `on_infeasible: fail` (the
+  default) an impossible budget fails the node with the solver's reason instead of
+  writing a plausible subset; `mark` writes all-false rows with that reason. The
+  output is `sat_selected` plus `sat_reason`, and rows are never dropped. Covered by
+  eight node tests (coverage, budget conflicts, ungrouped rows, determinism).
 
 ## [2.2.1] - 2026-11-03
 

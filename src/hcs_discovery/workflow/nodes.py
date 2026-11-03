@@ -29,6 +29,7 @@ from ..plugins.science.properties.adapter import (
     run_property_prediction,
 )
 from ..plugins.science.properties.models import get_property_model
+from ..sat import select_subset
 from ..similarity import (
     SUPPORTED_BITS,
     SUPPORTED_RADIUS,
@@ -853,6 +854,110 @@ def _run_join(table: Table, config: JoinConfig, ctx: NodeContext) -> Table:
     return result
 
 
+# --------------------------------------------------------------------------- SAT selection
+class SatSelectConfig(BaseModel):
+    """Choose a subset that covers every group, with a hard candidate budget."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    group_column: str = Field(pattern=r"^[a-z][a-z0-9_]{0,63}$")
+    id_column: str = Field(default="compound_id", pattern=r"^[a-z][a-z0-9_]{0,63}$")
+    k_max: int = Field(ge=1, le=100_000)
+    min_per_group: int = Field(default=1, ge=0, le=1_000)
+    output_column: str = Field(default="sat_selected", pattern=r"^[a-z][a-z0-9_]{0,47}$")
+    reason_column: str = Field(default="sat_reason", pattern=r"^[a-z][a-z0-9_]{0,47}$")
+    on_infeasible: Literal["fail", "mark"] = "fail"
+
+
+def _run_sat_select(table: Table, config: SatSelectConfig, ctx: NodeContext) -> Table:
+    table.require([config.id_column, config.group_column])
+    groups: dict[str, list[str]] = {}
+    ungrouped: set[str] = set()
+    for row in table.rows:
+        candidate = row.get(config.id_column)
+        if candidate is None or candidate == "":
+            raise ValidationError(
+                f"Column '{config.id_column}' has an empty value; every row needs an id.",
+                details={"column": config.id_column},
+            )
+        group = row.get(config.group_column)
+        if group is None or group == "":
+            ungrouped.add(str(candidate))
+            continue
+        groups.setdefault(str(group), []).append(str(candidate))
+    if not groups:
+        raise ValidationError(
+            "No row has a value in the group column, so there is nothing to cover.",
+            details={"group_column": config.group_column},
+        )
+
+    selection = select_subset(groups, k_max=config.k_max, min_per_group=config.min_per_group)
+    if not selection.satisfiable:
+        if config.on_infeasible == "fail":
+            raise ValidationError(
+                "The coverage constraints cannot be satisfied with this budget.",
+                details={
+                    "reason": selection.reason,
+                    "k_max": config.k_max,
+                    "min_per_group": config.min_per_group,
+                    "groups": len(groups),
+                },
+            )
+        selected: set[str] = set()
+        fallback_reason = selection.reason or "unsatisfiable"
+    else:
+        selected = set(selection.selected)
+        fallback_reason = None
+
+    values: list[bool] = []
+    reasons: list[str] = []
+    for row in table.rows:
+        candidate = str(row.get(config.id_column))
+        if candidate in ungrouped:
+            values.append(False)
+            reasons.append("no group value")
+        elif candidate in selected:
+            values.append(True)
+            reasons.append("selected")
+        else:
+            values.append(False)
+            reasons.append(fallback_reason or "not selected within the budget")
+
+    result = table.copy().add_values(
+        Column(
+            config.output_column,
+            "SAT selected",
+            "boolean",
+            method=f"DPLL coverage (k<={config.k_max}, min {config.min_per_group}/group)",
+            description="True when the solver picked this candidate; not a ranking.",
+        ),
+        values,
+    )
+    result = result.add_values(
+        Column(
+            config.reason_column,
+            "SAT reason",
+            "string",
+            method="DPLL coverage",
+            description="Why the solver selected or skipped this row.",
+        ),
+        reasons,
+    )
+    ctx.log(
+        f"SAT selection: {len(selected)} selected, {len(groups)} groups, "
+        f"k_max={config.k_max}, min_per_group={config.min_per_group}, "
+        f"{selection.stats.decisions} decisions.",
+        data={
+            "selected": len(selected),
+            "groups": len(groups),
+            "satisfiable": selection.satisfiable,
+            "decisions": selection.stats.decisions,
+        },
+    )
+    ctx.report_progress(1.0)
+    return result
+
+
 def register_builtin_nodes(registry: NodeRegistry) -> None:
     registry.register(
         NodeDefinition(
@@ -1008,5 +1113,41 @@ def register_builtin_nodes(registry: NodeRegistry) -> None:
             requires=(),
             outputs=lambda _config: [],
             documentation="Combines multiple pipeline branches using key-based alignment.",
+        )
+    )
+    registry.register(
+        NodeDefinition(
+            type="select.sat",
+            title="SAT coverage selection",
+            category="prioritisation",
+            version=NODE_VERSION,
+            description=(
+                "Choose at most k_max rows so every group is represented at least min_per_group "
+                "times, or report that the constraints are impossible."
+            ),
+            config_model=SatSelectConfig,
+            handler=_run_sat_select,
+            requires=(),
+            extra_requires=lambda config: (config.id_column, config.group_column),
+            outputs=lambda config: [
+                Column(
+                    config.output_column,
+                    "SAT selected",
+                    "boolean",
+                    method="DPLL coverage selection",
+                    description="True when the solver picked this candidate.",
+                ),
+                Column(
+                    config.reason_column,
+                    "SAT reason",
+                    "string",
+                    method="DPLL coverage selection",
+                ),
+            ],
+            documentation=(
+                "A dependency-free DPLL solver decides coverage, not a ranking. With "
+                "on_infeasible='fail' the node refuses to write a partial selection; 'mark' "
+                "writes all-false rows with the solver's reason instead."
+            ),
         )
     )

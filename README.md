@@ -62,7 +62,7 @@ prioritisation signals. Read
 | GPU similarity search (Vulkan / D3D12 / Metal, one WGSL kernel) | **Available** on a hardware adapter, exact CPU fallback | Bit-identical to RDKit on every measured library; resident-library throughput ≈100 M Tanimoto/s at 500k fingerprints on this host's integrated GPU ([benchmark](docs/validation/gpu-tanimoto.md)); threshold searches use the BitBound prefilter and skip up to 88 % of a density-varied library |
 | Browser compute (RDKit WebAssembly + WebGPU Tanimoto) | **Available**, opt-in on the Settings page | Self-test and bit-exact WebGPU parity tests run against the served app |
 | Offline lab (no backend at all) | **Available** | Import CSV/SDF/SMI, RDKit descriptors, triage, ranking, GPU/CPU similarity and IndexedDB persistence, verified against a static build at 360 px; a service worker makes it work offline after the first visit (verified with the server killed) |
-| Constraint selection (SAT) | **Available** | Dependency-free DPLL with watched literals; brute-force differential tests, pigeonhole UNSAT, `sat solve` and `sat select` |
+| Constraint selection (SAT) | **Available** | Dependency-free DPLL with watched literals; brute-force differential tests, pigeonhole UNSAT, `sat solve`/`sat select` and the `select.sat` workflow node |
 | Dataset fingerprint cache | **Available** | Packed Morgan fingerprints stored per dataset with a compound-set checksum and a blob checksum; reuse, invalidation and corruption rebuild are tested; measured 43× faster than re-fingerprinting on a synthetic 5,000-row library ([report](docs/validation/fingerprint-cache.md)) |
 | MCP server | **Available** | `hcs-discovery mcp serve`: five read-only tools over JSON-RPC 2.0, scripted stdio session test |
 | Container image | **Builds and runs** | Multi-stage Dockerfile; health, SPA and a similarity search verified in the container on this host |
@@ -252,7 +252,7 @@ are using. Hardware presence alone is never reported as a speed claim.
 
 | Gate | Command | Result |
 |---|---|---|
-| Backend tests | `uv run pytest -q` | <!-- gen:tests -->582 passed, 0 skipped<!-- /gen:tests --> on the development host; the two live docking tests are deselected there because no Vina binary is installed, and CI runs them on Linux |
+| Backend tests | `uv run pytest -q` | <!-- gen:tests -->591 passed, 0 skipped<!-- /gen:tests --> on the development host; the two live docking tests are deselected there because no Vina binary is installed, and CI runs them on Linux |
 | Coverage | `uv run pytest --cov=hcs_discovery --cov-branch` | <!-- gen:coverage -->83 % branch coverage<!-- /gen:coverage --> locally; CI floor 70%, HAEL modules ≥94% |
 | Python format/lint/type | `uv run ruff format --check .`, `uv run ruff check .`, `uv run mypy` | Clean locally and in CI |
 | Frontend typecheck/build | `npm run typecheck`, `npm run build` in `apps/web` | Clean locally and in CI |

@@ -857,6 +857,29 @@ Worked through GEMINI.md again from the merged `main`.
   verwaiste Deklarationen hinterlassen (lightningcss-Fehler) — beides behoben.
 - Offen: Lighthouse-LCP/CLS-Budget; Tag/PyPI/DOI (owner-gated).
 
+## 2026-11-03 (22:45) — `select.sat` als Workflow-Node
+
+- Ausgangslage: `main` @ `3377c8e` (2.2.1); die parallele Hosted-Parity-Arbeit ist
+  gemerged, mein Review ist beantwortet (Treiber ist `pg8000`, nicht `psycopg`), der
+  Baum ist clean.
+- Neu: `select.sat` in `workflow/nodes.py` — wählt höchstens `k_max` Zeilen, sodass
+  jede Gruppe ≥ `min_per_group` vertreten ist, über den vorhandenen DPLL-Solver
+  (`select_subset`, Sinz-Zähler).
+  - `on_infeasible: fail` (Default) bricht mit dem Solver-Grund ab, statt eine
+    plausible Teilmenge zu schreiben; `mark` schreibt alle Zeilen als nicht gewählt
+    mit Grund und lässt den Lauf weiterlaufen.
+  - Ausgabe `sat_selected` (boolean) + `sat_reason`; Zeilen werden nie entfernt.
+  - Zeilen ohne Gruppenzwang (`NULL`/leer) werden nie gewählt, Grund „no group value".
+  - Deterministisch (Solver sortiert IDs), Gruppen- und ID-Spalte sind Pflicht.
+- Tests: `tests/unit/test_sat_node.py` (8) — Abdeckung, Budgetkonflikt (fail/mark),
+  Zeilen ohne Gruppe, leere Gruppenspalte, `min_per_group`, fehlende Spalten,
+  Determinismus.
+- Doku: `docs/user-guide/WORKFLOWS.md` (Feldtabelle + YAML), README-Zeile,
+  CHANGELOG, Roadmap (Next-Zeile erledigt).
+- Verifikation: ruff/format auf den geänderten Dateien, Node-Tests grün, Node im
+  Registry-Katalog sichtbar (`select.sat`), Workflow-Validator akzeptiert ihn
+  (Gruppenspalte muss von einer Vorgänger-Node stammen). Voller Lauf unten.
+
 ## Blockers
 
 - None technical at the time of writing. The `v0.1.0` preview is published and

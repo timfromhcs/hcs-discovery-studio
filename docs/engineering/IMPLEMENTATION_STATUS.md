@@ -108,7 +108,7 @@ test or a recorded manual check; it does not mean validated science.
 
 - Self-contained wheel bundling the built SPA; smoke-tested locally on port 8793
   and by the CI wheel job.
-- <!-- gen:tests -->582 passed, 0 skipped<!-- /gen:tests --> backend tests on the
+- <!-- gen:tests -->591 passed, 0 skipped<!-- /gen:tests --> backend tests on the
   development host (the live docking tests are deselected there because no Vina
   binary is installed), and the same suite in CI on Linux with the binary
   installed.
@@ -189,7 +189,7 @@ Evidence below was produced on `main` at commit `12febcf` and re-run locally on
 | Gate | Status | Evidence |
 |---|---|---|
 | Lint, format, types | Pass locally and in CI | Ruff, mypy (89 source files) |
-| Backend tests | Pass locally and in CI | <!-- gen:tests -->582 passed, 0 skipped<!-- /gen:tests --> on the development host (the skips are the live docking tests); <!-- gen:coverage -->83 % branch coverage<!-- /gen:coverage -->; Hypothesis properties for ranking and joins; HAEL modules ≥94% |
+| Backend tests | Pass locally and in CI | <!-- gen:tests -->591 passed, 0 skipped<!-- /gen:tests --> on the development host (the skips are the live docking tests); <!-- gen:coverage -->83 % branch coverage<!-- /gen:coverage -->; Hypothesis properties for ranking and joins; HAEL modules ≥94% |
 | Frontend build and E2E | Pass locally and in CI | typecheck, build, 3 Playwright tests on isolated data |
 | Visual QA | Pass locally | `apps/web/scripts/visual_qa.mjs`: 18 routes × 6 widths (incl. 640 px = 200% zoom) × 2 themes = 192 captures, WCAG AA text contrast, heading order, keyboard focus; screenshots reviewed by hand |
 | Fresh migration and wheel | Pass locally and in CI | Wheel ships Alembic scripts and records a revision; wheel installed into a clean venv and completed db upgrade → project → import → run → results |
