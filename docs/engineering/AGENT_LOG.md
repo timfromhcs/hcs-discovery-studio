@@ -813,6 +813,26 @@ Worked through GEMINI.md again from the merged `main`.
 - Offen: Messung „Zeit pro Suche mit/ohne Cache" auf einer großen Bibliothek steht
   noch aus; der Cache-Effekt ist derzeit funktional, nicht in ms belegt.
 
+## 2026-11-03 (12:40) — Cache gemessen + selbstheilende Stundenschleife
+
+- **Cache-Messung nachgeholt** (`scripts/science/benchmark_fingerprint_cache.py`,
+  synthetische 5.000-Zeilen-Bibliothek, Median aus 3 Läufen): `pack_smiles` 656,9 ms,
+  erster Cache-Aufbau 724,1 ms, Cache-Treffer 15,3 ms → **43×**; Checksummen stabil.
+  Report: `docs/validation/fingerprint-cache.md` (inkl. Grenzen: synthetisch, ein
+  Host, Verhältnis „Neu-Fingerprint vs. Cache-Lesen", keine Ende-zu-Ende-Latenz).
+- **Stundenschleife selbstheilend gemacht** (`scripts/ops/`):
+  - `hourly_wakeup.ps1`: JSON-Lock mit PID, **OS-Prüfung auf einen laufenden
+    opencode-Prozess derselben Session** (überlebt einen getöteten Wrapper), ein
+    Retry, Heartbeat `logs/heartbeat.json`, `opencode`-Pfadauflösung.
+  - `watchdog.ps1`: läuft alle 15 min, startet nur bei fehlendem/veraltetem
+    Heartbeat (>75 min) oder `failed`; Dry-Run getestet, erkennt einen 120-min-alten
+    Heartbeat korrekt.
+  - `install_hourly_task.ps1`: registriert beide Tasks per `schtasks` (ohne Admin);
+    `Register-ScheduledTask` scheiterte hier an fehlenden Rechten.
+  - Doku: `docs/ops/HOURLY_LOOP.md` (Ablauf, Prüf- und Reparaturbefehle).
+- Verifikation: Dry-Runs beider Skripte, laufender Turn wird als „already running
+  (pid …)" erkannt; Tasks `HCS-OpenCode-Hourly` und `HCS-OpenCode-Watchdog` sichtbar.
+
 ## Blockers
 
 - None technical at the time of writing. The `v0.1.0` preview is published and

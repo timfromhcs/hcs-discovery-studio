@@ -75,6 +75,9 @@ container image and the service worker described below.
   detected and rebuilt instead of returning scores for the wrong rows. The API
   payload reports `fingerprints.cached` and the checksum, and the metrics endpoint
   exposes `hcs_fingerprint_cache_entries` / `hcs_fingerprint_cache_compounds`.
+  Measured on a synthetic 5,000-row library: 656.9 ms to fingerprint, 15.3 ms to
+  read the cached matrix (43×), checksums verified on every call
+  ([report](docs/validation/fingerprint-cache.md)).
 - **BitBound prefilter for threshold searches.** A fingerprint whose popcount bound
   `min(a,b)/max(a,b)` cannot reach the requested threshold is skipped without a
   comparison; only the candidates are scored. The hits are proven identical to a
