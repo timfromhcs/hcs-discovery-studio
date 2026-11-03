@@ -1,6 +1,6 @@
 [project]
 name = "hcs-discovery-studio"
-version = "2.1.0"
+version = "2.2.0"
 description = "Local-first, open-source AI drug-discovery research workbench with reproducible workflows, provenance and a headless CLI."
 readme = "README.md"
 requires-python = ">=3.12,<3.14"
@@ -35,6 +35,9 @@ dependencies = [
 [project.optional-dependencies]
 llm = ["httpx>=0.27"]
 gpu = ["wgpu>=0.32", "numpy>=2"]
+# Hosted deployments can point ``HCS_DATABASE_URL`` at PostgreSQL. pg8000 is a
+# pure-Python, BSD-3-Clause driver: psycopg is LGPL and would fail the license gate.
+postgres = ["pg8000>=1.31"]
 
 [project.scripts]
 hcs-discovery = "hcs_discovery.cli.main:cli"
@@ -49,6 +52,7 @@ dev = [
   "hypothesis>=6.100",
   "types-PyYAML>=6.0",
   "wgpu>=0.32",
+  "pg8000>=1.31",
 ]
 
 [build-system]

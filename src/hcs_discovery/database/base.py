@@ -30,19 +30,24 @@ def _apply_sqlite_pragmas(dbapi_connection, _connection_record) -> None:
     cursor.close()
 
 
+def _wants_sqlite_pragmas(url: str) -> bool:
+    """SQLite is the only dialect that accepts these PRAGMAs."""
+    return url.startswith("sqlite")
+
+
 def create_db_engine(url: str | None = None, *, settings: Settings | None = None) -> Engine:
     settings = settings or get_settings()
     settings.ensure_dirs()
     url = url or settings.database_url
     engine = create_engine(url, future=True, pool_pre_ping=True)
-    if url.startswith("sqlite"):
+    if _wants_sqlite_pragmas(url):
         event.listen(engine, "connect", _apply_sqlite_pragmas)
     return engine
 
 
 def get_engine(settings: Settings | None = None) -> Engine:
     settings = settings or get_settings()
-    key = str(settings.db_path)
+    key = settings.database_url
     if key not in _engines:
         _engines[key] = create_db_engine(settings.database_url, settings=settings)
     return _engines[key]
@@ -50,7 +55,7 @@ def get_engine(settings: Settings | None = None) -> Engine:
 
 def ensure_database_initialized(settings: Settings | None = None) -> None:
     settings = settings or get_settings()
-    key = str(settings.db_path)
+    key = settings.database_url
     if key in _initialized:
         return
     engine = get_engine(settings)
@@ -64,7 +69,7 @@ def ensure_database_initialized(settings: Settings | None = None) -> None:
 
 def get_session_factory(settings: Settings | None = None) -> sessionmaker[Session]:
     settings = settings or get_settings()
-    key = str(settings.db_path)
+    key = settings.database_url
     if key not in _factories:
         ensure_database_initialized(settings)
         _factories[key] = sessionmaker(bind=get_engine(settings), expire_on_commit=False, future=True)

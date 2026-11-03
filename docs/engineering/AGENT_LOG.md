@@ -870,3 +870,49 @@ Worked through GEMINI.md again from the merged `main`.
   claiming scientific breadth.
 - Consider replacing RDKit's bundled stubs with a maintained stub package, or
   pin a release whose stubs mypy can parse.
+
+## 2026-11-03 - Hosted parity and release 2.2.0
+
+Plan: `docs/engineering/PLAN_2026-11-03_HOSTED_PARITY.md`.
+
+**Branch hygiene.** `release/v2.0.0` (`9434518`), `fix/v2-stable-gates`
+(`55874cf`) and `fix/v2-gemini-mandate` (`e8071d1`) were each ahead of `main`, but
+every divergent commit subject is present in `main` through the squashed merges
+`556c76d` (PR #6) and `12febcf` (PR #7). They are superseded, not unmerged work.
+
+**Baseline gate run.** `scripts/gates.py --level full` failed at `G5` with
+`npm ci ... EPERM: unlink apps/web/node_modules/@rolldown/binding-win32-x64-msvc`.
+Two orphaned processes from an interrupted earlier run (a `vite preview` on 8792
+and a hung `playwright test e2e/a11y.spec.ts`) held the file. Killing them fixed
+`npm ci`; this is a host-state failure, not a repository defect.
+
+**Hosted parity.** One Vercel project now serves the SPA and `/api/v1`.
+Verified on the deployment: `/api/v1/health` ok, `/api/v1/ready`
+`database: ok`, `/api/v1/projects` with a demo project of 16 compounds and one
+computed triage run, `/` and `/lab` returning the SPA shell, and
+`POST /api/v1/runs` finishing `succeeded` in 2.1 s with `HCS_RUN_MODE=inline`.
+Three defects surfaced and were fixed on the way:
+
+1. `ModuleNotFoundError: No module named 'hcs_discovery'` - Vercel installs the
+   declared dependencies but not the project in a `src/` layout. The entrypoint
+   now puts `src/` on `sys.path`.
+2. `ImportError: libXrender.so.1` from `rdkit.Chem.Draw` - the eager import in
+   `chemistry/depiction.py` broke **every** route. The import is lazy and the
+   depiction endpoint answers `424 missing_dependency`.
+3. The CLI uploaded local runtime data and a deploy died on
+   `.e2e-data/run-*/hcs.sqlite3`. Added `.vercelignore`.
+
+**Postgres driver choice.** `psycopg` is LGPL and `scripts/ci/check_licenses.py`
+rejects it; `pg8000` (BSD-3-Clause, pure Python) is used instead.
+
+**Not durable on the host.** The SQLite file and run artifacts live on `/tmp`.
+`HCS_DATABASE_URL` makes rows durable when pointed at PostgreSQL; artifacts are
+still regenerable files and object storage remains a follow-up.
+
+**Open follow-ups**
+
+- Object storage for uploads and run artifacts; a Vercel Queues/Daemons worker to
+  replace inline execution for long runs.
+- `vercel promote` rebuilt from the git HEAD instead of moving the alias, so the
+  production alias pointed at the pre-change commit until a CLI production deploy
+  of the verified tree replaced it.

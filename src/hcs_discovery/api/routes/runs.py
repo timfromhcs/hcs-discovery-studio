@@ -16,6 +16,7 @@ from ...core.config import Settings
 from ...core.errors import NotFoundError, ValidationError
 from ...core.paths import safe_join
 from ...database.models import Run
+from ...jobs.inline import execute_inline
 from ...jobs.queue import request_cancel
 from ...reports.render import (
     export_report,
@@ -31,6 +32,29 @@ from ..schemas import CancelResponse, RunCreateRequest
 router = APIRouter(prefix="/api/v1", tags=["runs"])
 
 TERMINAL = {"succeeded", "failed", "cancelled"}
+
+
+def _maybe_execute_inline(request: Request, session: Session, run_id: str) -> dict:
+    """Return the run detail, executing it first when the host has no worker.
+
+    ``HCS_RUN_MODE=inline`` is for serverless deployments, where a background
+    worker thread cannot survive the response. The default (``queue``) is
+    untouched.
+    """
+    app_settings: Settings = request.app.state.settings
+    detail = services.get_run_detail(session, run_id)
+    if app_settings.run_mode != "inline":
+        return detail
+    status = execute_inline(
+        app_settings,
+        run_id=run_id,
+        registry=request.app.state.registry,
+    )
+    session.expire_all()
+    detail = services.get_run_detail(session, run_id)
+    detail["execution"] = "inline"
+    detail["inline_status"] = status
+    return detail
 
 
 @router.post("/runs", status_code=202)
@@ -54,7 +78,7 @@ def create_run(payload: RunCreateRequest, request: Request, session: Session = D
         )
     else:
         raise ValidationError("Provide either a workflow definition or a workflow_id.")
-    return services.get_run_detail(session, run.id)
+    return _maybe_execute_inline(request, session, run.id)
 
 
 @router.get("/runs")
@@ -212,7 +236,7 @@ def retry_run(run_id: str, request: Request, session: Session = Depends(db)) -> 
         seed=source.seed,
         registry=request.app.state.registry,
     )
-    return services.get_run_detail(session, run.id)
+    return _maybe_execute_inline(request, session, run.id)
 
 
 @router.get("/runs/{run_id}/export/{fmt}")

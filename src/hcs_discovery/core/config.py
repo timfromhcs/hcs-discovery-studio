@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     )
 
     data_dir: Path = Path("./data")
+    # Override the SQLite default with any SQLAlchemy URL (for a hosted instance,
+    # e.g. a PostgreSQL URL). Unset keeps the local single-file database.
+    database_url_override: str | None = None
     network_policy: NetworkPolicy = "local"
     host: str = "127.0.0.1"
     port: int = Field(default=8787, ge=1, le=65535)
@@ -54,6 +57,13 @@ class Settings(BaseSettings):
     # Hosted previews only: build a disposable synthetic workspace on first start.
     # Off by default; it refuses to touch a data directory that already has projects.
     demo_mode: bool = False
+
+    # Where runs are executed. ``queue`` (default) needs a separate worker process
+    # or the embedded thread in ``serve``. ``inline`` executes the run inside the
+    # submitting request, which is the only option on a serverless host that
+    # cannot keep a worker alive after the response.
+    run_mode: Literal["queue", "inline"] = "queue"
+    inline_run_budget_seconds: float = Field(default=120.0, ge=1)
 
     # Docking receptors are read from ``<data_dir>/receptors``. Absolute paths
     # elsewhere on the host are refused unless a trusted local operator opts in, so
@@ -91,7 +101,13 @@ class Settings(BaseSettings):
 
     @property
     def database_url(self) -> str:
+        if self.database_url_override:
+            return self.database_url_override
         return f"sqlite+pysqlite:///{self.db_path.as_posix()}"
+
+    @property
+    def uses_sqlite(self) -> bool:
+        return self.database_url.startswith("sqlite")
 
     @property
     def is_loopback(self) -> bool:
@@ -112,6 +128,8 @@ class Settings(BaseSettings):
         """Configuration safe to show in the UI/CLI. Never includes secrets."""
         return {
             "data_dir": str(self.data_dir),
+            "database_backend": "sqlite" if self.uses_sqlite else "external",
+            "run_mode": self.run_mode,
             "network_policy": self.network_policy,
             "host": self.host,
             "port": self.port,
