@@ -280,3 +280,56 @@ jobs:
             cat dist/SHA256SUMS.txt
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+
+  # Optional PyPI publication. It is skipped unless the repository variable
+  # PYPI_PUBLISH is "true" and a trusted publisher for this repository + workflow
+  # ("release.yml") + environment ("pypi") is registered on PyPI. No long-lived token
+  # exists anywhere: GitHub mints a short-lived OIDC token, PyPI exchanges it for an
+  # upload credential and records a PEP 740 provenance attestation.
+  pypi:
+    name: Publish to PyPI (trusted publishing)
+    needs: [verify, publish]
+    if: ${{ vars.PYPI_PUBLISH == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment:
+      name: pypi
+      url: https://pypi.org/project/hcs-discovery-studio/
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Check out the verified commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.verify.outputs.sha }}
+          persist-credentials: false
+      - name: Install uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+      - name: Install Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Build the SPA (the wheel bundles it)
+        working-directory: apps/web
+        run: |
+          npm ci
+          npm run build
+      - name: Build the wheel
+        run: |
+          uv sync --frozen --no-dev
+          uv build --wheel
+      - name: Check the distributions
+        run: |
+          uvx --from twine==6.1.0 twine check --strict dist/*.whl
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist
+          attestations: true

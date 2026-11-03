@@ -737,6 +737,36 @@ Worked through GEMINI.md again from the merged `main`.
 - Gates: ruff/mypy grün, volle Suite + Gate-Runner folgen im selben Lauf.
 - Offen: Dataset-Fingerprint-Cache (nächste Zeile), Metriken, Lighthouse/axe.
 
+## 2026-11-03 (08:00) — Release-Runde v2.1.0 (R1–R4)
+
+- Branch `main` @ `e096f81`; Plan `docs/engineering/RELEASE_PLAN_v2.1.md`.
+- R1: Version 2.1.0 in `pyproject.toml`, `src/hcs_discovery/__init__.py`,
+  `apps/web/package.json` (+ Lockfile) und `CITATION.cff`; CHANGELOG-Abschnitt
+  `## [2.1.0] - 2026-11-03` (mit dem Hinweis, dass 2.0.0 nie veröffentlicht wurde);
+  Release Notes `docs/releases/v2.1.0.md`; README-Badge/Quickstart/Citation/Status
+  darauf umgestellt.
+- R2: `release.yml` bekommt einen **gated** PyPI-Job (Trusted Publishing, OIDC,
+  Environment `pypi`, `PYPI_PUBLISH=true` nötig); Runbook
+  `docs/engineering/RELEASING.md` mit Tag/PyPI/DOI-Schritten, Rollback und
+  Post-Release-Checks. Der Job läuft ohne Variable nicht und bricht keine Releases.
+- R3: WCAG-2.2-Verbesserungen im Offline-Lab: `aria-live="polite"` + programmatischer
+  Fokus auf Import- und Similarity-Ergebnis, `scroll-padding-top` gegen den
+  Sticky-Header (2.4.11), Touch-Ziele ≥44 px unter 640 px (2.5.8). Playwright prüft
+  Announcement, Fokus, Scroll-Padding und Buttonhöhe.
+- R4: README/Status/Docs-Links aktualisiert (Long-term-Roadmap, Release-Plan,
+  Runbook, Release Notes).
+- Zwei echte Fehler dabei gefunden und behoben:
+  - Der EXE-Smoke-Test prüfte hart auf `2.0.0` und ließ G15 nach dem Versionsbump
+    scheitern; er liest die erwartete Version jetzt aus `pyproject.toml`.
+  - Mehrere Dateien waren durch PowerShell-Encoding doppelt kodiert (Mojibake:
+    „â€—", „Ã×", „FranÃ§ais"); per UTF-8-Reparatur bereinigt, danach repo-weit 0
+    Treffer. Lehre: Dateien nur mit dem Edit-Tool oder explizitem
+    `UTF8Encoding($false)` schreiben.
+- Verifikation: 567 Tests, 83 % Branch-Coverage, ruff/mypy grün, Gate-Runner
+  `--level full` grün, G15 grün, Wheel-Smoke (G8) grün, `verify_version.py v2.1.0`
+  grün.
+- Offen (owner-gated): Tag, GitHub Release, PyPI-Upload, DOI.
+
 ## Blockers
 
 - None technical at the time of writing. The `v0.1.0` preview is published and

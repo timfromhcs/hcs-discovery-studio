@@ -34,7 +34,7 @@ function numberOrNull(descriptors: Record<string, number>, key: string): number 
  *
  * Everything here runs in the tab: RDKit WebAssembly for chemistry, the shared WGSL
  * kernel (or the CPU reference) for Tanimoto, IndexedDB for the stored copy. The page
- * says what it does not do â€” no docking, no force fields, no server-side provenance â€”
+ * says what it does not do — no docking, no force fields, no server-side provenance —
  * instead of showing a plausible number it cannot back up.
  */
 export function LabPage() {
@@ -52,6 +52,16 @@ export function LabPage() {
   const [similarity, setSimilarity] = useState<LibraryScoreResult | null>(null);
   const [simBusy, setSimBusy] = useState(false);
   const [simError, setSimError] = useState<string | null>(null);
+  const importResultRef = useRef<HTMLDivElement>(null);
+  const similarityResultRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (rows.length > 0) importResultRef.current?.focus();
+  }, [rows.length, importedAt]);
+
+  useEffect(() => {
+    if (similarity) similarityResultRef.current?.focus();
+  }, [similarity]);
 
   useEffect(() => {
     let cancelled = false;
@@ -231,7 +241,7 @@ export function LabPage() {
 
       <Card>
         <CardHeader
-          title="1 Â· Import"
+          title="1 · Import"
           subtitle="CSV with a SMILES column, .smi (SMILES name) or .sdf. Row-level failures are counted, not hidden."
           icon="upload"
           actions={
@@ -256,18 +266,24 @@ export function LabPage() {
             if (file) void importFile(file);
           }}
         />
-        {busy ? <p className="muted small">Parsing and describing {progress ?? "â€¦"}</p> : null}
+        {busy ? <p className="muted small">Parsing and describing {progress ?? "…"}</p> : null}
         {error ? (
           <InlineNotice tone="danger" title="Import failed">
             {error}
           </InlineNotice>
         ) : null}
         {rows.length > 0 ? (
-          <>
+          <div
+            ref={importResultRef}
+            tabIndex={-1}
+            aria-live="polite"
+            className="lab-result"
+            data-testid="lab-import-result"
+          >
             <KeyValue
               items={[
                 { label: "File", value: fileName, mono: true },
-                { label: "Imported", value: importedAt ? new Date(importedAt).toLocaleString() : "â€”" },
+                { label: "Imported", value: importedAt ? new Date(importedAt).toLocaleString() : "—" },
                 { label: "Structures", value: rows.length.toLocaleString() },
                 { label: "Rejected rows", value: rejected.toLocaleString() },
               ]}
@@ -277,7 +293,7 @@ export function LabPage() {
                 Delete stored copy
               </Button>
             </div>
-          </>
+          </div>
         ) : (
           <p className="muted small">Nothing imported yet. A 17-row example lives in examples/datasets/demo_library.csv.</p>
         )}
@@ -286,8 +302,8 @@ export function LabPage() {
       {rows.length > 0 ? (
         <Card>
           <CardHeader
-            title="2 Â· Triage and ranking"
-            subtitle={`${passed} of ${rows.length} pass every rule. The score is a weighted, dataset-relative composite â€” not a drug-likeness law.`}
+            title="2 · Triage and ranking"
+            subtitle={`${passed} of ${rows.length} pass every rule. The score is a weighted, dataset-relative composite — not a drug-likeness law.`}
             icon="filter"
           />
           <div className="table-wrap tall">
@@ -315,11 +331,11 @@ export function LabPage() {
                     <td>{index + 1}</td>
                     <td>{entry.row.name}</td>
                     <td className="mono small">{entry.row.smiles}</td>
-                    <td>{entry.row.mw === null ? "â€”" : entry.row.mw.toFixed(1)}</td>
-                    <td>{entry.row.logp === null ? "â€”" : entry.row.logp.toFixed(2)}</td>
-                    <td>{entry.row.tpsa === null ? "â€”" : entry.row.tpsa.toFixed(1)}</td>
-                    <td>{entry.row.qed === null ? "â€”" : entry.row.qed.toFixed(3)}</td>
-                    <td>{entry.score === null ? "â€”" : entry.score.toFixed(3)}</td>
+                    <td>{entry.row.mw === null ? "—" : entry.row.mw.toFixed(1)}</td>
+                    <td>{entry.row.logp === null ? "—" : entry.row.logp.toFixed(2)}</td>
+                    <td>{entry.row.tpsa === null ? "—" : entry.row.tpsa.toFixed(1)}</td>
+                    <td>{entry.row.qed === null ? "—" : entry.row.qed.toFixed(3)}</td>
+                    <td>{entry.score === null ? "—" : entry.score.toFixed(3)}</td>
                     <td>
                       {entry.passed ? (
                         <Badge tone="ok" dot>
@@ -343,7 +359,7 @@ export function LabPage() {
       {rows.length > 0 ? (
         <Card>
           <CardHeader
-            title="3 Â· Similarity"
+            title="3 · Similarity"
             subtitle="Query against the imported library. GPU counts must match the CPU reference exactly or no score is shown."
             icon="run"
             actions={
@@ -368,14 +384,20 @@ export function LabPage() {
             </InlineNotice>
           ) : null}
           {similarity ? (
-            <>
+            <div
+              ref={similarityResultRef}
+              tabIndex={-1}
+              aria-live="polite"
+              className="lab-result"
+              data-testid="lab-similarity-result"
+            >
               <KeyValue
                 items={[
                   {
                     label: "Engine",
                     value:
                       similarity.engine === "gpu"
-                        ? `WebGPU Â· ${similarity.adapter ?? "adapter"}`
+                        ? `WebGPU · ${similarity.adapter ?? "adapter"}`
                         : "CPU reference (no hardware adapter)",
                     mono: similarity.engine === "gpu",
                   },
@@ -404,7 +426,7 @@ export function LabPage() {
                   </tbody>
                 </table>
               </div>
-            </>
+            </div>
           ) : (
             <p className="muted small">No score computed yet. The first run loads the kernel and fingerprints the library.</p>
           )}

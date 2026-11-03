@@ -4,18 +4,18 @@
 
 # HCS Discovery Studio
 
-**Open science. Reproducible discovery. Made with â¤ï¸ by hcsmedia.**
+**Open science. Reproducible discovery. Made with ❤️ by hcsmedia.**
 
 A local-first, open-source workbench for reproducible computational
 drug-discovery research. Import a compound library, run transparent triage
 and docking workflows, inspect every row, event and artifact, and automate the same pipeline
-from the CLI or HTTP API â€” without Docker, CUDA, an account, or a cloud key.
+from the CLI or HTTP API — without Docker, CUDA, an account, or a cloud key.
 
 [![CI](https://github.com/timfromhcs/hcs-discovery-studio/actions/workflows/ci.yml/badge.svg)](https://github.com/timfromhcs/hcs-discovery-studio/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/timfromhcs/hcs-discovery-studio/actions/workflows/codeql.yml/badge.svg)](https://github.com/timfromhcs/hcs-discovery-studio/actions/workflows/codeql.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![Python 3.12â€“3.13](https://img.shields.io/badge/python-3.12%E2%80%933.13-3776ab.svg)](pyproject.toml)
-[![Status: v2.0.0 release candidate](https://img.shields.io/badge/status-v2.0.0%20candidate-3dd6c3.svg)](docs/engineering/IMPLEMENTATION_STATUS.md)
+[![Python 3.12–3.13](https://img.shields.io/badge/python-3.12%E2%80%933.13-3776ab.svg)](pyproject.toml)
+[![Status: v2.1.0 release candidate](https://img.shields.io/badge/status-v2.1.0-3dd6c3.svg)](docs/engineering/IMPLEMENTATION_STATUS.md)
 
 <img src="docs/screenshots/workspace-dark.png" alt="HCS Discovery Studio workspace showing projects, machine diagnostics, queue state and recent runs" width="1200">
 
@@ -32,7 +32,7 @@ reproducible**, whether it came from the UI, the CLI, or the API.
   run manifests.
 - **Transparent ranking.** RDKit descriptors, explicit rule filters, Pareto
   fronts and a weighted composite score. Weights are visible; rejected rows stay
-  visible; nothing is hidden behind an opaque â€œdrug scoreâ€.
+  visible; nothing is hidden behind an opaque “drug score”.
 - **Headless parity.** Every shipped UI action has a CLI and `/api/v1`
   equivalent. Long jobs expose status, logs, cancellation, failure reasons and
   artifacts.
@@ -52,14 +52,14 @@ prioritisation signals. Read
 |---|---|---|
 | CSV, SDF and SMILES import with row-level errors | **Available** | 16/17 demo rows imported; failures retained |
 | RDKit standardisation, descriptors and Morgan/Tanimoto similarity | **Available** | Deterministic fixture tests |
-| AutoDock Vina CPU docking | **Host-dependent** | Needs the official Vina 1.2.x binary; flexible-ligand PDBQT matches Meeko on 48/51 fixtures ([report](docs/validation/ligand-prep-meeko.md)); one-complex redocking check (1IEP, top pose â‰¤ 0.94 Ã… over 5 seeds, [report](docs/validation/vina-redocking-1iep.md)); not a docking benchmark |
-| Literature property estimates (ESOL, CNS MPO) | **Available** | Reduced ESOL: RMSE 0.97, RÂ² 0.07 on 45 measured compounds ([report](docs/validation/esol-solubility.md)); CNS MPO is an approximation (cLogP for ClogD, assumed pKa) |
+| AutoDock Vina CPU docking | **Host-dependent** | Needs the official Vina 1.2.x binary; flexible-ligand PDBQT matches Meeko on 48/51 fixtures ([report](docs/validation/ligand-prep-meeko.md)); one-complex redocking check (1IEP, top pose ≤ 0.94 Å over 5 seeds, [report](docs/validation/vina-redocking-1iep.md)); not a docking benchmark |
+| Literature property estimates (ESOL, CNS MPO) | **Available** | Reduced ESOL: RMSE 0.97, R² 0.07 on 45 measured compounds ([report](docs/validation/esol-solubility.md)); CNS MPO is an approximation (cLogP for ClogD, assumed pKa) |
 | Bemis-Murcko generic scaffold splitting | **Available** | Leakage-free split validation tests |
 | PubChem & ChEMBL public data connectors | **Available** | NCBI & EBI REST search with policy-gated access |
 | DAG branching & table joins | **Available** | Kahn topological sort, fan-out, and `table.join` |
 | Targets & structures with provenance | **Available** (API + CLI, no UI page yet) | Target CRUD, PDB import with SHA-256 and chain/ligand/missing-residue inspection; mmCIF refused explicitly |
 | Deb's Fast Non-dominated Sorting & Pareto ranking | **Available** | Multi-objective sorting invariant tests |
-| GPU similarity search (Vulkan / D3D12 / Metal, one WGSL kernel) | **Available** on a hardware adapter, exact CPU fallback | Bit-identical to RDKit on every measured library; resident-library throughput â‰ˆ100 M Tanimoto/s at 500k fingerprints on this host's integrated GPU ([benchmark](docs/validation/gpu-tanimoto.md)); threshold searches use the BitBound prefilter and skip up to 88 % of a density-varied library |
+| GPU similarity search (Vulkan / D3D12 / Metal, one WGSL kernel) | **Available** on a hardware adapter, exact CPU fallback | Bit-identical to RDKit on every measured library; resident-library throughput ≈100 M Tanimoto/s at 500k fingerprints on this host's integrated GPU ([benchmark](docs/validation/gpu-tanimoto.md)); threshold searches use the BitBound prefilter and skip up to 88 % of a density-varied library |
 | Browser compute (RDKit WebAssembly + WebGPU Tanimoto) | **Available**, opt-in on the Settings page | Self-test and bit-exact WebGPU parity tests run against the served app |
 | Offline lab (no backend at all) | **Available** | Import CSV/SDF/SMI, RDKit descriptors, triage, ranking, GPU/CPU similarity and IndexedDB persistence, verified against a static build at 360 px; a service worker makes it work offline after the first visit (verified with the server killed) |
 | Constraint selection (SAT) | **Available** | Dependency-free DPLL with watched literals; brute-force differential tests, pigeonhole UNSAT, `sat solve` and `sat select` |
@@ -69,7 +69,7 @@ prioritisation signals. Read
 | Persistent lease-based queue & restart recovery | **Available** | Queue/worker integration tests |
 | Bounded cache lifecycle & cascade deletion | **Available** | Size/age pruning and orphan cleanup tests |
 | Report export & table truncation disclosures | **Available** | Markdown/HTML truncation notices & full CSV/JSON/SDF export |
-| React UI for project â†’ import â†’ workflow â†’ run â†’ results | **Available** | 5 Playwright E2E tests |
+| React UI for project → import → workflow → run → results | **Available** | 5 Playwright E2E tests |
 | CLI and versioned HTTP API | **Available** | Shared domain services; CLI integration tests |
 | Self-contained wheel with bundled SPA | **Available** | Built and smoke-tested without Node runtime; ships the GPU kernel |
 | One-file executable (PyInstaller) | **Builds and smoke-tests** | Gate G15: `version`, `db upgrade`, `doctor`, served `/api/v1/ready` and a verified GPU similarity search inside the frozen binary |
@@ -81,7 +81,7 @@ The full ledger, including partial features and known defects, is in
 
 ## Quick start
 
-### Option A â€” source checkout (recommended for development)
+### Option A — source checkout (recommended for development)
 
 Requirements: **Python 3.12 or 3.13**, [uv](https://docs.astral.sh/uv/), and
 **Node.js 22.12 or newer** (Vite 8 requires Node 20.19+ or 22.12+) for the
@@ -106,17 +106,17 @@ uv run hcs-discovery serve --port 8787
 cd apps/web && npm run dev        # http://127.0.0.1:5173, proxies /api to 8787
 ```
 
-### Option B â€” release wheel
+### Option B — release wheel
 
 Download the wheel from the
 [latest release](https://github.com/timfromhcs/hcs-discovery-studio/releases/latest)
-(`v2.0.0` is published there only once all release gates pass).
+(`v2.1.0` is published there only once all release gates pass).
 It bundles the built UI:
 
 ```bash
 python -m venv .venv
 . .venv/bin/activate              # Windows: .venv\Scripts\Activate.ps1
-pip install hcs_discovery_studio-2.0.0-py3-none-any.whl
+pip install hcs_discovery_studio-2.1.0-py3-none-any.whl
 hcs-discovery doctor
 hcs-discovery serve
 ```
@@ -124,11 +124,11 @@ hcs-discovery serve
 Verify release assets with `SHA256SUMS.txt` and the GitHub build-provenance
 attestation (commands are in the release notes).
 
-### Option C â€” one-file executable (build it yourself)
+### Option C — one-file executable (build it yourself)
 The repository ships a PyInstaller spec that bundles the CLI, the API, RDKit, the
 built SPA, the Alembic migrations and the GPU kernel into a single binary. It is
 built and smoke-tested by the release gate (`G15`), and it is not published as a
-download until `v2.0.0` ships:
+download until `v2.1.0` ships:
 
 ```bash
 uv pip install "pyinstaller==6.22.3"        # build-only, deliberately not in the lockfile
@@ -138,11 +138,11 @@ build/exe-dist/hcs-discovery.exe serve
 ```
 
 The smoke test runs `version`, `db upgrade`, `doctor`, a served `/api/v1/ready`
-check, and â€” when the host has a hardware GPU â€” a verified GPU similarity search
+check, and — when the host has a hardware GPU — a verified GPU similarity search
 inside the frozen binary, so a missing kernel file cannot silently fall back to
 the CPU.
 
-### Option D â€” Docker
+### Option D — Docker
 
 ```bash
 export HCS_API_TOKEN=$(openssl rand -hex 24)
@@ -154,7 +154,7 @@ The image builds the SPA in a Node stage and ships the API, the SPA, the
 migrations and the GPU kernel in a slim Python runtime. A non-loopback bind
 requires `HCS_API_TOKEN`; TLS belongs to a proxy in front of it.
 
-### Option E â€” entirely in the browser (no backend)
+### Option E — entirely in the browser (no backend)
 
 Open `/lab` (in the local app, or in a static build of `apps/web/dist`). It imports
 CSV/SDF/SMI, computes descriptors with RDKit WebAssembly, triages, ranks and scores
@@ -193,10 +193,10 @@ flowchart LR
     UI["React SPA<br/>TypeScript + Vite"] --> API["FastAPI<br/>/api/v1"]
     CLI["hcs-discovery CLI"] --> SVC["Service layer"]
     API --> SVC
-    SVC --> DB[("SQLite<br/>projects Â· datasets Â· runs")]
+    SVC --> DB[("SQLite<br/>projects · datasets · runs")]
     SVC --> Q["Lease-based queue"]
     Q --> W["Worker"]
-    W --> N["Workflow nodes<br/>descriptors Â· similarity Â· filters Â· ranking"]
+    W --> N["Workflow nodes<br/>descriptors · similarity · filters · ranking"]
     N --> RDKIT["RDKit"]
     N --> CACHE[("Content-addressed<br/>node cache")]
     W --> ART[("Artifacts +<br/>run manifests")]
@@ -223,7 +223,7 @@ Every run records:
 - Python, application, RDKit and dependency versions;
 - host, OS, CPU and backend description;
 - artifact paths, media types, sizes and SHA-256 checksums;
-- explicit scientific limitations and the runâ€™s terminal status.
+- explicit scientific limitations and the run’s terminal status.
 
 A rerun with the same inputs, configuration and engine versions can reuse cached
 node outputs. This is **not** a claim of bit-identical results across different
@@ -236,7 +236,7 @@ RDKit or dependency versions. See
 |---|---|---|
 | CPU x86-64, Windows 11 | **Verified locally** | Ryzen 7 7735HS, 19.8 GB RAM, Python 3.12 |
 | CPU x86-64, Linux | **Verified in CI** | Ubuntu runner, Python 3.12 |
-| Vulkan (similarity search) | **Verified locally** | AMD Radeon 680M integrated GPU, Vulkan via `wgpu-py`; GPU counts are bit-exact against the CPU reference. 500k fingerprints in â‰ˆ5 ms with the library resident (â‰ˆ100 M Tanimoto/s), â‰ˆ19Ã— RDKit's bulk call ([benchmark](docs/validation/gpu-tanimoto.md)); threshold searches use the BitBound prefilter and skip up to 88 % of a density-varied library |
+| Vulkan (similarity search) | **Verified locally** | AMD Radeon 680M integrated GPU, Vulkan via `wgpu-py`; GPU counts are bit-exact against the CPU reference. 500k fingerprints in ≈5 ms with the library resident (≈100 M Tanimoto/s), ≈19× RDKit's bulk call ([benchmark](docs/validation/gpu-tanimoto.md)); threshold searches use the BitBound prefilter and skip up to 88 % of a density-varied library |
 | WebGPU (browser) | **Verified locally in Chrome** | Same WGSL kernel, parity checked against JavaScript before any timing; opt-in on the Settings page |
 | CUDA | **Not required, not used** | No CUDA dependency in the base install; CUDA-only libraries such as nvMolKit are not a comparison point here |
 | GPU acceleration | **Available for similarity search only** | Docking, descriptors, property estimates and docking stay on the CPU; no other engine claims GPU execution |
@@ -252,11 +252,11 @@ are using. Hardware presence alone is never reported as a speed claim.
 | Gate | Command | Result |
 |---|---|---|
 | Backend tests | `uv run pytest -q` | <!-- gen:tests -->567 passed, 0 skipped<!-- /gen:tests --> on the development host; the two live docking tests are deselected there because no Vina binary is installed, and CI runs them on Linux |
-| Coverage | `uv run pytest --cov=hcs_discovery --cov-branch` | <!-- gen:coverage -->83 % branch coverage<!-- /gen:coverage --> locally; CI floor 70%, HAEL modules â‰¥94% |
+| Coverage | `uv run pytest --cov=hcs_discovery --cov-branch` | <!-- gen:coverage -->83 % branch coverage<!-- /gen:coverage --> locally; CI floor 70%, HAEL modules ≥94% |
 | Python format/lint/type | `uv run ruff format --check .`, `uv run ruff check .`, `uv run mypy` | Clean locally and in CI |
 | Frontend typecheck/build | `npm run typecheck`, `npm run build` in `apps/web` | Clean locally and in CI |
 | End-to-end | `npm run test:e2e` in `apps/web` | 12 passed locally (studio journey, planned engines, unknown runs, browser WebAssembly self-test, WebGPU parity, offline lab x3, offline cache with the server killed, SEO/404 x3) |
-| Visual and a11y QA | `node apps/web/scripts/visual_qa.mjs` against a running app | 192 captures (18 routes Ã— 6 widths Ã— 2 themes), 0 automatic findings |
+| Visual and a11y QA | `node apps/web/scripts/visual_qa.mjs` against a running app | 192 captures (18 routes × 6 widths × 2 themes), 0 automatic findings |
 | License policy | `uv run python scripts/ci/check_licenses.py`, `node scripts/ci/check_licenses.mjs` | Pass locally and in CI |
 | Dependency audit | `pip-audit`, `npm audit --omit=dev` | No known vulnerabilities at release time |
 | Secret scan | gitleaks | Pass in CI on full history |
@@ -293,7 +293,7 @@ threat model and residual risks are in
 
 - **Docking is checked, not benchmarked.** Ligand preparation is compared with
   Meeko, and CI redocks imatinib into one holo structure (PDB 1IEP) and requires
-  the top pose within 2.0 Ã… of the crystal pose. One complex is a regression
+  the top pose within 2.0 Å of the crystal pose. One complex is a regression
   check, not evidence of accuracy on other targets, cross-docking or affinity
   ranking. Receptors must be prepared PDBQT files under
   `<HCS_DATA_DIR>/receptors`.
@@ -329,8 +329,8 @@ The complete list, including partial features and risks, is in
 
 | Symptom | Fix |
 |---|---|
-| `program not found` for `uv run hcs â€¦` | The executable is `hcs-discovery`, not `hcs`. |
-| UI shows â€œfrontend not builtâ€ | Run `npm ci && npm run build` in `apps/web`, or install the release wheel. |
+| `program not found` for `uv run hcs …` | The executable is `hcs-discovery`, not `hcs`. |
+| UI shows “frontend not built” | Run `npm ci && npm run build` in `apps/web`, or install the release wheel. |
 | Port already in use | `hcs-discovery serve --port 8790`; check `hcs-discovery doctor`. |
 | Non-loopback bind refused | Set `HCS_API_TOKEN` and pass `--host 0.0.0.0`; TLS is not included. |
 | RDKit import fails | Use Python 3.12 or 3.13 and reinstall with `uv sync --dev`. |
@@ -344,33 +344,36 @@ More help: [Windows install](docs/user-guide/INSTALL_WINDOWS.md),
 
 ## Documentation
 
-- **User guide:** [Quick start](docs/user-guide/QUICKSTART.md) Â·
-  [CLI](docs/user-guide/CLI.md) Â· [Workflows](docs/user-guide/WORKFLOWS.md) Â·
-  [Local models](docs/user-guide/LOCAL_MODELS.md) Â·
+- **User guide:** [Quick start](docs/user-guide/QUICKSTART.md) ·
+  [CLI](docs/user-guide/CLI.md) · [Workflows](docs/user-guide/WORKFLOWS.md) ·
+  [Local models](docs/user-guide/LOCAL_MODELS.md) ·
   [Scientific limitations](docs/user-guide/SCIENTIFIC_LIMITATIONS.md)
-- **Zero to hero:** [English](docs/guides/ZERO_TO_HERO.en.md) Â·
-  [Deutsch](docs/guides/ZERO_TO_HERO.de.md) Â·
-  [FranÃ§ais](docs/guides/ZERO_TO_HERO.fr.md)
-- **Automation:** [API](docs/user-guide/CLI.md) Â· MCP (`hcs-discovery mcp serve`) Â·
-  `hcs-discovery similarity search` Â· `hcs-discovery sat solve|select`
-- **Architecture:** [Overview](docs/architecture/OVERVIEW.md) Â·
-  [Workflow engine](docs/architecture/WORKFLOW_ENGINE.md) Â·
-  [Data model](docs/architecture/DATA_MODEL.md) Â·
+- **Zero to hero:** [English](docs/guides/ZERO_TO_HERO.en.md) ·
+  [Deutsch](docs/guides/ZERO_TO_HERO.de.md) ·
+  [Français](docs/guides/ZERO_TO_HERO.fr.md)
+- **Automation:** [API](docs/user-guide/CLI.md) · MCP (`hcs-discovery mcp serve`) ·
+  `hcs-discovery similarity search` · `hcs-discovery sat solve|select`
+- **Architecture:** [Overview](docs/architecture/OVERVIEW.md) ·
+  [Workflow engine](docs/architecture/WORKFLOW_ENGINE.md) ·
+  [Data model](docs/architecture/DATA_MODEL.md) ·
   [Plugin API](docs/architecture/PLUGIN_API.md)
-- **Engineering:** [Implementation status](docs/engineering/IMPLEMENTATION_STATUS.md) Â·
-  [Zero-backend plan](docs/engineering/PLAN_2026-11-03_ZERO_BACKEND.md) Â·
-  [Release evidence](docs/engineering/RELEASE_EVIDENCE.md) Â·
+- **Engineering:** [Implementation status](docs/engineering/IMPLEMENTATION_STATUS.md) ·
+  [Long-term roadmap](docs/engineering/ROADMAP_LONG_TERM.md) ·
+  [Release plan v2.1](docs/engineering/RELEASE_PLAN_v2.1.md) ·
+  [Releasing runbook](docs/engineering/RELEASING.md) ·
+  [Zero-backend plan](docs/engineering/PLAN_2026-11-03_ZERO_BACKEND.md) ·
+  [Release evidence](docs/engineering/RELEASE_EVIDENCE.md) ·
   [Agent log](docs/engineering/AGENT_LOG.md)
-- **Research and validation:** [Component/license audit](docs/research/COMPONENT_AND_LICENSE_AUDIT.md) Â·
-  [Validation protocol](docs/scientific-validation/VALIDATION_PROTOCOL.md) Â·
-  [SOTA gap analysis](docs/research/SOTA_GAP_ANALYSIS.md) Â·
-  [GPU Tanimoto benchmark](docs/validation/gpu-tanimoto.md) Â·
-  [HAEL (experimental)](docs/research/HAEL.md) Â·
+- **Research and validation:** [Component/license audit](docs/research/COMPONENT_AND_LICENSE_AUDIT.md) ·
+  [Validation protocol](docs/scientific-validation/VALIDATION_PROTOCOL.md) ·
+  [SOTA gap analysis](docs/research/SOTA_GAP_ANALYSIS.md) ·
+  [GPU Tanimoto benchmark](docs/validation/gpu-tanimoto.md) ·
+  [HAEL (experimental)](docs/research/HAEL.md) ·
   [Research register](docs/research/RESEARCH_REGISTER.md)
-- **Security:** [Threat model](docs/security/THREAT_MODEL.md) Â· [SECURITY.md](SECURITY.md)
-- **Contributing:** [CONTRIBUTING.md](CONTRIBUTING.md) Â·
-  [Developer guide](docs/developer-guide/CONTRIBUTING.md) Â·
-  [Testing](docs/developer-guide/TESTING.md) Â· [Code of conduct](CODE_OF_CONDUCT.md)
+- **Security:** [Threat model](docs/security/THREAT_MODEL.md) · [SECURITY.md](SECURITY.md)
+- **Contributing:** [CONTRIBUTING.md](CONTRIBUTING.md) ·
+  [Developer guide](docs/developer-guide/CONTRIBUTING.md) ·
+  [Testing](docs/developer-guide/TESTING.md) · [Code of conduct](CODE_OF_CONDUCT.md)
 
 ## Citation
 
@@ -381,7 +384,7 @@ If you use this work, cite the repository using [CITATION.cff](CITATION.cff):
   author  = {hcsmedia},
   title   = {HCS Discovery Studio},
   year    = {2026},
-  version = {2.0.0},
+  version = {2.1.0},
   url     = {https://github.com/timfromhcs/hcs-discovery-studio},
   license = {Apache-2.0}
 }
@@ -397,8 +400,12 @@ No third-party model weights or proprietary datasets are bundled.
 
 ---
 
-**Status:** `2.0.0` release candidate in preparation; it is published only after
-the local gates and cloud CI pass for the tagged commit. See `IMPLEMENTATION_STATUS.md` for the full feature ledger and `CHANGELOG.md` for the change list.
+**Status:** `2.1.0` release candidate in preparation; it is published only after
+the local gates and cloud CI pass for the tagged commit. Release notes:
+[`docs/releases/v2.1.0.md`](docs/releases/v2.1.0.md); the human steps are in
+[`docs/engineering/RELEASING.md`](docs/engineering/RELEASING.md). See
+`IMPLEMENTATION_STATUS.md` for the full feature ledger and `CHANGELOG.md` for the
+change list.
 
 
 

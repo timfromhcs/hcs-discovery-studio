@@ -8,6 +8,17 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Nothing yet. The next change starts here.
+
+## [2.1.0] - 2026-11-03
+
+`2.0.0` was prepared as a release candidate and never tagged or published. This is
+the first published version after it; it contains the GPU similarity engine, the
+offline browser lab, the similarity API, the MCP server, the SAT solver, the
+container image and the service worker described below.
+
+### Added
+
 - **Offline lab: the workbench without a backend.** `/lab` imports CSV/SDF/SMI,
   computes descriptors with RDKit WebAssembly, applies the same triage rules and
   the same weighted composite ranking as the server template, scores Tanimoto

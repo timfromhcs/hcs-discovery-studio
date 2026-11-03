@@ -63,8 +63,15 @@ def build_frontend() -> None:
 
 
 def build_executable() -> None:
-    shutil.rmtree(DIST, ignore_errors=True)
-    shutil.rmtree(WORK, ignore_errors=True)
+    for path, label in ((DIST, "output"), (WORK, "work")):
+        if path.exists():
+            try:
+                shutil.rmtree(path)
+            except PermissionError as exc:  # pragma: no cover - host-specific
+                raise SystemExit(
+                    f"Cannot clear the {label} directory {path}: {exc}. "
+                    "A running hcs-discovery executable keeps its own file open; close it and retry."
+                ) from exc
     run(
         [
             sys.executable,
@@ -95,6 +102,13 @@ def _wait_ready(url: str, timeout: float = 60.0) -> bool:
     return False
 
 
+def expected_version() -> str:
+    import tomllib
+
+    data = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    return str(data["project"]["version"])
+
+
 def smoke_test(exe: Path) -> None:
     if not exe.is_file():
         raise SystemExit(f"executable not found: {exe}")
@@ -114,8 +128,9 @@ def smoke_test(exe: Path) -> None:
             )
 
         version = call("version")
-        if "2.0.0" not in version.stdout:
-            raise SystemExit(f"exe version check failed:\n{version.stdout}\n{version.stderr}")
+        expected = expected_version()
+        if expected not in version.stdout:
+            raise SystemExit(f"exe version check failed (expected {expected}):\n{version.stdout}\n{version.stderr}")
 
         call("db", "upgrade")
         current = call("db", "current")

@@ -39,6 +39,12 @@ test("offline lab imports, triages, scores and persists without a backend", asyn
   await expect(page.getByText("Rejected rows")).toBeVisible();
   await expect(page.getByRole("cell", { name: "Broken" })).toHaveCount(0);
 
+  // WCAG: the result is announced and receives focus, so keyboard and screen-reader
+  // users land on the outcome instead of guessing that something happened.
+  const importRegion = page.getByTestId("lab-import-result");
+  await expect(importRegion).toHaveAttribute("aria-live", "polite");
+  await expect(importRegion).toBeFocused();
+
   // Triage and ranking run on RDKit WebAssembly output.
   await expect(page.getByText(/of 3 pass every rule/)).toBeVisible();
   await expect(page.getByRole("cell", { name: "3", exact: true })).toBeVisible();
@@ -68,7 +74,13 @@ test("offline lab fits a 360 px phone without horizontal scrolling", async ({ pa
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
   );
   expect(overflow).toBeLessThanOrEqual(1);
-  await expect(page.getByRole("button", { name: "Choose file" })).toBeVisible();
+  const choose = page.getByRole("button", { name: "Choose file" });
+  await expect(choose).toBeVisible();
+  // WCAG 2.2 target size and focus visibility under a sticky header.
+  const box = await choose.boundingBox();
+  expect(box?.height ?? 0).toBeGreaterThanOrEqual(43.5);
+  const scrollPadding = await page.evaluate(() => getComputedStyle(document.documentElement).scrollPaddingTop);
+  expect(parseFloat(scrollPadding)).toBeGreaterThan(0);
 });
 
 test("offline lab deletes its stored copy", async ({ page }) => {
