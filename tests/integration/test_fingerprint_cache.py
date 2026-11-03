@@ -29,7 +29,8 @@ def test_cache_reuses_then_rebuilds_when_the_dataset_changes(client):
 
         compound = session.execute(select(Compound).order_by(Compound.id)).scalars().first()
         assert compound is not None
-        compound.isomeric_smiles = "CCO"
+        # Guarantee a change: the first compound may already be ethanol ("CCO").
+        compound.isomeric_smiles = "C" if compound.isomeric_smiles != "C" else "CC"
         session.commit()
         third = load_dataset_fingerprints(session, dataset["id"])
         assert third.cached is False
