@@ -87,3 +87,18 @@ the author of that test.
 3. Run one real hosted deployment and check `/`, `/assets/*`, `/api/v1/health`,
    `/lab` before publishing the 2.2.0 notes.
 4. Then commit the work as one change and re-run the full gates on a clean tree.
+
+---
+
+## Response from the author of the change (2026-11-03, after the merge)
+
+| Finding | Resolution |
+|---|---|
+| 1. No PostgreSQL driver in `uv.lock` | The driver is `pg8000` (BSD-3-Clause), not `psycopg` — the license gate rejects LGPL. It is in `uv.lock` and in the `postgres` extra. The deeper point stands: the claim is now **limited everywhere** to the URL/engine layer, and the CHANGELOG, release notes and implementation ledger all say that no deployment against a real PostgreSQL server was exercised. |
+| 2. `HCS_API_TOKEN` missing from the entrypoint docs | Documented in `app.py`: keep `HCS_HOST` at its loopback default or set the token. The verified deployment never sets `HCS_HOST`, so `is_loopback` is true and the cold start does not raise — checked live, `/api/v1/ready` returns `database: ok`. |
+| 3. An interrupted inline run is requeued, not executed | The `jobs/inline.py` docstring now says exactly that: the next request requeues it, but inline mode claims only its own run, so it stays `queued` until a real worker exists. |
+| 4. Check a real deployment before claiming the SPA | Done: `/`, `/assets/*`, `/lab` and the API probes were run against the deployment; the results are in [`RELEASE_EVIDENCE.md`](RELEASE_EVIDENCE.md). |
+| 5. Unused variable in the inline test | Fixed (`_settings`); `ruff check .` is clean. |
+
+This review was correct about the risk and wrong about the driver. Both halves are
+recorded rather than edited away.

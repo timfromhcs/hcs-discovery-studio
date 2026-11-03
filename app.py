@@ -11,6 +11,12 @@ Required environment for a hosted preview:
     HCS_RUN_MODE=inline          # no worker process can outlive the response
     HCS_WEB_DIST=/var/task/apps/web/dist   # the SPA built by vercel.json
 
+Leave ``HCS_HOST`` at its loopback default on a hosted instance, or set
+``HCS_API_TOKEN``: :func:`create_app` refuses to bind to a non-loopback interface
+without a token, and that failure happens at cold start, not at request time.
+Vercel never binds ``HCS_HOST``, so the verified deployment runs with the loopback
+default.
+
 The default local configuration is unchanged: without ``HCS_DEMO_MODE`` this
 serves whatever real data directory it is given, exactly like ``serve``.
 """

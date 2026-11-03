@@ -50,7 +50,9 @@ test or a recorded manual check; it does not mean validated science.
   over HTTP finishing `succeeded` in 2.1 s with `HCS_RUN_MODE=inline`.
 - `HCS_DATABASE_URL` switches the state to any SQLAlchemy URL (PostgreSQL via the
   `postgres` extra and the BSD-3-Clause `pg8000` driver). Engine caches are keyed
-  by URL; `public_dict` reports the backend, never the URL.
+  by URL; `public_dict` reports the backend, never the URL. Unit-tested at the URL
+  and engine layer only — no deployment against a real PostgreSQL server has been
+  exercised, and there is no PostgreSQL migration test.
 - Not durable on the host: the SQLite file and run artifacts live on `/tmp` and are
   rebuilt per instance. Object storage is not implemented. The deployment stays
   behind Vercel Authentication.

@@ -31,7 +31,9 @@ unchanged — every new switch is off by default.
   `pg8000` (BSD-3-Clause) because `psycopg` is LGPL and would fail the license
   gate. Engine caches are now keyed by URL instead of by data directory, so two
   database URLs in one process cannot share an engine. `public_dict` reports
-  `database_backend` and never the URL itself.
+  `database_backend` and never the URL itself. The URL and engine layer are
+  unit-tested; a deployment against a real PostgreSQL server is **not** yet
+  exercised and is not claimed.
 - **`HCS_RUN_MODE=inline`.** On a serverless host no worker thread survives the
   response, so the submitting request claims exactly the run it created and
   executes it through the normal `Worker`. `queue` remains the default. A run

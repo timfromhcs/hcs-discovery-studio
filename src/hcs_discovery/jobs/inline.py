@@ -11,7 +11,10 @@ Honest limits, deliberately not hidden:
 * Once a run is claimed it executes to completion. ``inline_run_budget_seconds``
   only stops *further* attempts inside one request; it cannot interrupt the
   executor. A run longer than the platform's function duration is killed by the
-  host, its lease expires and the normal stale-run recovery retries it later.
+  host and its lease expires. The **next** inline request calls
+  ``recover_stale_runs`` and requeues it, but inline mode claims only the run the
+  request created — so a requeued older run stays ``queued`` until a real worker
+  runs. Serverless does not self-heal; it stops losing work.
 * Inline mode serialises work through the request. It is a preview/one-user
   mechanism, not a replacement for the queue and a real worker.
 """
