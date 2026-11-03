@@ -23,10 +23,13 @@ CPU reference, and the engine detail says so.
 
 from __future__ import annotations
 
+import os
 import time
 from collections.abc import Sequence
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from functools import lru_cache
+from itertools import pairwise
 from typing import Any, Literal
 
 import numpy as np
@@ -37,8 +40,12 @@ from hcs_discovery.gpu.device import probe_gpu
 from hcs_discovery.gpu.fingerprints import BITS, RADIUS, WORDS, pack_smiles
 
 EnginePreference = Literal["auto", "cpu", "gpu"]
+BoostPreference = Literal["auto", "gpu", "cpu", "hybrid"]
 SUPPORTED_RADIUS = RADIUS
 SUPPORTED_BITS = BITS
+# Below this library size the coordination overhead of a hybrid split dominates.
+HYBRID_MIN_ROWS = 20_000
+_HYBRID_MAX_WORKERS = 4
 
 __all__ = [
     "BITS",
@@ -46,6 +53,7 @@ __all__ = [
     "SUPPORTED_BITS",
     "SUPPORTED_RADIUS",
     "WORDS",
+    "BoostPreference",
     "Engine",
     "GpuUnavailableError",
     "Hit",
@@ -76,9 +84,14 @@ class Engine:
     detail: str
     adapter: str | None = None
     backend: str | None = None
+    adapter_type: str | None = None
+    mode: Literal["gpu", "cpu", "hybrid"] = "gpu"
+    workers: int = 1
 
     @property
     def label(self) -> str:
+        if self.mode == "hybrid" and self.adapter:
+            return f"hybrid ({self.backend or 'unknown backend'}, {self.adapter} + {self.workers} CPU threads)"
         if self.name == "gpu" and self.adapter:
             return f"gpu ({self.backend or 'unknown backend'}, {self.adapter})"
         return self.name
@@ -104,21 +117,24 @@ class SearchResult:
         return len(self.hits)
 
 
-def resolve_engine(prefer: EnginePreference = "auto") -> Engine:
+def resolve_engine(prefer: EnginePreference = "auto", boost: BoostPreference = "auto") -> Engine:
     """Return the engine a search would use, without touching any data."""
-    if prefer == "cpu":
-        return Engine("cpu", "CPU reference requested")
+    if prefer == "cpu" or boost == "cpu":
+        return Engine("cpu", "CPU reference requested", mode="cpu")
     probe = device_probe()
     if probe.get("status") == "available":
+        adapter_type = probe.get("adapter_type")
         return Engine(
             "gpu",
             "Hardware adapter selected",
             adapter=probe.get("adapter"),
             backend=probe.get("backend"),
+            adapter_type=adapter_type,
+            mode="gpu",
         )
     if prefer == "gpu":
         raise GpuUnavailableError(str(probe.get("detail") or "no hardware GPU adapter"))
-    return Engine("cpu", str(probe.get("detail") or "no hardware GPU adapter"))
+    return Engine("cpu", str(probe.get("detail") or "no hardware GPU adapter"), mode="cpu")
 
 
 @lru_cache(maxsize=1)
@@ -153,14 +169,69 @@ class TanimotoIndex:
         smiles: Sequence[str],
         *,
         prefer: EnginePreference = "auto",
+        boost: BoostPreference = "auto",
         verify: bool = True,
         bits: int = SUPPORTED_BITS,
         radius: int = SUPPORTED_RADIUS,
+        workers: int | None = None,
     ) -> None:
-        self._packed, self._valid = pack_smiles(smiles)
-        self._n = len(smiles)
+        packed, valid = pack_smiles(smiles)
+        self._install(
+            packed, valid, prefer=prefer, boost=boost, verify=verify, bits=bits, radius=radius, workers=workers
+        )
+
+    @classmethod
+    def from_packed(
+        cls,
+        packed: np.ndarray,
+        valid: np.ndarray | None = None,
+        *,
+        prefer: EnginePreference = "auto",
+        boost: BoostPreference = "auto",
+        verify: bool = True,
+        workers: int | None = None,
+    ) -> TanimotoIndex:
+        """Build an index from already packed fingerprints (same kernel, no RDKit)."""
+        library = np.ascontiguousarray(packed, dtype=np.uint32)
+        if library.ndim != 2 or library.shape[1] != WORDS:
+            raise ValidationError(
+                "Packed fingerprints must have shape (n, 64) uint32.",
+                details={"shape": list(library.shape)},
+            )
+        index = cls.__new__(cls)
+        mask = np.ones(library.shape[0], dtype=bool) if valid is None else np.asarray(valid, dtype=bool)
+        if mask.shape[0] != library.shape[0]:
+            raise ValidationError("valid must have one entry per fingerprint.")
+        index._install(
+            library,
+            mask,
+            prefer=prefer,
+            boost=boost,
+            verify=verify,
+            bits=SUPPORTED_BITS,
+            radius=SUPPORTED_RADIUS,
+            workers=workers,
+        )
+        return index
+
+    def _install(
+        self,
+        packed: np.ndarray,
+        valid: np.ndarray,
+        *,
+        prefer: EnginePreference,
+        boost: BoostPreference,
+        verify: bool,
+        bits: int,
+        radius: int,
+        workers: int | None,
+    ) -> None:
+        self._packed = packed
+        self._valid = valid
+        self._n = int(packed.shape[0])
         self._verify = verify
-        self._engine = self._choose(prefer, bits, radius)
+        self._workers = workers
+        self._engine = self._choose(prefer, bits, radius, boost)
         self._gpu = None
         if self._engine.name == "gpu":
             from hcs_discovery.gpu.engine import GpuEngine
@@ -170,17 +241,78 @@ class TanimotoIndex:
             except Exception as exc:
                 if prefer == "gpu":
                     raise GpuUnavailableError(str(exc)) from exc
-                self._engine = Engine("cpu", f"GPU initialisation failed: {exc}")
+                self._engine = Engine("cpu", f"GPU initialisation failed: {exc}", mode="cpu")
+        if self._engine.name == "gpu" and boost in {"auto", "hybrid"}:
+            self._engine = self._maybe_hybrid(boost, prefer)
 
-    def _choose(self, prefer: EnginePreference, bits: int, radius: int) -> Engine:
+    def _cpu_workers(self) -> int:
+        if self._workers is not None:
+            return max(1, self._workers)
+        return max(1, min(_HYBRID_MAX_WORKERS, (os.cpu_count() or 2) - 1))
+
+    def _maybe_hybrid(self, boost: BoostPreference, prefer: EnginePreference) -> Engine:
+        """Hybrid splits GPU and CPU work; auto only when a measurement says it pays off."""
+        if boost == "gpu" or prefer != "auto":
+            return self._engine
+        if boost == "hybrid":
+            return self._as_hybrid()
+        if self._n < HYBRID_MIN_ROWS or self._engine.adapter_type != "IntegratedGPU":
+            return self._engine
+        if self._hybrid_helps():
+            return self._as_hybrid()
+        return Engine(
+            "gpu",
+            "GPU-only: the CPU share is more than four times slower than this adapter",
+            adapter=self._engine.adapter,
+            backend=self._engine.backend,
+            adapter_type=self._engine.adapter_type,
+            mode="gpu",
+        )
+
+    def _as_hybrid(self) -> Engine:
+        return Engine(
+            "gpu",
+            "GPU and CPU score different slices of the library",
+            adapter=self._engine.adapter,
+            backend=self._engine.backend,
+            adapter_type=self._engine.adapter_type,
+            mode="hybrid",
+            workers=self._cpu_workers(),
+        )
+
+    def _hybrid_helps(self) -> bool:
+        """Measure one small GPU dispatch against the CPU reference and decide.
+
+        The cost of a popcount scan is data-independent, so a fixed query and a
+        capped sample are enough. A split can only help when the CPU share is
+        within a small factor of the GPU; otherwise the CPU work is pure overhead.
+        """
+        assert self._gpu is not None
+        sample = min(self._n, 8192)
+        library = self._packed[:sample]
+        query = np.zeros(WORDS, dtype=np.uint32)
+        self._gpu.counts(query, library[: min(sample, 64)])  # warm-up
+        started = time.perf_counter()
+        self._gpu.counts(query, library)
+        gpu_ms = (time.perf_counter() - started) * 1000.0
+        started = time.perf_counter()
+        cpu_counts(query, library)
+        cpu_ms = (time.perf_counter() - started) * 1000.0
+        return cpu_ms <= 4.0 * gpu_ms
+
+    def _choose(self, prefer: EnginePreference, bits: int, radius: int, boost: BoostPreference) -> Engine:
         if (radius, bits) != (SUPPORTED_RADIUS, SUPPORTED_BITS):
             if prefer == "gpu":
                 raise ValidationError(
                     "The GPU kernel is fixed at Morgan/ECFP radius=2, 2048 bits.",
                     details={"radius": radius, "bits": bits},
                 )
-            return Engine("cpu", f"CPU reference: kernel is {SUPPORTED_RADIUS}/{SUPPORTED_BITS}, not {radius}/{bits}")
-        return resolve_engine(prefer)
+            return Engine(
+                "cpu",
+                f"CPU reference: kernel is {SUPPORTED_RADIUS}/{SUPPORTED_BITS}, not {radius}/{bits}",
+                mode="cpu",
+            )
+        return resolve_engine(prefer, boost)
 
     # -- properties -------------------------------------------------------
     @property
@@ -206,19 +338,64 @@ class TanimotoIndex:
     # -- scoring ----------------------------------------------------------
     def counts(self, query_smiles: str) -> tuple[np.ndarray, np.ndarray]:
         """Exact intersection/union popcounts for every row (GPU when available)."""
-        query = self._query_fingerprint(query_smiles)
-        if self._gpu is not None:
-            result = self._gpu.counts(query, self._packed)
+        return self.counts_for(self._query_fingerprint(query_smiles))
+
+    def counts_for(self, query: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        """Same as :meth:`counts`, for an already packed query fingerprint."""
+        fingerprint = np.ascontiguousarray(query, dtype=np.uint32).reshape(-1)
+        if fingerprint.shape[0] != WORDS:
+            raise ValidationError(
+                "A query fingerprint must be 64 uint32 words.",
+                details={"words": int(fingerprint.shape[0])},
+            )
+        if self._gpu is not None and self._engine.mode == "hybrid":
+            inter, union = self._hybrid_counts(fingerprint)
+        elif self._gpu is not None:
+            result = self._gpu.counts(fingerprint, self._packed)
             inter, union = result.inter, result.union
-            if self._verify:
-                reference_inter, reference_union = cpu_counts(query, self._packed)
-                if not (np.array_equal(inter, reference_inter) and np.array_equal(union, reference_union)):
-                    raise ParityError(
-                        "GPU Tanimoto counts differ from the CPU reference; no result was returned.",
-                        # the counts themselves are not attached: they would be huge
-                    )
-            return inter, union
-        return cpu_counts(query, self._packed)
+        else:
+            return cpu_counts(fingerprint, self._packed)
+        if self._verify:
+            reference_inter, reference_union = cpu_counts(fingerprint, self._packed)
+            if not (np.array_equal(inter, reference_inter) and np.array_equal(union, reference_union)):
+                raise ParityError(
+                    "GPU Tanimoto counts differ from the CPU reference; no result was returned.",
+                    # the counts themselves are not attached: they would be huge
+                )
+        return inter, union
+
+    def _hybrid_counts(self, query: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        """Score the library with the GPU and the CPU at the same time, then merge in order."""
+        assert self._gpu is not None
+        n = self._n
+        integrated = self._engine.adapter_type == "IntegratedGPU"
+        # The GPU is the faster engine on every host measured so far, so it takes the
+        # larger share; the CPU fills the rest without waiting for a dispatch.
+        gpu_rows = min(n, max(64, int(n * (0.7 if integrated else 0.85))))
+        workers = max(1, self._engine.workers)
+        inter = np.empty(n, dtype=np.uint32)
+        union = np.empty(n, dtype=np.uint32)
+        bounds = np.linspace(gpu_rows, n, workers + 1, dtype=int)
+        chunks = [(start, stop) for start, stop in pairwise(int(value) for value in bounds) if stop > start]
+        with ThreadPoolExecutor(max_workers=max(1, len(chunks))) as pool:
+            cpu_futures = [
+                (pool.submit(cpu_counts, query, self._packed[start:stop]), start, stop) for start, stop in chunks
+            ]
+            # The GPU dispatch runs on this thread: it is a driver call, and keeping it
+            # out of the pool means no worker is blocked while the device works.
+            gpu_inter, gpu_union = self._gpu_counts_slice(query, gpu_rows, 0)
+            inter[:gpu_rows] = gpu_inter
+            union[:gpu_rows] = gpu_union
+            for future, start, stop in cpu_futures:
+                part_inter, part_union = future.result()
+                inter[start:stop] = part_inter
+                union[start:stop] = part_union
+        return inter, union
+
+    def _gpu_counts_slice(self, query: np.ndarray, count: int, offset: int) -> tuple[np.ndarray, np.ndarray]:
+        assert self._gpu is not None
+        result = self._gpu.counts(query, self._packed[offset : offset + count])
+        return result.inter, result.union
 
     def scores(self, query_smiles: str) -> np.ndarray:
         return _scores_from_counts(*self.counts(query_smiles))
@@ -295,21 +472,25 @@ def tanimoto_search(
     k: int | None = None,
     threshold: float | None = None,
     prefer: EnginePreference = "auto",
+    boost: BoostPreference = "auto",
     verify: bool = True,
 ) -> SearchResult:
     """One-shot search; builds the index, scores and closes the device."""
-    with TanimotoIndex(smiles, prefer=prefer, verify=verify) as index:
+    with TanimotoIndex(smiles, prefer=prefer, boost=boost, verify=verify) as index:
         return index.search(query_smiles, k=k, threshold=threshold)
 
 
-def similarity_runtime_fingerprint(prefer: EnginePreference = "auto") -> dict[str, str]:
+def similarity_runtime_fingerprint(
+    prefer: EnginePreference = "auto", boost: BoostPreference = "auto"
+) -> dict[str, str]:
     """Cache-key input: which engine and adapter would produce the values."""
     try:
-        engine = resolve_engine(prefer)
+        engine = resolve_engine(prefer, boost)
     except GpuUnavailableError as exc:
         return {"similarity_engine": "unavailable", "similarity_detail": str(exc)}
     return {
         "similarity_engine": engine.name,
+        "similarity_mode": engine.mode,
         "similarity_backend": engine.backend or "none",
         "similarity_adapter": engine.adapter or "none",
     }

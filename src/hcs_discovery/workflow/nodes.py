@@ -106,6 +106,9 @@ class SimilarityConfig(BaseModel):
     # "auto" uses a hardware GPU when the host has one and the CPU reference otherwise.
     # "gpu" fails instead of falling back, so an explicit request is never silently ignored.
     engine: Literal["auto", "cpu", "gpu"] = "auto"
+    # "auto" adds a concurrent CPU share only where it pays off (integrated GPU +
+    # a large library); "hybrid" forces the split, "gpu"/"cpu" pin one engine.
+    boost: Literal["auto", "gpu", "cpu", "hybrid"] = "auto"
 
     @field_validator("query_smiles")
     @classmethod
@@ -142,7 +145,7 @@ def _similarity_values_vectorised(table: Table, config: SimilarityConfig, ctx: N
     """Score the whole column with the shared kernel (GPU when available, else numpy)."""
     smiles = [row["smiles"] for row in table.rows]
     try:
-        with TanimotoIndex(smiles, prefer=config.engine) as index:
+        with TanimotoIndex(smiles, prefer=config.engine, boost=config.boost) as index:
             result = index.search(config.query_smiles)
             engine = index.engine
             valid = index.valid.copy()
@@ -161,6 +164,8 @@ def _similarity_values_vectorised(table: Table, config: SimilarityConfig, ctx: N
         + ("; counts verified against the CPU reference" if result.parity_checked else ""),
         data={
             "engine": engine.name,
+            "mode": engine.mode,
+            "workers": engine.workers,
             "backend": engine.backend,
             "adapter": engine.adapter,
             "parity_checked": result.parity_checked,
@@ -874,7 +879,7 @@ def register_builtin_nodes(registry: NodeRegistry) -> None:
             handler=_run_similarity,
             requires=("smiles",),
             extra_requires=lambda _config: (),
-            runtime_fingerprint=lambda config: similarity_runtime_fingerprint(config.engine),
+            runtime_fingerprint=lambda config: similarity_runtime_fingerprint(config.engine, config.boost),
             outputs=lambda config: [
                 Column(
                     config.column,

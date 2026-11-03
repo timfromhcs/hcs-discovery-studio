@@ -7,6 +7,7 @@ import { AboutPage } from "./pages/About";
 import { CompoundPage } from "./pages/Compound";
 import { DataSourcesPage } from "./pages/DataSources";
 import { LibraryPage } from "./pages/Library";
+import { LabPage } from "./pages/Lab";
 import { ModelsPage } from "./pages/Models";
 import { NotFoundPage } from "./pages/NotFound";
 import { ProjectPage } from "./pages/Project";
@@ -56,6 +57,7 @@ export function App() {
                 <Route path="runs/:runId/results" element={<ResultsPage />} />
                 <Route path="compounds/:compoundId" element={<CompoundPage />} />
                 <Route path="models" element={<ModelsPage />} />
+                <Route path="lab" element={<LabPage />} />
                 <Route path="sources" element={<DataSourcesPage />} />
                 <Route path="settings" element={<SettingsPage />} />
                 <Route path="about" element={<AboutPage />} />

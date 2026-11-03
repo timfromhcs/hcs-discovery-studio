@@ -302,3 +302,79 @@ export async function compareEngines(n = 100_000, repeats = 5): Promise<GpuCompa
     engine.destroy();
   }
 }
+
+export interface LibraryScoreResult {
+  scores: Float64Array;
+  valid: boolean[];
+  engine: "gpu" | "cpu";
+  adapter: string | null;
+  parityExact: boolean | null;
+  ms: number;
+  n: number;
+}
+
+/** float64 Tanimoto from exact integer counts: the same double division as RDKit. */
+function scoresFromCounts(counts: Counts, n: number): Float64Array {
+  const out = new Float64Array(n);
+  for (let i = 0; i < n; i++) {
+    out[i] = counts.union[i] > 0 ? counts.inter[i] / counts.union[i] : 0;
+  }
+  return out;
+}
+
+/**
+ * Score a whole library against one query, GPU first with an exact parity gate.
+ *
+ * The WebGPU kernel returns the same integer popcounts as the CPU reference; if they
+ * differ the result is reported as a failure instead of returning plausible numbers.
+ * Without a hardware adapter the CPU reference runs and says so.
+ */
+export async function scoreLibrary(smiles: string[], query: string): Promise<LibraryScoreResult> {
+  const started = performance.now();
+  const { packed, valid } = await fingerprintsFromSmiles([...smiles, query]);
+  const n = smiles.length;
+  if (!valid[n]) throw new Error("The query SMILES could not be parsed by RDKit.");
+  const library = packed.slice(0, n * WORDS);
+  const queryFp = packed.slice(n * WORDS, (n + 1) * WORDS);
+  const reference = cpuCounts(queryFp, library, n);
+
+  let engine: WebGpuTanimoto | null = null;
+  try {
+    engine = await WebGpuTanimoto.create();
+  } catch {
+    engine = null;
+  }
+  if (!engine) {
+    return {
+      scores: scoresFromCounts(reference, n),
+      valid: valid.slice(0, n),
+      engine: "cpu",
+      adapter: null,
+      parityExact: null,
+      ms: performance.now() - started,
+      n,
+    };
+  }
+  try {
+    engine.loadLibrary(transpose(library, n), n);
+    const counts = await engine.queryResident(queryFp);
+    const exact =
+      counts.inter.length === n &&
+      counts.inter.every((value, index) => value === reference.inter[index]) &&
+      counts.union.every((value, index) => value === reference.union[index]);
+    if (!exact) {
+      throw new Error("GPU counts differ from the CPU reference; no scores were returned.");
+    }
+    return {
+      scores: scoresFromCounts(counts, n),
+      valid: valid.slice(0, n),
+      engine: "gpu",
+      adapter: engine.adapterName,
+      parityExact: true,
+      ms: performance.now() - started,
+      n,
+    };
+  } finally {
+    engine.destroy();
+  }
+}

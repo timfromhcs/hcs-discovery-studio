@@ -5,8 +5,8 @@ Do not edit by hand: re-run the script on the host you want to describe.
 
 | Item | Value |
 |---|---|
-| Date | 2026-11-03 01:07:10Z |
-| Commit | `118ec99` |
+| Date | 2026-11-03 01:35:14Z |
+| Commit | `5dc23cf` |
 | Host | AMD64 Family 25 Model 68 Stepping 1, AuthenticAMD · Windows 11 AMD64 |
 | Adapter | AMD Radeon(TM) Graphics |
 | Backend | Vulkan |
@@ -19,10 +19,10 @@ Median of 5 repetitions, milliseconds, end-to-end (upload, dispatch,
 readback). "GPU resident" keeps the library in a storage buffer and moves only the
 256-byte query.
 
-| Library | numpy CPU | RDKit ms | GPU upload | GPU resident | RDKit M/s | GPU M/s | speed-up | Parity | err |
+| Library | numpy CPU | RDKit ms | GPU upload | GPU resident | GPU+CPU hybrid | hybrid vs upload | speed-up | Parity | err |
 |---|---|---|---|---|---|---|---|---|---|
-| 100,000 | 196.5 | 20.2 | 53.4 | 1.6 | 4.94 | 60.89 | 12.3x | exact | 0.0e+00 |
-| 500,000 | 1,144.9 | 96.4 | 244.4 | 5.0 | 5.19 | 99.17 | 19.1x | exact | 0.0e+00 |
+| 100,000 | 187.2 | 16.3 | 43.1 | 1.4 | 41.9 | 1.03x | 11.5x | exact | 0.0e+00 |
+| 500,000 | 1,238.5 | 93.5 | 233.1 | 6.5 | 213.9 | 1.09x | 14.4x | exact | 0.0e+00 |
 
 ## What this does and does not establish
 

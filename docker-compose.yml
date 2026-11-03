@@ -1,0 +1,19 @@
+services:
+  studio:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: hcs-discovery-studio:local
+    ports:
+      - "8787:8787"
+    environment:
+      # Required: the API refuses a non-loopback bind without a bearer token.
+      HCS_API_TOKEN: ${HCS_API_TOKEN:?set HCS_API_TOKEN (for example: HCS_API_TOKEN=$(openssl rand -hex 24) docker compose up)}
+      HCS_NETWORK_POLICY: local
+      HCS_DATA_DIR: /data
+    volumes:
+      - hcs-data:/data
+    restart: unless-stopped
+
+volumes:
+  hcs-data:

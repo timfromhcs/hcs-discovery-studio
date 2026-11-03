@@ -8,6 +8,43 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- **Offline lab: the workbench without a backend.** `/lab` imports CSV/SDF/SMI,
+  computes descriptors with RDKit WebAssembly, applies the same triage rules and
+  the same weighted composite ranking as the server template, scores Tanimoto
+  similarity through the shared WebGPU kernel (or the labelled CPU reference) and
+  keeps the stored copy in IndexedDB on the device. The Playwright suite runs it
+  against a static build with no API server, at 360 px, including a reload to
+  prove persistence and a delete that really deletes.
+- **Similarity API.** `POST /api/v1/similarity/search` and
+  `GET /api/v1/similarity/engines` expose the same `hcs.similarity-search.v1`
+  payload as the CLI, with structured 404/validation errors and no silent CPU
+  fallback when `engine="gpu"` cannot be satisfied.
+- **MCP server.** `hcs-discovery mcp serve` speaks JSON-RPC 2.0 over stdio with
+  five read-only tools (`hcs_doctor`, `hcs_similarity_search`, `hcs_gpu_bench`,
+  `hcs_workflow_validate`, `hcs_models_list`). No new runtime dependency; a
+  scripted subprocess test asserts that stdout carries protocol messages only.
+- **Hybrid GPU+CPU similarity boost.** `--boost auto|gpu|cpu|hybrid` splits the
+  library between the GPU and CPU threads. `auto` turns the split on only when a
+  calibration on the live library shows the CPU share can keep up; otherwise it
+  stays GPU-only and says so. Measured 1.03–1.09× over the GPU upload path here.
+- **SAT solver and constraint selection.** `hcs_discovery/sat.py` is a
+  dependency-free DPLL solver with watched literals, unit propagation, pure
+  literal elimination and deterministic branching. `hcs-discovery sat solve`
+  reads DIMACS (exit 5 = unsatisfiable); `sat select` chooses at most k candidates
+  covering every group, using a sequential-counter cardinality encoding. Tested
+  against brute force on 40 random 3-SAT instances, pigeonhole UNSAT and unit
+  chains.
+- **Container image.** Multi-stage `Dockerfile` (Node build, slim Python runtime,
+  non-root, healthcheck), `.dockerignore` and `docker-compose.yml`; verified by
+  building, starting, and running a similarity search plus `sat select` inside it.
+- **SEO and i18n documentation.** Per-route titles, descriptions, canonical and
+  Open Graph tags, JSON-LD `SoftwareApplication`, `robots.txt` and `sitemap.xml`,
+  plus zero-to-hero guides in English, German and French. A Playwright spec checks
+  the metadata on a static build and the real 404 page.
+- **Hourly autonomous wake-up.** `scripts/ops/hourly_wakeup.ps1` continues this
+  session with a timestamped prompt under a lock, refusing to start with unmerged
+  paths; `install_hourly_task.ps1` registers the Windows scheduled task.
+
 - **Targets and structures with provenance (API + CLI).** The reserved `targets`
   and `structures` tables now have services, versioned routes
   (`/api/v1/projects/{id}/targets`, `/api/v1/projects/{id}/structures`) and a

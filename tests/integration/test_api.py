@@ -245,3 +245,59 @@ def test_remote_binding_authenticates(settings):
         headers = {"Authorization": "Bearer test-token-value"}
         assert test_client.get("/api/v1/projects", headers=headers).status_code == 200
         assert test_client.get("/api/v1/projects", headers={"Authorization": "Bearer wrong"}).status_code == 401
+
+
+def test_similarity_search_matches_the_cli_payload(client, monkeypatch):
+    monkeypatch.setattr(
+        "hcs_discovery.similarity.probe_gpu",
+        lambda: {"status": "software_only", "detail": "No hardware GPU adapter was found."},
+    )
+    from hcs_discovery.similarity import clear_device_cache
+
+    clear_device_cache()
+    project = _create_project(client)
+    dataset = _import(client, project["id"])
+    response = client.post(
+        "/api/v1/similarity/search",
+        json={
+            "dataset_id": dataset["id"],
+            "query_smiles": "c1ccccc1",
+            "k": 3,
+            "engine": "cpu",
+        },
+    )
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["schema"] == "hcs.similarity-search.v1"
+    assert payload["engine"]["name"] == "cpu"
+    assert payload["parity_checked"] is False
+    assert payload["n_library"] == dataset["imported_count"]
+    assert payload["hits"][0]["similarity"] == 1.0
+    assert [hit["rank"] for hit in payload["hits"]] == [1, 2, 3]
+    clear_device_cache()
+
+
+def test_similarity_search_rejects_unknown_dataset_and_bad_smiles(client):
+    response = client.post(
+        "/api/v1/similarity/search",
+        json={"dataset_id": "dts_missing", "query_smiles": "c1ccccc1"},
+    )
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "not_found"
+
+    project = _create_project(client)
+    dataset = _import(client, project["id"])
+    bad = client.post(
+        "/api/v1/similarity/search",
+        json={"dataset_id": dataset["id"], "query_smiles": "not-a-smiles", "engine": "cpu"},
+    )
+    assert bad.status_code in {400, 422}
+    body = bad.json()
+    assert "validation" in json.dumps(body).lower()
+
+
+def test_similarity_engines_endpoint_reports_the_kernel(client):
+    payload = client.get("/api/v1/similarity/engines").json()
+    assert payload["fingerprint"] == {"type": "morgan", "radius": 2, "bits": 2048}
+    assert payload["boost_modes"] == ["auto", "gpu", "cpu", "hybrid"]
+    assert payload["probe"]["status"] in {"available", "software_only", "unavailable"}

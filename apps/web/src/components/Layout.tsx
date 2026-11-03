@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation, useParams } from "react-router-dom";
 import { useProject, useSettings, useStats } from "../api/queries";
 import { useTheme } from "../lib/theme";
+import { usePageMeta } from "../lib/meta";
 import { Icon, Logo, type IconName } from "./Icon";
 import { Badge, IconButton, Skeleton } from "./ui";
 import { CREDIT } from "../lib/constants";
@@ -15,6 +16,7 @@ interface NavItem {
 
 const primary: NavItem[] = [
   { to: "/", label: "Workspace", icon: "workspace", end: true },
+  { to: "/lab", label: "Offline lab", icon: "molecule" },
   { to: "/models", label: "Model registry", icon: "models" },
   { to: "/sources", label: "Data sources", icon: "database" },
   { to: "/settings", label: "Settings", icon: "settings" },
@@ -30,6 +32,7 @@ export function Layout() {
   const settings = useSettings();
   const project = useProject(projectId ?? "");
   const closeMenu = () => setMenuOpen(false);
+  usePageMeta(location.pathname);
 
   useEffect(() => {
     closeMenu();

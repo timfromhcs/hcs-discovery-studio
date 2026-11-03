@@ -127,10 +127,12 @@ def test_runtime_fingerprint_names_engine_and_adapter(monkeypatch):
     monkeypatch.setattr("hcs_discovery.similarity.probe_gpu", lambda: fake)
     assert similarity_runtime_fingerprint("auto") == {
         "similarity_engine": "gpu",
+        "similarity_mode": "gpu",
         "similarity_backend": "Vulkan",
         "similarity_adapter": "AMD Radeon(TM) Graphics",
     }
     assert similarity_runtime_fingerprint("cpu")["similarity_engine"] == "cpu"
+    assert similarity_runtime_fingerprint("auto", "cpu")["similarity_mode"] == "cpu"
 
 
 def test_one_shot_search_result_is_self_describing():
@@ -184,3 +186,46 @@ def test_probe_reports_hardware_only():
     assert probe["status"] in {"available", "software_only", "unavailable"}
     if probe["status"] == "available":
         assert probe["backend"] in {"Vulkan", "D3D12", "Metal"}
+
+
+# --------------------------------------------------------------------------- hybrid
+HYBRID_SMILES = [
+    "CC(=O)Oc1ccccc1C(=O)O",
+    "CN1CCC[C@H]1c1cccnc1",
+    "c1ccccc1",
+    "CC(C)Cc1ccc(cc1)C(C)C(=O)O",
+    "CN1C=NC2=C1C(=O)N(C(=O)N2C)C",
+]
+
+
+@pytest.mark.gpu
+def test_hybrid_split_is_bit_exact_and_merges_in_order():
+    if select_adapter() is None:
+        pytest.skip("no hardware GPU adapter")
+    library = [HYBRID_SMILES[index % len(HYBRID_SMILES)] for index in range(120)]
+    with TanimotoIndex(library, prefer="auto", boost="hybrid", workers=2) as hybrid:
+        assert hybrid.engine.mode == "hybrid"
+        assert hybrid.engine.workers == 2
+        hybrid_scores = hybrid.scores(QUERY)
+    with TanimotoIndex(library, prefer="cpu") as reference:
+        cpu_scores = reference.scores(QUERY)
+    assert list(hybrid_scores) == list(cpu_scores)
+
+
+def test_boost_cpu_never_touches_the_gpu(monkeypatch):
+    monkeypatch.setattr(
+        "hcs_discovery.similarity.probe_gpu",
+        lambda: {"status": "available", "adapter": "Fake", "backend": "Vulkan", "adapter_type": "IntegratedGPU"},
+    )
+    with TanimotoIndex(SMILES, prefer="auto", boost="cpu") as index:
+        assert index.engine.name == "cpu" and index.engine.mode == "cpu"
+
+
+def test_hybrid_without_hardware_falls_back_to_cpu(monkeypatch):
+    monkeypatch.setattr(
+        "hcs_discovery.similarity.probe_gpu",
+        lambda: {"status": "software_only", "detail": "No hardware GPU adapter was found."},
+    )
+    with TanimotoIndex(SMILES, prefer="auto", boost="hybrid") as index:
+        assert index.engine.name == "cpu"
+        assert "No hardware GPU adapter" in index.engine.detail

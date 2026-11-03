@@ -70,3 +70,6 @@ tmp/
 
 # Vercel CLI local link (the linked project is created with `vercel link`)
 .env.local
+
+# autonomous wake-up logs
+logs/

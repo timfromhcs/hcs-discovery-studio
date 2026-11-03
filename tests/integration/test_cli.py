@@ -243,3 +243,39 @@ def test_similarity_search_reports_engine_and_hits(settings, tmp_path: Path):
     assert rows[0] == "row_index,name,smiles,similarity"
     assert len(rows) == 4
     assert rows[1].endswith("1.000000")
+
+
+def test_sat_solve_satisfiable_and_unsatisfiable(settings, tmp_path: Path):
+    sat = tmp_path / "sat.cnf"
+    sat.write_text("c example\np cnf 3 2\n1 -2 0\n2 3 0\n", encoding="utf-8")
+    payload = _json(runner.invoke(app, ["--json", "sat", "solve", "--cnf", str(sat)]))
+    assert payload["schema"] == "hcs.sat-solution.v1"
+    assert payload["satisfiable"] is True
+    assert payload["variables"] == 3 and payload["clauses"] == 2
+
+    unsat = tmp_path / "unsat.cnf"
+    unsat.write_text("p cnf 1 2\n1 0\n-1 0\n", encoding="utf-8")
+    result = runner.invoke(app, ["--json", "sat", "solve", "--cnf", str(unsat)])
+    assert result.exit_code == 5
+    assert json.loads(result.stdout)["satisfiable"] is False
+
+
+def test_sat_select_reports_selection_and_conflict(settings):
+    selected = _json(
+        runner.invoke(
+            app,
+            ["--json", "sat", "select", "--group", "low=a,b", "--group", "high=c", "--k-max", "2"],
+        )
+    )
+    assert selected["satisfiable"] is True
+    chosen = set(selected["selected"])
+    assert chosen & {"a", "b"}, "the low bin must be covered"
+    assert "c" in chosen, "the high bin must be covered"
+    assert len(chosen) <= 2
+
+    conflict = runner.invoke(
+        app,
+        ["--json", "sat", "select", "--group", "a=x", "--group", "b=y", "--group", "c=z", "--k-max", "2"],
+    )
+    assert conflict.exit_code == 5
+    assert json.loads(conflict.stdout)["satisfiable"] is False

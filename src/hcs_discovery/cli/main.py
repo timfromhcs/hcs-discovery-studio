@@ -83,6 +83,8 @@ agent_app = typer.Typer(help="Safe research assistant (Ask, Plan, Run).", no_arg
 target_app = typer.Typer(help="Targets and structures.", no_args_is_help=True)
 gpu_app = typer.Typer(help="GPU (Vulkan/WebGPU) similarity probe and benchmark.", no_args_is_help=True)
 similarity_app = typer.Typer(help="Similarity search over a structure file.", no_args_is_help=True)
+sat_app = typer.Typer(help="SAT solving and constraint-based selection.", no_args_is_help=True)
+mcp_app = typer.Typer(help="MCP server for local AI assistants (stdio).", no_args_is_help=True)
 
 for name, sub in (
     ("project", project_app),
@@ -100,6 +102,8 @@ for name, sub in (
     ("target", target_app),
     ("gpu", gpu_app),
     ("similarity", similarity_app),
+    ("sat", sat_app),
+    ("mcp", mcp_app),
 ):
     app.add_typer(sub, name=name)
 
@@ -1351,6 +1355,11 @@ def similarity_search(
     k: int = typer.Option(10, "--k", min=1, max=10_000, help="Number of nearest neighbours to show."),
     threshold: float | None = typer.Option(None, "--threshold", min=0.0, max=1.0, help="Minimum similarity."),
     engine: str = typer.Option("auto", "--engine", help="auto, cpu or gpu. 'gpu' fails instead of falling back."),
+    boost: str = typer.Option(
+        "auto",
+        "--boost",
+        help="auto, gpu, cpu or hybrid. 'auto' splits GPU+CPU only when it can pay off.",
+    ),
     output: Path | None = typer.Option(None, "--output", help="Write every scored row to this CSV file."),
     max_rows: int = typer.Option(
         50_000,
@@ -1373,6 +1382,8 @@ def similarity_search(
 
     if engine not in {"auto", "cpu", "gpu"}:
         _fail(ValidationError("engine must be one of auto, cpu or gpu.", details={"engine": engine}))
+    if boost not in {"auto", "gpu", "cpu", "hybrid"}:
+        _fail(ValidationError("boost must be one of auto, gpu, cpu or hybrid.", details={"boost": boost}))
     parsed = _run_cli(parse_file, file, file.name, "auto", ImportOptions(max_rows=max_rows))
     if parsed is None:
         return
@@ -1385,7 +1396,7 @@ def similarity_search(
         _fail(ValidationError("No structures could be read from the file.", details={"path": str(file)}))
     smiles = [canonical for _, canonical in imported]
     try:
-        with TanimotoIndex(smiles, prefer=engine) as index:  # type: ignore[arg-type]
+        with TanimotoIndex(smiles, prefer=engine, boost=boost) as index:  # type: ignore[arg-type]
             result = index.search(query, k=k, threshold=threshold)
             resolved = index.engine
     except GpuUnavailableError as exc:
@@ -1423,9 +1434,12 @@ def similarity_search(
         "n_rejected": parsed.record_count - len(imported),
         "engine": {
             "name": resolved.name,
+            "mode": resolved.mode,
+            "workers": resolved.workers,
             "detail": resolved.detail,
             "adapter": resolved.adapter,
             "backend": resolved.backend,
+            "adapter_type": resolved.adapter_type,
         },
         "parity_checked": result.parity_checked,
         "k": k,
@@ -1452,6 +1466,108 @@ def similarity_search(
     if not hits:
         lines.append("No structure reached the threshold.")
     _print(ctx, payload, "\n".join(lines))
+
+
+def _read_dimacs(path: Path) -> tuple[list[list[int]], int]:
+    """Minimal DIMACS reader: comments, the header, and 0-terminated clauses."""
+    clauses: list[list[int]] = []
+    variables = 0
+    pending: list[int] = []
+    for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+        stripped = line.strip()
+        if not stripped or stripped.startswith("c") or stripped.startswith("%"):
+            continue
+        if stripped.startswith("p"):
+            parts = stripped.split()
+            if len(parts) != 4 or parts[1] != "cnf":
+                raise ValidationError("Malformed DIMACS header.", details={"line": number})
+            variables = int(parts[2])
+            continue
+        for token in stripped.split():
+            literal = int(token)
+            if literal == 0:
+                clauses.append(pending)
+                pending = []
+            else:
+                pending.append(literal)
+    if pending:
+        clauses.append(pending)
+    return clauses, variables
+
+
+@sat_app.command("solve")
+def sat_solve(
+    ctx: typer.Context,
+    cnf: Path = typer.Option(..., "--cnf", exists=True, dir_okay=False, readable=True, help="DIMACS CNF file."),
+) -> None:
+    """Decide a CNF. Exit code 0 = satisfiable, 5 = unsatisfiable, 3 = malformed input."""
+    from ..sat import solve
+
+    clauses, variables = _read_dimacs(cnf)
+    result = solve(clauses, variables=variables)
+    model: list[int] = sorted(variable for variable, value in result.model.items() if value)
+    payload = {
+        "schema": "hcs.sat-solution.v1",
+        "satisfiable": result.satisfiable,
+        "variables": result.variables,
+        "clauses": result.clauses,
+        "decisions": result.decisions,
+        "propagations": result.propagations,
+        "model": model,
+    }
+    human = f"satisfiable: {result.clauses} clauses, {result.variables} variables, {result.decisions} decisions\n" + (
+        "true: " + " ".join(str(v) for v in model) if result.satisfiable else "no model exists"
+    )
+    _print(ctx, payload, human)
+    if not result.satisfiable:
+        raise typer.Exit(5)
+
+
+@sat_app.command("select")
+def sat_select(
+    ctx: typer.Context,
+    group: list[str] = typer.Option(
+        ...,
+        "--group",
+        help="NAME=id1,id2,... — a bin that must be covered (repeatable).",
+    ),
+    k_max: int = typer.Option(..., "--k-max", min=0, help="Maximum number of candidates to select."),
+    min_per_group: int = typer.Option(1, "--min-per-group", min=0, help="How many candidates each bin needs."),
+) -> None:
+    """Pick at most k candidates so every group is covered, or say it is impossible."""
+    from ..sat import select_subset
+
+    groups: dict[str, list[str]] = {}
+    for specification in group:
+        name, _, members = specification.partition("=")
+        if not name or not members:
+            _fail(ValidationError("Groups must look like NAME=id1,id2.", details={"group": specification}))
+            return
+        groups[name] = [member.strip() for member in members.split(",") if member.strip()]
+    selection = select_subset(groups, k_max=k_max, min_per_group=min_per_group)
+    payload = {
+        "schema": "hcs.sat-selection.v1",
+        "satisfiable": selection.satisfiable,
+        "selected": list(selection.selected),
+        "k_max": selection.k_max,
+        "min_per_group": min_per_group,
+        "reason": selection.reason,
+        "decisions": selection.stats.decisions,
+    }
+    human = (
+        "selected: " + ", ".join(selection.selected) if selection.satisfiable else f"unsatisfiable: {selection.reason}"
+    )
+    _print(ctx, payload, human)
+    if not selection.satisfiable:
+        raise typer.Exit(5)
+
+
+@mcp_app.command("serve")
+def mcp_serve() -> None:
+    """Serve read-only HCS tools over MCP (JSON-RPC 2.0 on stdin/stdout)."""
+    from ..mcp_server import serve
+
+    raise typer.Exit(serve())
 
 
 @app.command("version")

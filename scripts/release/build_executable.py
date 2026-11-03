@@ -100,15 +100,17 @@ def smoke_test(exe: Path) -> None:
         raise SystemExit(f"executable not found: {exe}")
 
     env = dict(os.environ)
-    # ignore_cleanup_errors: Windows can keep a handle on the SQLite file for a
-    # moment after the server process exits; the directory is under the temporary
-    # directory either way and the smoke assertions have already run.
+    # Run a copy of the binary, not build/exe-dist/hcs-discovery.exe: a one-file
+    # PyInstaller executable keeps its own file open while it runs, so the next build
+    # would fail with a PermissionError on a file the smoke test itself started.
     with tempfile.TemporaryDirectory(prefix="hcs-exe-smoke-", ignore_cleanup_errors=True) as data_dir:
         env["HCS_DATA_DIR"] = data_dir
+        target = Path(data_dir) / exe.name
+        shutil.copy2(exe, target)
 
         def call(*args: str) -> subprocess.CompletedProcess[str]:
             return subprocess.run(
-                [str(exe), *args], env=env, capture_output=True, text=True, encoding="utf-8", errors="replace"
+                [str(target), *args], env=env, capture_output=True, text=True, encoding="utf-8", errors="replace"
             )
 
         version = call("version")
@@ -145,7 +147,7 @@ def smoke_test(exe: Path) -> None:
                 )
 
         server = subprocess.Popen(
-            [str(exe), "serve", "--port", "8807"], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+            [str(target), "serve", "--port", "8807"], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
         )
         try:
             if not _wait_ready("http://127.0.0.1:8807/api/v1/ready"):

@@ -24,15 +24,25 @@ export default defineConfig({
     screenshot: "only-on-failure",
     video: "off",
   },
-  webServer: {
-    command: "uv run hcs-discovery serve --port 8791",
-    cwd: repoRoot,
-    url: "http://127.0.0.1:8791/api/v1/health",
-    reuseExistingServer: false,
-    timeout: 120_000,
-    env: {
-      HCS_DATA_DIR: process.env.HCS_E2E_DATA_DIR,
-      HCS_NETWORK_POLICY: "local",
+  webServer: [
+    {
+      command: "uv run hcs-discovery serve --port 8791",
+      cwd: repoRoot,
+      url: "http://127.0.0.1:8791/api/v1/health",
+      reuseExistingServer: false,
+      timeout: 120_000,
+      env: {
+        HCS_DATA_DIR: process.env.HCS_E2E_DATA_DIR,
+        HCS_NETWORK_POLICY: "local",
+      },
     },
-  },
+    {
+      // The offline lab is verified against the static build, with no API server.
+      command: "npm run preview -- --port 8792 --strictPort --host 127.0.0.1",
+      cwd: join(repoRoot, "apps", "web"),
+      url: "http://127.0.0.1:8792",
+      reuseExistingServer: false,
+      timeout: 120_000,
+    },
+  ],
 });

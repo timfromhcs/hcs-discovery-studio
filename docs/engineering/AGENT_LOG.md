@@ -655,6 +655,40 @@ Worked through GEMINI.md again from the merged `main`.
   API-Route für die Suche, GPU-Fingerprint-Generierung, Vergleich mit nvMolKit
   (CUDA-only, andere Hardware).
 
+## 2026-11-03 (Abend) — Zero-Backend-Lab, MCP, SAT, Hybrid, Container
+
+- Branch `feat/zero-backend-workspace` (von `main` nach dem GPU-Merge).
+- Recherche → `docs/engineering/PLAN_2026-11-03_ZERO_BACKEND.md` (Vercel-Limits,
+  Container, OPFS/SQLite/IndexedDB, WebGPU-Präzision, SAT, Packaging).
+- Gebaut und verifiziert:
+  - **Offline-Lab** (`apps/web/src/pages/Lab.tsx`, `lib/offlineLab.ts`): Import
+    CSV/SDF/SMI, RDKit-WASM-Deskriptoren, identische Triage/Composite-Ranking-
+    Semantik, WebGPU/CPU-Similarität, IndexedDB-Persistenz, CSV-Export, 360-px-Layout.
+    Drei Playwright-Tests gegen `vite preview` (kein API-Server), inkl. Reload und
+    Löschen.
+  - **API** `POST /api/v1/similarity/search` + `/engines` mit demselben Schema wie
+    die CLI; Tests für 404, ungültiges SMILES, engine=gpu ohne Adapter.
+  - **MCP** `mcp_server.py` (JSON-RPC 2.0, stdio, fünf Read-only-Tools), CLI
+    `hcs-discovery mcp serve`; Subprozess-Test prüft, dass stdout nur Protokoll ist.
+  - **Hybrid-Boost**: GPU+CPU-Split mit Kalibrierung; `auto` bleibt GPU-only, wenn
+    die CPU nicht mithalten kann. Gemessen 1,03–1,09× gegenüber GPU-Upload.
+  - **SAT**: DPLL mit Watched Literals, Pure-Literal-Elimination, deterministischer
+    Branching; 40 Brute-Force-Differentialfälle, Pigeonhole-UNSAT, Sequenzzähler;
+    CLI `sat solve` (Exit 5) und `sat select`.
+  - **Docker**: Multi-Stage-Image (SPA im Node-Stage, schlanker Python-Runtime,
+    non-root, Healthcheck); Container startet, liefert `/api/v1/health`, SPA 200,
+    Similarity-Suche und `sat select` im Container. Stolpersteine: WGSL-Import
+    außerhalb des Web-Kontexts (Kernel an denselben relativen Pfad kopiert) und
+    RDKit-Draw-Abhängigkeiten (`libxrender1`, `libexpat1`, `libfontconfig1`,
+    `libfreetype6`).
+  - **SEO/Doku**: Meta/OG/Canonical/JSON-LD, `robots.txt`, `sitemap.xml`,
+    Zero-to-Hero-Guides EN/DE/FR; Playwright prüft Metadaten und die echte 404-Seite.
+  - **Stündlicher Weckruf**: `scripts/ops/hourly_wakeup.ps1` (Lock, Merge-Check, Log)
+    plus `install_hourly_task.ps1`; Task `HCS-OpenCode-Hourly` ist installiert
+    (`Status: Bereit`), Dry-Run protokolliert.
+- Nicht getan / bewusst offen: Service-Worker-Offline-Cache, veröffentlichte
+  npm-/PyPI-Pakete, UI-Übersetzung (nur Guides), BitBound-Prefilter.
+
 ## Blockers
 
 - None technical at the time of writing. The `v0.1.0` preview is published and

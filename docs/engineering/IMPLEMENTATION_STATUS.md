@@ -1,4 +1,4 @@
-# Implementation status
+﻿# Implementation status
 
 Last updated: 2026-11-03. Version: `2.0.0` release candidate merged to `main`
 (commit `12febcf`, PR #7); not tagged or published yet. The GPU similarity path
@@ -19,12 +19,12 @@ test or a recorded manual check; it does not mean validated science.
 | Persistent queue | Done | Lease claim, heartbeat, recovery, cancellation, retry tests |
 | RDKit import/standardise | Done | CSV/SDF/SMILES, row outcomes, descriptor tests |
 | Workflow engine | Done | Validation, execution, cache, events, manifest tests |
-| CPU scientific slice | Done | Descriptors → filters → Pareto/composite → summary with integrity checks |
-| React UI | Done for shipped features | Visual QA: 18 routes × 6 widths × 2 themes, 0 automatic findings |
+| CPU scientific slice | Done | Descriptors â†’ filters â†’ Pareto/composite â†’ summary with integrity checks |
+| React UI | Done for shipped features | Visual QA: 18 routes Ã— 6 widths Ã— 2 themes, 0 automatic findings |
 | CLI/API parity | Done for shipped actions | Shared services; CLI tests |
 | Local LLM provider / Safe Research Agent | Done | Ask, Plan, Run modes with strict allowlisted tools |
-| AutoDock Vina docking | Runs; reference-tested on one complex | Host-dependent binary; ligand PDBQT matches Meeko on 48/51 fixtures; 1IEP redocking ≤ 0.94 Å over 5 seeds, enforced in CI; not benchmarked |
-| Property estimates | Runs; weak/approximate | Reduced ESOL measured (RMSE 0.97, R² 0.07, n=45); CNS MPO approximation |
+| AutoDock Vina docking | Runs; reference-tested on one complex | Host-dependent binary; ligand PDBQT matches Meeko on 48/51 fixtures; 1IEP redocking â‰¤ 0.94 Ã… over 5 seeds, enforced in CI; not benchmarked |
+| Property estimates | Runs; weak/approximate | Reduced ESOL measured (RMSE 0.97, RÂ² 0.07, n=45); CNS MPO approximation |
 | PubChem / ChEMBL connectors | Done | Policy-gated; mocked-transport tests; blocked by default |
 | DAG Workflows | Done | Multi-branch DAGs, Kahn topological sort, and table.join with strict-key checks |
 | HAEL adaptive scheduler | Experimental, library only | Typed evidence gates, cost model, deterministic trace, 94 property/guard tests ([design](../research/HAEL.md)); no workflow node, API, CLI or UI yet |
@@ -84,17 +84,18 @@ test or a recorded manual check; it does not mean validated science.
 
 - Self-contained wheel bundling the built SPA; smoke-tested locally on port 8793
   and by the CI wheel job.
-- <!-- gen:tests -->476 passed, 0 skipped<!-- /gen:tests --> backend tests on the
+- <!-- gen:tests -->554 passed, 0 skipped<!-- /gen:tests --> backend tests on the
   development host (the live docking tests are deselected there because no Vina
   binary is installed), and the same suite in CI on Linux with the binary
   installed.
-- <!-- gen:coverage -->83 % branch coverage<!-- /gen:coverage --> locally; the CI floor
+- <!-- gen:coverage -->82 % branch coverage<!-- /gen:coverage --> locally; the CI floor
   is 70 %.
-- 5 Playwright end-to-end tests passing locally and in CI, including the RDKit
-  WebAssembly self-test and the WebGPU parity benchmark against the served app.
+- 11 Playwright end-to-end tests passing locally (studio journey, planned engines,
+  unknown runs, RDKit WebAssembly self-test, WebGPU parity, the offline lab at
+  360 px and the SEO/404 checks).
 - Ruff format/check and mypy clean locally and in CI.
 - Frontend typecheck and production build clean locally and in CI.
-- Visual and accessibility QA: 18 routes × 6 widths (incl. 640 px = 200% zoom) ×
+- Visual and accessibility QA: 18 routes Ã— 6 widths (incl. 640 px = 200% zoom) Ã—
   2 themes = 192 captures, 0 automatic findings, screenshots reviewed by hand.
 - Genuine screenshots in `docs/screenshots/`.
 - GitHub Actions run
@@ -164,13 +165,13 @@ Evidence below was produced on `main` at commit `12febcf` and re-run locally on
 | Gate | Status | Evidence |
 |---|---|---|
 | Lint, format, types | Pass locally and in CI | Ruff, mypy (89 source files) |
-| Backend tests | Pass locally and in CI | <!-- gen:tests -->476 passed, 0 skipped<!-- /gen:tests --> on the development host (the skips are the live docking tests); <!-- gen:coverage -->83 % branch coverage<!-- /gen:coverage -->; Hypothesis properties for ranking and joins; HAEL modules ≥94% |
+| Backend tests | Pass locally and in CI | <!-- gen:tests -->554 passed, 0 skipped<!-- /gen:tests --> on the development host (the skips are the live docking tests); <!-- gen:coverage -->82 % branch coverage<!-- /gen:coverage -->; Hypothesis properties for ranking and joins; HAEL modules â‰¥94% |
 | Frontend build and E2E | Pass locally and in CI | typecheck, build, 3 Playwright tests on isolated data |
-| Visual QA | Pass locally | `apps/web/scripts/visual_qa.mjs`: 18 routes × 6 widths (incl. 640 px = 200% zoom) × 2 themes = 192 captures, WCAG AA text contrast, heading order, keyboard focus; screenshots reviewed by hand |
-| Fresh migration and wheel | Pass locally and in CI | Wheel ships Alembic scripts and records a revision; wheel installed into a clean venv and completed db upgrade → project → import → run → results |
+| Visual QA | Pass locally | `apps/web/scripts/visual_qa.mjs`: 18 routes Ã— 6 widths (incl. 640 px = 200% zoom) Ã— 2 themes = 192 captures, WCAG AA text contrast, heading order, keyboard focus; screenshots reviewed by hand |
+| Fresh migration and wheel | Pass locally and in CI | Wheel ships Alembic scripts and records a revision; wheel installed into a clean venv and completed db upgrade â†’ project â†’ import â†’ run â†’ results |
 | Cache provenance | Pass | Package fingerprint, detected Vina version and receptor hash in keys |
 | CodeQL, secret scan, audits, licenses | Pass in CI | Required jobs on the PR and on `main` |
-| Docking reference validation | Pass (one complex) | 1IEP redocking: HCS preparation 0.42–0.94 Å, Vina-example control 0.29–0.37 Å, 5 seeds; CI job `science-vina` enforces ≤ 2.0 Å ([report](../validation/vina-redocking-1iep.md)) |
+| Docking reference validation | Pass (one complex) | 1IEP redocking: HCS preparation 0.42â€“0.94 Ã…, Vina-example control 0.29â€“0.37 Ã…, 5 seeds; CI job `science-vina` enforces â‰¤ 2.0 Ã… ([report](../validation/vina-redocking-1iep.md)) |
 | Release workflow | Hardened, untested end to end | Exact-SHA CI/CodeQL gate, draft-then-verify; the release-candidate run will be its first real execution |
 | Release candidate published and verified | **Not met** | No tag pushed yet |
 
@@ -201,3 +202,4 @@ run of the release workflow and owner approval for tagging.
 Every "working" item above can be checked with a command in
 `docs/user-guide/CLI.md` or a test in `docs/developer-guide/TESTING.md`. If a
 claim cannot be reproduced, treat it as a documentation bug and open an issue.
+
