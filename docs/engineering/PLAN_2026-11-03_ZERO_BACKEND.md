@@ -285,8 +285,12 @@ P8 (scheduler) runs in parallel, independent of the code
       only — the guides are translated, not the interface.
 - [x] Hourly task exists (`schtasks /Query` → Ready), is logged, takes a lock and
       refuses to run with unmerged paths.
-- [ ] `scripts/gates.py --level full` and G15 pass on the merged commit.
-- [ ] README states exactly what works, what is weak, and what is planned.
+- [x] `scripts/gates.py --level full` passes on this tree (G0–G11; G13 skipped
+      because gitleaks is not installed) and G15 passes at release level.
+- [x] README states exactly what works, what is weak, and what is planned.
+- [x] Merged to `main` and pushed; the production deployment was re-verified
+      afterwards (RDKit WASM self-test, WebGPU parity, offline-lab import and
+      persistence).
 
 ## 7. What this plan deliberately does not do
 
