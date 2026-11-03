@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from ...core.errors import NotFoundError, ValidationError
 from ...database.models import Compound, Dataset
 from ...gpu.device import probe_gpu
+from ...services import load_dataset_fingerprints
 from ...similarity import (
     SUPPORTED_BITS,
     SUPPORTED_RADIUS,
@@ -69,18 +70,20 @@ def similarity_search(payload: SimilaritySearchRequest, session: Session = Depen
     dataset = session.get(Dataset, payload.dataset_id)
     if dataset is None:
         raise NotFoundError("Dataset not found.", details={"dataset_id": payload.dataset_id})
+    fingerprints = load_dataset_fingerprints(session, payload.dataset_id)
     rows = session.execute(
-        select(Compound.id, Compound.name, Compound.isomeric_smiles)
-        .where(Compound.dataset_id == payload.dataset_id)
-        .order_by(Compound.id)
+        select(Compound.id, Compound.name, Compound.isomeric_smiles).where(Compound.id.in_(fingerprints.compound_ids))
     ).all()
-    if not rows:
-        raise ValidationError("The dataset has no compounds to score.", details={"dataset_id": payload.dataset_id})
-    smiles = [row.isomeric_smiles for row in rows]
+    by_id = {row.id: row for row in rows}
+    if len(by_id) != fingerprints.count:
+        raise ValidationError(
+            "The dataset changed while the search was prepared; retry.",
+            details={"dataset_id": payload.dataset_id},
+        )
     prefiltered = False
-    candidates = len(smiles)
+    candidates = fingerprints.count
     try:
-        with TanimotoIndex(smiles, prefer=payload.engine, boost=payload.boost) as index:
+        with TanimotoIndex.from_packed(fingerprints.packed, prefer=payload.engine, boost=payload.boost) as index:
             resolved = index.engine
             if payload.threshold is not None:
                 # BitBound only helps a threshold search; a k-nearest query needs the
@@ -104,9 +107,9 @@ def similarity_search(payload: SimilaritySearchRequest, session: Session = Depen
     hits = [
         {
             "rank": rank,
-            "compound_id": rows[hit.index].id,
-            "name": rows[hit.index].name or "",
-            "smiles": rows[hit.index].isomeric_smiles,
+            "compound_id": by_id[fingerprints.compound_ids[hit.index]].id,
+            "name": by_id[fingerprints.compound_ids[hit.index]].name or "",
+            "smiles": by_id[fingerprints.compound_ids[hit.index]].isomeric_smiles,
             "similarity": round(hit.similarity, 6),
         }
         for rank, hit in enumerate(raw_hits, start=1)
@@ -115,7 +118,14 @@ def similarity_search(payload: SimilaritySearchRequest, session: Session = Depen
         "schema": SCHEMA,
         "dataset_id": payload.dataset_id,
         "query": payload.query_smiles,
-        "n_library": len(smiles),
+        "n_library": fingerprints.count,
+        "fingerprints": {
+            "cached": fingerprints.cached,
+            "checksum": fingerprints.checksum,
+            "count": fingerprints.count,
+            "radius": fingerprints.radius,
+            "bits": fingerprints.bits,
+        },
         "engine": {
             "name": resolved.name,
             "mode": resolved.mode,
@@ -126,7 +136,7 @@ def similarity_search(payload: SimilaritySearchRequest, session: Session = Depen
             "detail": resolved.detail,
         },
         "parity_checked": parity,
-        "prefilter": {"enabled": prefiltered, "candidates": candidates, "library": len(smiles)},
+        "prefilter": {"enabled": prefiltered, "candidates": candidates, "library": fingerprints.count},
         "k": payload.k,
         "threshold": payload.threshold,
         "timings_ms": {key: round(value, 3) for key, value in timings.items()},

@@ -11,6 +11,7 @@ from .datasets import (
     standardize_one,
     validate_molecules,
 )
+from .fingerprints_cache import DatasetFingerprintSet, fingerprint_cache_stats, load_dataset_fingerprints
 from .models import get_model, list_models
 from .projects import (
     create_project,
@@ -51,6 +52,7 @@ from .targets import (
 )
 
 __all__ = [
+    "DatasetFingerprintSet",
     "artifact_path",
     "compound_detail",
     "copy_structure_to",
@@ -66,6 +68,7 @@ __all__ = [
     "delete_target",
     "delete_workflow",
     "events_after",
+    "fingerprint_cache_stats",
     "get_compound",
     "get_dataset",
     "get_model",
@@ -83,6 +86,7 @@ __all__ = [
     "list_runs",
     "list_structures",
     "list_targets",
+    "load_dataset_fingerprints",
     "project_overview",
     "queued_run_count",
     "render_depiction",

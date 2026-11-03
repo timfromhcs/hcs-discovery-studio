@@ -65,6 +65,9 @@ test or a recorded manual check; it does not mean validated science.
 - Content-addressed node cache with implementation and engine versions.
 - SSE event stream and CLI log following from the same rows.
 - Results persisted as rows plus JSON/CSV; artifacts hashed and downloadable.
+- Packed fingerprints stored once per dataset (checksummed), so repeated similarity
+  searches do not re-fingerprint the library; a changed dataset or a damaged blob is
+  detected and rebuilt.
 - Manifest with workflow snapshot, dataset checksum, environment, hardware,
   cache keys, artifacts and limitations.
 
@@ -84,7 +87,7 @@ test or a recorded manual check; it does not mean validated science.
 
 - Self-contained wheel bundling the built SPA; smoke-tested locally on port 8793
   and by the CI wheel job.
-- <!-- gen:tests -->569 passed, 0 skipped<!-- /gen:tests --> backend tests on the
+- <!-- gen:tests -->573 passed, 0 skipped<!-- /gen:tests --> backend tests on the
   development host (the live docking tests are deselected there because no Vina
   binary is installed), and the same suite in CI on Linux with the binary
   installed.
@@ -165,7 +168,7 @@ Evidence below was produced on `main` at commit `12febcf` and re-run locally on
 | Gate | Status | Evidence |
 |---|---|---|
 | Lint, format, types | Pass locally and in CI | Ruff, mypy (89 source files) |
-| Backend tests | Pass locally and in CI | <!-- gen:tests -->569 passed, 0 skipped<!-- /gen:tests --> on the development host (the skips are the live docking tests); <!-- gen:coverage -->83 % branch coverage<!-- /gen:coverage -->; Hypothesis properties for ranking and joins; HAEL modules ≥94% |
+| Backend tests | Pass locally and in CI | <!-- gen:tests -->573 passed, 0 skipped<!-- /gen:tests --> on the development host (the skips are the live docking tests); <!-- gen:coverage -->83 % branch coverage<!-- /gen:coverage -->; Hypothesis properties for ranking and joins; HAEL modules ≥94% |
 | Frontend build and E2E | Pass locally and in CI | typecheck, build, 3 Playwright tests on isolated data |
 | Visual QA | Pass locally | `apps/web/scripts/visual_qa.mjs`: 18 routes × 6 widths (incl. 640 px = 200% zoom) × 2 themes = 192 captures, WCAG AA text contrast, heading order, keyboard focus; screenshots reviewed by hand |
 | Fresh migration and wheel | Pass locally and in CI | Wheel ships Alembic scripts and records a revision; wheel installed into a clean venv and completed db upgrade → project → import → run → results |

@@ -68,6 +68,13 @@ container image and the service worker described below.
   queue depth, node-cache entries and bytes, GPU availability). No dependency, no
   paths, no tokens, no per-request labels; it follows the same bearer-token rule as
   the rest of `/api/v1`. Traces and dashboards are still absent and listed as such.
+- **Dataset fingerprint cache.** Packed Morgan fingerprints are stored once per
+  dataset (`dataset_fingerprints`, migration `b7d21c4f9a03`) with a checksum over
+  the compound set and one over the packed bytes. A repeated similarity search no
+  longer re-fingerprints the library; a changed dataset or a truncated blob is
+  detected and rebuilt instead of returning scores for the wrong rows. The API
+  payload reports `fingerprints.cached` and the checksum, and the metrics endpoint
+  exposes `hcs_fingerprint_cache_entries` / `hcs_fingerprint_cache_compounds`.
 - **BitBound prefilter for threshold searches.** A fingerprint whose popcount bound
   `min(a,b)/max(a,b)` cannot reach the requested threshold is skipped without a
   comparison; only the candidates are scored. The hits are proven identical to a

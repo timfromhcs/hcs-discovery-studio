@@ -19,6 +19,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    LargeBinary,
     String,
     Text,
     UniqueConstraint,
@@ -279,3 +280,26 @@ class AuditEvent(Base):
     object_id: Mapped[str | None] = mapped_column(String(64))
     outcome: Mapped[str] = mapped_column(String(20), default="ok", nullable=False)
     metadata_json: Mapped[dict[str, Any]] = mapped_column("metadata", JSON, default=dict, nullable=False)
+
+
+class DatasetFingerprints(Base):
+    """Packed Morgan fingerprints for one dataset, rebuilt only when the data changes.
+
+    Fingerprinting is the dominant cost of a similarity search, and the same dataset
+    is searched repeatedly. The row stores a checksum over the exact compound set
+    (id + SMILES, ordered) and a checksum over the packed bytes, so a changed dataset
+    or a corrupted blob is detected and rebuilt instead of returning wrong scores.
+    """
+
+    __tablename__ = "dataset_fingerprints"
+
+    id: Mapped[str] = mapped_column(String(40), primary_key=True)
+    dataset_id: Mapped[str] = mapped_column(ForeignKey("datasets.id", ondelete="CASCADE"), unique=True, index=True)
+    radius: Mapped[int] = mapped_column(Integer, nullable=False)
+    bits: Mapped[int] = mapped_column(Integer, nullable=False)
+    compound_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    compounds_checksum: Mapped[str] = mapped_column(String(64), nullable=False)
+    checksum: Mapped[str] = mapped_column(String(64), nullable=False)
+    packed: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=db_now, nullable=False)
+    last_used_at: Mapped[datetime] = mapped_column(DateTime, default=db_now, nullable=False)

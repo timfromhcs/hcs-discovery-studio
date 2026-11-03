@@ -166,4 +166,15 @@ def metrics(request: Request, session: Session = Depends(db), settings: Settings
         "# TYPE hcs_gpu_available gauge",
         f"hcs_gpu_available {gpu_available}",
     ]
+    from ...services import fingerprint_cache_stats
+
+    fingerprints = fingerprint_cache_stats(session)
+    lines += [
+        "# HELP hcs_fingerprint_cache_entries Datasets with stored packed fingerprints.",
+        "# TYPE hcs_fingerprint_cache_entries gauge",
+        f"hcs_fingerprint_cache_entries {fingerprints['entries']}",
+        "# HELP hcs_fingerprint_cache_compounds Compounds covered by the fingerprint cache.",
+        "# TYPE hcs_fingerprint_cache_compounds gauge",
+        f"hcs_fingerprint_cache_compounds {fingerprints['compounds']}",
+    ]
     return "\n".join(lines) + "\n"

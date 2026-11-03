@@ -357,3 +357,35 @@ def test_metrics_counts_grow_with_data(client):
     assert "hcs_projects 1" in body
     assert "hcs_datasets 1" in body
     assert "hcs_compounds 16" in body
+
+
+def test_similarity_api_reuses_the_fingerprint_cache(client, monkeypatch):
+    from hcs_discovery.similarity import clear_device_cache
+
+    monkeypatch.setattr(
+        "hcs_discovery.similarity.probe_gpu",
+        lambda: {"status": "software_only", "detail": "No hardware GPU adapter was found."},
+    )
+    clear_device_cache()
+    project = _create_project(client)
+    dataset = _import(client, project["id"])
+    request = {
+        "dataset_id": dataset["id"],
+        "query_smiles": "c1ccccc1",
+        "k": 3,
+        "engine": "cpu",
+    }
+    first = client.post("/api/v1/similarity/search", json=request)
+    assert first.status_code == 200, first.text
+    first_payload = first.json()
+    assert first_payload["fingerprints"]["cached"] is False
+    assert first_payload["fingerprints"]["count"] == dataset["imported_count"]
+    assert first_payload["hits"][0]["similarity"] == 1.0
+
+    second = client.post("/api/v1/similarity/search", json=request)
+    assert second.status_code == 200, second.text
+    second_payload = second.json()
+    assert second_payload["fingerprints"]["cached"] is True
+    assert second_payload["fingerprints"]["checksum"] == first_payload["fingerprints"]["checksum"]
+    assert second_payload["hits"] == first_payload["hits"]
+    clear_device_cache()

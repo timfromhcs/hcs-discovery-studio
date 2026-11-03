@@ -788,6 +788,31 @@ Worked through GEMINI.md again from the merged `main`.
   Ledger vermerkt.
 - Gates: ruff/mypy grün, API-Suite 20 passed, voller Lauf unten.
 
+## 2026-11-03 (11:00) — Dataset-Fingerprint-Cache (Migration b7d21c4f9a03)
+
+- Branch `main` @ `8da569d`. Nächste „Now"-Zeile: Fingerprints nicht bei jeder Suche
+  neu berechnen.
+- Neu: Modell `DatasetFingerprints` + Migration `b7d21c4f9a03` (Tabelle
+  `dataset_fingerprints`, unique Index auf `dataset_id`, FK CASCADE) und Service
+  `services/fingerprints_cache.py`:
+  - Compounds werden in stabiler Reihenfolge (`ORDER BY id`) gelesen; die IDs kommen
+    mit der Matrix zurück, damit Treffer-Indizes sicher auf Zeilen zeigen.
+  - `compounds_checksum` (id + SMILES) erkennt geänderte Daten, `checksum` über die
+    gepackten Bytes erkennt abgeschnittene/manipulierte Blobs → Neuaufbau statt
+    falscher Scores.
+  - Nur radius 2/2048 Bit (Kernel); andere Formen sind ein Validierungsfehler.
+- API `POST /api/v1/similarity/search` nutzt den Cache über
+  `TanimotoIndex.from_packed`; Payload meldet `fingerprints.{cached,checksum,count,
+  radius,bits}`. Der Index wird pro Request neu gebaut (kein globaler Zustand).
+- Metriken: `hcs_fingerprint_cache_entries`, `hcs_fingerprint_cache_compounds`.
+- Tests: `tests/integration/test_fingerprint_cache.py` (Reuse → cached=true,
+  Compounds ändern → cached=false, Blob korrupt → Neuaufbau, unbekanntes Dataset →
+  NotFound), API-Test (zweiter Aufruf cached=true, identische Hits), Alembic
+  `check` (Modelle == Migrationen) und Migrations-Smoke grün.
+- Gates: ruff/mypy grün, volle Suite im selben Lauf.
+- Offen: Messung „Zeit pro Suche mit/ohne Cache" auf einer großen Bibliothek steht
+  noch aus; der Cache-Effekt ist derzeit funktional, nicht in ms belegt.
+
 ## Blockers
 
 - None technical at the time of writing. The `v0.1.0` preview is published and
