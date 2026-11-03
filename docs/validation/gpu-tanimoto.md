@@ -5,8 +5,8 @@ Do not edit by hand: re-run the script on the host you want to describe.
 
 | Item | Value |
 |---|---|
-| Date | 2026-11-03 00:28:39Z |
-| Commit | `2758178` |
+| Date | 2026-11-03 01:07:10Z |
+| Commit | `118ec99` |
 | Host | AMD64 Family 25 Model 68 Stepping 1, AuthenticAMD · Windows 11 AMD64 |
 | Adapter | AMD Radeon(TM) Graphics |
 | Backend | Vulkan |
@@ -19,10 +19,10 @@ Median of 5 repetitions, milliseconds, end-to-end (upload, dispatch,
 readback). "GPU resident" keeps the library in a storage buffer and moves only the
 256-byte query.
 
-| Library | numpy CPU | RDKit `BulkTanimotoSimilarity` | GPU upload | GPU resident | RDKit M/s | GPU resident M/s | resident vs RDKit | Parity | max abs err vs RDKit |
+| Library | numpy CPU | RDKit ms | GPU upload | GPU resident | RDKit M/s | GPU M/s | speed-up | Parity | err |
 |---|---|---|---|---|---|---|---|---|---|
-| 100,000 | 181.6 | 16.2 | 43.6 | 1.5 | 6.19 | 64.96 | 10.5x | exact | 0.0e+00 |
-| 500,000 | 963.6 | 92.2 | 228.9 | 5.2 | 5.42 | 95.95 | 17.7x | exact | 0.0e+00 |
+| 100,000 | 196.5 | 20.2 | 53.4 | 1.6 | 4.94 | 60.89 | 12.3x | exact | 0.0e+00 |
+| 500,000 | 1,144.9 | 96.4 | 244.4 | 5.0 | 5.19 | 99.17 | 19.1x | exact | 0.0e+00 |
 
 ## What this does and does not establish
 
