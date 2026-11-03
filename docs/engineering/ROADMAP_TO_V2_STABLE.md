@@ -103,11 +103,15 @@ compute path extends the local-first idea to the browser:
   Add the artifact to the release workflow.
 
 ### Deployment
-- **P6 — Vercel preview (first local, then cloud).** Deploy the SPA with the
-  WebAssembly/WebGPU capability to the `hcs-discovery-studio` project and verify
-  the served page and browser capability end to end. The full RDKit backend stays
-  local/wheel-based because it exceeds Vercel's function size limit (recorded in
-  §1).
+- **P6 (done) — Vercel preview and production (first local, then cloud).** The
+  static SPA with the WebAssembly/WebGPU capability is deployed to the
+  `hcs-discovery-studio` project. Verified in Chrome against the deployed URL:
+  RDKit WebAssembly self-test `verified`, WebGPU Tanimoto `parity: bit-exact`
+  over 100,000 fingerprints. The deployment is protected by Vercel
+  Authentication, so the check used the CLI's development OIDC token; nothing was
+  made public to run it. The full RDKit backend stays local/wheel-based because it
+  exceeds Vercel's function size limit (recorded in §1). Evidence:
+  [Release evidence](RELEASE_EVIDENCE.md#browser-compute-on-vercel--verified-2026-11-03).
 
 ## 5. Risks
 
@@ -124,7 +128,7 @@ compute path extends the local-first idea to the browser:
 - [x] RDKit WebAssembly chemistry works in-browser and matches backend output.
 - [x] WebGPU probe reports a verified hardware fit (or honest absence).
 - [ ] One-file executable builds and passes the doctor/serve smoke journey.
-- [ ] Vercel preview serves the SPA with browser compute; links verified.
+- [x] Vercel preview serves the SPA with browser compute; links verified.
 - [ ] Release publishes wheel + exe + SBOM + checksums + attestation.
 - [ ] `main` merged; README reconciled.
 

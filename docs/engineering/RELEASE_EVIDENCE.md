@@ -16,12 +16,11 @@ verified in a real browser session against the deployed URL, not locally:
 
 | Item | Value |
 |---|---|
-| Deployment | `https://hcs-discovery-studio-g7i0jm3zf-hcsmediacorp.vercel.app` (preview, Ready) |
-| Production alias | `https://hcs-discovery-studio.vercel.app` (pointing at an earlier production deployment) |
+| Deployment | `https://hcs-discovery-studio.vercel.app` (production) and `https://hcs-discovery-studio-g7i0jm3zf-hcsmediacorp.vercel.app` (first preview of the same build) |
 | Protection | Vercel Authentication is enabled; automated access used the CLI's development OIDC token as `x-vercel-trusted-oidc-idp-token`. Nothing was made public for the test. |
 | Browser | system Chrome 141 with `--enable-unsafe-webgpu` |
 | RDKit WebAssembly self-test | **verified** — canonical SMILES `CC(=O)Oc1ccccc1C(=O)O`, descriptors and SVG rendered client-side |
-| WebGPU Tanimoto | **parity: bit-exact** over 100,000 fingerprints against the JavaScript reference; 10.5× measured speed-up on the visitor GPU |
+| WebGPU Tanimoto | **parity: bit-exact** over 100,000 fingerprints against the JavaScript reference; 10.5× measured speed-up on the preview and 11.2× on production (same visitor GPU, repeated run) |
 | Page errors | none |
 | Backend | **absent by design** — every `/api/v1` call fails in the static preview; this deployment demonstrates the client-side compute path only |
 
