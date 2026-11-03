@@ -24,9 +24,33 @@ verified in a real browser session against the deployed URL, not locally:
 | Page errors | none |
 | Backend | **absent by design** — every `/api/v1` call fails in the static preview; this deployment demonstrates the client-side compute path only |
 
-Reproduce: `vercel deploy`, then run the same Playwright journey used by
-`apps/web/e2e/gpu.spec.ts` and `apps/web/e2e/browser-compute.spec.ts` against the
-deployment URL with the OIDC header from `vercel env pull`.
+---
+
+## Full application on Vercel — verified 2026-11-03 (v2.2.0)
+
+The same project now serves the SPA **and** `/api/v1`. The former blocker (561 MB
+bundle against the 500 MB Python limit) is resolved by Vercel's Large Functions
+beta; nothing was made public to run the checks.
+
+| Item | Value |
+|---|---|
+| Project | `hcsmediacorp/hcs-discovery-studio` |
+| Production | `https://hcs-discovery-studio.vercel.app` (behind Vercel Authentication; probed with `vercel curl`) |
+| Verified build | `https://hcs-discovery-studio-g8scjirtg-hcsmediacorp.vercel.app`, then deployed to production |
+| Function config | root `app.py`, `maxDuration` 300 s, `includeFiles: apps/web/dist/**`, `VERCEL_SUPPORT_LARGE_FUNCTIONS=1` |
+| Environment | `HCS_DATA_DIR=/tmp/hcs`, `HCS_DEMO_MODE=true`, `HCS_RUN_MODE=inline`, `HCS_NETWORK_POLICY=local`, `HCS_WEB_DIST=/var/task/apps/web/dist` |
+| `GET /api/v1/health` | `{"status":"ok","product":"HCS Discovery Studio","version":"2.2.0"}` |
+| `GET /api/v1/ready` | `{"status":"ready","database":"ok"}` (cold start ≈2–3 s) |
+| `GET /api/v1/projects` | one demo project, **16 compounds**, **1 run**, computed on that instance at start-up |
+| Demo run | `status: succeeded`, started and finished within the first cold start |
+| `POST /api/v1/runs` | `status: succeeded` in **2.1 s** round trip (`execution: inline`) |
+| SPA | `GET /` and `GET /lab` return the app shell; unknown client paths fall through to it |
+| Depiction | `424 missing_dependency` on hosts without `libXrender`; every other endpoint unaffected |
+
+Reproduce: `vercel deploy --prod`, then
+`vercel curl https://hcs-discovery-studio.vercel.app/api/v1/ready` (the CLI adds
+the deployment-protection token itself). The browser probes from the section above
+still apply to the SPA half of the deployment.
 
 ---
 
@@ -40,7 +64,7 @@ of that earlier run; they are not edited retroactively.
 
 | Measurement | Command | Observed |
 |---|---|---|
-| Tests (no docking binary on this host) | `uv run pytest -q` via G4 | <!-- gen:tests -->573 passed, 0 skipped<!-- /gen:tests --> |
+| Tests (no docking binary on this host) | `uv run pytest -q` via G4 | <!-- gen:tests -->582 passed, 0 skipped<!-- /gen:tests --> |
 | Coverage | same run, `--cov-branch` | <!-- gen:coverage -->83 % branch coverage<!-- /gen:coverage --> |
 | Tests with the docking binary | `HCS_REQUIRE_VINA=1 uv run pytest tests/scientific/test_vina_adapter.py` | **NOT RUN** locally: no Vina binary is installed on this host (PLAN.md R0.4) |
 

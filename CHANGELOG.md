@@ -10,6 +10,58 @@ All notable changes to this project are documented here. The format follows
 
 - Nothing yet. The next change starts here.
 
+## [2.2.0] - 2026-11-03
+
+The hosted deployment now runs the whole workbench: the SPA **and** `/api/v1`
+from one Vercel project, with a real computed demo workspace. Local behaviour is
+unchanged — every new switch is off by default.
+
+### Added
+
+- **Hosted parity: the full application on Vercel.** The FastAPI app is deployed
+  as a Vercel Function next to the SPA, from the root `app.py` entrypoint. The
+  blocker recorded in `ROADMAP_TO_V2_STABLE.md` (561 MB bundle against a 500 MB
+  Python limit) is resolved by Vercel's Large Functions beta
+  (`VERCEL_SUPPORT_LARGE_FUNCTIONS=1`, up to 5 GB). Verified on the deployment:
+  `/api/v1/health`, `/api/v1/ready`, `/api/v1/projects` returning a seeded demo
+  project with 16 compounds and a computed triage run, the SPA shell for `/` and
+  `/lab`, and a workflow submitted over HTTP finishing `succeeded` in 2.1 s.
+- **`HCS_DATABASE_URL`.** Any SQLAlchemy URL can replace the SQLite default, so a
+  hosted instance can point at PostgreSQL. The optional `postgres` extra uses
+  `pg8000` (BSD-3-Clause) because `psycopg` is LGPL and would fail the license
+  gate. Engine caches are now keyed by URL instead of by data directory, so two
+  database URLs in one process cannot share an engine. `public_dict` reports
+  `database_backend` and never the URL itself.
+- **`HCS_RUN_MODE=inline`.** On a serverless host no worker thread survives the
+  response, so the submitting request claims exactly the run it created and
+  executes it through the normal `Worker`. `queue` remains the default. A run
+  that is still unfinished when the request ends stays claimable, and the
+  existing lease recovery retries it; the mode is documented as a preview
+  mechanism, not a replacement for a real worker.
+- **`.vercelignore`.** The CLI previously uploaded local runtime data; a deploy
+  failed on a disappearing `.e2e-data` SQLite file.
+
+### Changed
+
+- `rdkit.Chem.Draw` is imported lazily. It links against
+  `libXrender`/Cairo, which the Vercel Python image does not ship; the eager
+  import made **every** API route fail with `FUNCTION_INVOCATION_FAILED`. A
+  missing drawing stack now returns a structured `424 missing_dependency` from
+  the depiction endpoint only; descriptors, similarity and ranking are
+  unaffected.
+- The Vercel entrypoint puts `src/` on the import path, because the runtime
+  installs the declared dependencies but not the project itself in a `src`
+  layout.
+- `vercel.json` uses the Python runtime instead of `framework: vite`: the SPA is
+  served by the function's existing catch-all route, so the security headers,
+  CSP and auth middleware apply to it. `maxDuration` is 300 s and
+  `apps/web/dist` is included in the bundle.
+
+### Fixed
+
+- The engine/session caches no longer collide when a process serves more than one
+  database URL.
+
 ## [2.1.0] - 2026-11-03
 
 `2.0.0` was prepared as a release candidate and never tagged or published. This is

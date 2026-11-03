@@ -15,7 +15,7 @@ from the CLI or HTTP API — without Docker, CUDA, an account, or a cloud key.
 [![CodeQL](https://github.com/timfromhcs/hcs-discovery-studio/actions/workflows/codeql.yml/badge.svg)](https://github.com/timfromhcs/hcs-discovery-studio/actions/workflows/codeql.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Python 3.12–3.13](https://img.shields.io/badge/python-3.12%E2%80%933.13-3776ab.svg)](pyproject.toml)
-[![Status: v2.1.0 release candidate](https://img.shields.io/badge/status-v2.1.0-3dd6c3.svg)](docs/engineering/IMPLEMENTATION_STATUS.md)
+[![Status: v2.2.0](https://img.shields.io/badge/status-v2.2.0-3dd6c3.svg)](docs/engineering/IMPLEMENTATION_STATUS.md)
 
 <img src="docs/screenshots/workspace-dark.png" alt="HCS Discovery Studio workspace showing projects, machine diagnostics, queue state and recent runs" width="1200">
 
@@ -111,13 +111,13 @@ cd apps/web && npm run dev        # http://127.0.0.1:5173, proxies /api to 8787
 
 Download the wheel from the
 [latest release](https://github.com/timfromhcs/hcs-discovery-studio/releases/latest)
-(`v2.1.0` is published there only once all release gates pass).
+(`v2.2.0` is published there only once all release gates pass).
 It bundles the built UI:
 
 ```bash
 python -m venv .venv
 . .venv/bin/activate              # Windows: .venv\Scripts\Activate.ps1
-pip install hcs_discovery_studio-2.1.0-py3-none-any.whl
+pip install hcs_discovery_studio-2.2.0-py3-none-any.whl
 hcs-discovery doctor
 hcs-discovery serve
 ```
@@ -129,7 +129,7 @@ attestation (commands are in the release notes).
 The repository ships a PyInstaller spec that bundles the CLI, the API, RDKit, the
 built SPA, the Alembic migrations and the GPU kernel into a single binary. It is
 built and smoke-tested by the release gate (`G15`), and it is not published as a
-download until `v2.1.0` ships:
+download until `v2.2.0` ships:
 
 ```bash
 uv pip install "pyinstaller==6.22.3"        # build-only, deliberately not in the lockfile
@@ -252,7 +252,7 @@ are using. Hardware presence alone is never reported as a speed claim.
 
 | Gate | Command | Result |
 |---|---|---|
-| Backend tests | `uv run pytest -q` | <!-- gen:tests -->573 passed, 0 skipped<!-- /gen:tests --> on the development host; the two live docking tests are deselected there because no Vina binary is installed, and CI runs them on Linux |
+| Backend tests | `uv run pytest -q` | <!-- gen:tests -->582 passed, 0 skipped<!-- /gen:tests --> on the development host; the two live docking tests are deselected there because no Vina binary is installed, and CI runs them on Linux |
 | Coverage | `uv run pytest --cov=hcs_discovery --cov-branch` | <!-- gen:coverage -->83 % branch coverage<!-- /gen:coverage --> locally; CI floor 70%, HAEL modules ≥94% |
 | Python format/lint/type | `uv run ruff format --check .`, `uv run ruff check .`, `uv run mypy` | Clean locally and in CI |
 | Frontend typecheck/build | `npm run typecheck`, `npm run build` in `apps/web` | Clean locally and in CI |
@@ -405,9 +405,10 @@ No third-party model weights or proprietary datasets are bundled.
 
 ---
 
-**Status:** `2.1.0` release candidate in preparation; it is published only after
-the local gates and cloud CI pass for the tagged commit. Release notes:
-[`docs/releases/v2.1.0.md`](docs/releases/v2.1.0.md); the human steps are in
+**Status:** `2.2.0` — the hosted deployment runs the full workbench (SPA and
+`/api/v1`). It is published only after the local gates and cloud CI pass for the
+tagged commit. Release notes:
+[`docs/releases/v2.2.0.md`](docs/releases/v2.2.0.md); the human steps are in
 [`docs/engineering/RELEASING.md`](docs/engineering/RELEASING.md). See
 `IMPLEMENTATION_STATUS.md` for the full feature ledger and `CHANGELOG.md` for the
 change list.

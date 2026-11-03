@@ -24,8 +24,8 @@ after a command, gate or test has produced the result. "State of the art" and
 |---|---|
 | Local gates (`scripts/gates.py --level full`) | **PASS** on `e5823b8`; re-run on the current branch below |
 | PR #13 (browser probe + doc reconciliation) | **CI and CodeQL green** |
-| Full backend on Vercel | **Blocked** — bundle 561 MB > Vercel's 500 MB function limit (RDKit + data dominate) |
-| Static SPA on Vercel | Project `hcs-discovery-studio` created; static deploy pending |
+| Full backend on Vercel | **Resolved in 2.2.0** — the 561 MB bundle now fits Vercel's Large Functions beta (`VERCEL_SUPPORT_LARGE_FUNCTIONS=1`, up to 5 GB); the full API is deployed and verified |
+| Static SPA on Vercel | Superseded — the same deployment serves the SPA *and* `/api/v1` from one project |
 | Browser compute | **Working** — RDKit WebAssembly self-test and WebGPU Tanimoto parity, both covered by Playwright against the served app |
 | GPU similarity search | **Working** — `hcs_discovery.similarity`, `chem.similarity` engine option, `similarity search` CLI, measured benchmark |
 | `v2.0.0` tag / release | Not created (owner approval required) |
@@ -129,6 +129,7 @@ compute path extends the local-first idea to the browser:
 - [x] WebGPU probe reports a verified hardware fit (or honest absence).
 - [ ] One-file executable builds and passes the doctor/serve smoke journey.
 - [x] Vercel preview serves the SPA with browser compute; links verified.
+- [x] The hosted deployment serves the full API as well as the SPA (2.2.0).
 - [ ] Release publishes wheel + exe + SBOM + checksums + attestation.
 - [ ] `main` merged; README reconciled.
 

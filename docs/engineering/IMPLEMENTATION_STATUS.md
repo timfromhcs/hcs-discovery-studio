@@ -1,8 +1,10 @@
 ﻿# Implementation status
 
-Last updated: 2026-11-03. Version: `2.0.0` release candidate merged to `main`
-(commit `12febcf`, PR #7); not tagged or published yet. The GPU similarity path
-and the browser-compute verification landed on 2026-11-03.
+Last updated: 2026-11-03. Version: `2.2.0`. `2.2.0` adds the hosted deployment of
+the full application (SPA + `/api/v1` from one Vercel project), an external
+database URL and inline run execution; see
+[the plan](PLAN_2026-11-03_HOSTED_PARITY.md) and
+[the release notes](../releases/v2.2.0.md).
 
 This document is the honest feature ledger. It distinguishes what has been
 exercised end-to-end from what is scaffolded, planned or deliberately absent.
@@ -35,6 +37,23 @@ test or a recorded manual check; it does not mean validated science.
 | v2.0.0 Stable | Awaiting release candidate run and owner approval | Local gates pass on the merged SHA; tag/publication not performed |
 
 ## Working now
+
+### Hosted deployment (verified 2026-11-03)
+
+- The full application — SPA **and** `/api/v1` — runs from one Vercel project. The
+  root `app.py` is the entrypoint; Vercel's Large Functions beta
+  (`VERCEL_SUPPORT_LARGE_FUNCTIONS=1`, up to 5 GB) carries the RDKit dependency
+  that the 500 MB Python limit used to block.
+- Verified on the deployment: `/api/v1/health` → ok, `/api/v1/ready` →
+  `database: ok`, `/api/v1/projects` → a demo project with 16 compounds and a
+  computed triage run, `/` and `/lab` → the SPA shell, and a workflow submitted
+  over HTTP finishing `succeeded` in 2.1 s with `HCS_RUN_MODE=inline`.
+- `HCS_DATABASE_URL` switches the state to any SQLAlchemy URL (PostgreSQL via the
+  `postgres` extra and the BSD-3-Clause `pg8000` driver). Engine caches are keyed
+  by URL; `public_dict` reports the backend, never the URL.
+- Not durable on the host: the SQLite file and run artifacts live on `/tmp` and are
+  rebuilt per instance. Object storage is not implemented. The deployment stays
+  behind Vercel Authentication.
 
 ### Data
 
@@ -87,7 +106,7 @@ test or a recorded manual check; it does not mean validated science.
 
 - Self-contained wheel bundling the built SPA; smoke-tested locally on port 8793
   and by the CI wheel job.
-- <!-- gen:tests -->573 passed, 0 skipped<!-- /gen:tests --> backend tests on the
+- <!-- gen:tests -->582 passed, 0 skipped<!-- /gen:tests --> backend tests on the
   development host (the live docking tests are deselected there because no Vina
   binary is installed), and the same suite in CI on Linux with the binary
   installed.
@@ -168,7 +187,7 @@ Evidence below was produced on `main` at commit `12febcf` and re-run locally on
 | Gate | Status | Evidence |
 |---|---|---|
 | Lint, format, types | Pass locally and in CI | Ruff, mypy (89 source files) |
-| Backend tests | Pass locally and in CI | <!-- gen:tests -->573 passed, 0 skipped<!-- /gen:tests --> on the development host (the skips are the live docking tests); <!-- gen:coverage -->83 % branch coverage<!-- /gen:coverage -->; Hypothesis properties for ranking and joins; HAEL modules ≥94% |
+| Backend tests | Pass locally and in CI | <!-- gen:tests -->582 passed, 0 skipped<!-- /gen:tests --> on the development host (the skips are the live docking tests); <!-- gen:coverage -->83 % branch coverage<!-- /gen:coverage -->; Hypothesis properties for ranking and joins; HAEL modules ≥94% |
 | Frontend build and E2E | Pass locally and in CI | typecheck, build, 3 Playwright tests on isolated data |
 | Visual QA | Pass locally | `apps/web/scripts/visual_qa.mjs`: 18 routes × 6 widths (incl. 640 px = 200% zoom) × 2 themes = 192 captures, WCAG AA text contrast, heading order, keyboard focus; screenshots reviewed by hand |
 | Fresh migration and wheel | Pass locally and in CI | Wheel ships Alembic scripts and records a revision; wheel installed into a clean venv and completed db upgrade → project → import → run → results |
@@ -199,6 +218,13 @@ run of the release workflow and owner approval for tagging.
   exports are complete.
 - The `targets`, `structures` and `predictions` tables are reserved and may
   change before they are used.
+- `rdkit.Chem.Draw` links against `libXrender`/Cairo. Hosts without it (the Vercel
+  Python image, minimal containers) return `424 missing_dependency` from
+  `/api/v1/compounds/{id}/depiction.svg`; depictions are unavailable there, and
+  nothing else is affected because the import is lazy.
+- On a serverless host, `HCS_RUN_MODE=inline` executes one run inside the
+  submitting request. A run longer than the function duration is killed, its lease
+  expires and stale-run recovery retries it; there is no background worker.
 
 ## How to verify a claim
 

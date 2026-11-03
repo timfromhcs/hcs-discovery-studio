@@ -53,11 +53,15 @@ def claim_next_run(
     *,
     worker_id: str,
     lease_seconds: int,
+    only_run_id: str | None = None,
 ) -> Run | None:
     with factory() as session:
-        candidate = session.execute(
-            select(Run).where(Run.status.in_(CLAIMABLE)).order_by(Run.created_at, Run.id).limit(1)
-        ).scalar_one_or_none()
+        query = select(Run).where(Run.status.in_(CLAIMABLE))
+        if only_run_id is not None:
+            # Inline execution claims exactly the run the request created, so a
+            # second queued run is never stolen by the wrong HTTP request.
+            query = query.where(Run.id == only_run_id)
+        candidate = session.execute(query.order_by(Run.created_at, Run.id).limit(1)).scalar_one_or_none()
         if candidate is None:
             return None
         now = db_now()

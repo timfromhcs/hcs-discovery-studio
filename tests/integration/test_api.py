@@ -7,6 +7,7 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 
+from hcs_discovery import __version__
 from hcs_discovery.api.app import create_app
 from hcs_discovery.core.config import Settings
 from hcs_discovery.core.errors import PolicyError
@@ -335,7 +336,7 @@ def test_metrics_endpoint_exposes_local_counters(client):
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/plain")
     body = response.text
-    assert 'hcs_build_info{version="2.1.0"' in body
+    assert f'hcs_build_info{{version="{__version__}"' in body
     assert "hcs_projects 0" in body
     assert 'hcs_queue_depth{status="queued"} 0' in body
     assert "hcs_node_cache_entries 0" in body

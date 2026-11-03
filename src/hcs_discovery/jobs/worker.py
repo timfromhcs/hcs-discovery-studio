@@ -38,7 +38,7 @@ class Worker:
     def stop(self) -> None:
         self._stop.set()
 
-    def run_once(self) -> Run | None:
+    def run_once(self, *, only_run_id: str | None = None) -> Run | None:
         recovered = recover_stale_runs(self.factory, self.settings)
         for item in recovered:
             logger.warning("recovered run", extra={"run_id": item["run_id"], "event": item["outcome"]})
@@ -46,6 +46,7 @@ class Worker:
             self.factory,
             worker_id=self.worker_id,
             lease_seconds=self.settings.run_lease_seconds,
+            only_run_id=only_run_id,
         )
         if run is None:
             return None

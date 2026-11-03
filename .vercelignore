@@ -1,0 +1,51 @@
+# Files the Vercel CLI must not upload.
+# The build runs on Vercel and produces apps/web/dist there; nothing generated
+# locally belongs in the deployment bundle.
+
+# Version control and tool caches
+.git
+.github
+.venv
+**/__pycache__
+**/*.py[cod]
+.mypy_cache
+.pytest_cache
+.ruff_cache
+.hypothesis
+.coverage
+coverage.xml
+htmlcov
+junit*.xml
+
+# Local runtime data: databases, runs, exports, logs, test workspaces
+data
+.e2e-data
+bin
+logs
+runs
+exports
+cache
+receptors
+dist
+build
+*.sqlite
+*.sqlite3
+*.db
+*.log
+tmp
+
+# Frontend build output and dependencies (rebuilt by buildCommand)
+apps/web/node_modules
+apps/web/dist
+apps/web/dist-ssr
+apps/web/test-results
+apps/web/playwright-report
+apps/web/blob-report
+apps/web/.playwright
+apps/web/tsconfig.tsbuildinfo
+
+# Local environment and link state
+.vercel
+.env
+.env.*
+!.env.example
