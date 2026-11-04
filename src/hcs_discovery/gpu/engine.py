@@ -8,7 +8,7 @@ from typing import Any
 
 import numpy as np
 
-from hcs_discovery.gpu import KERNEL_PATH, WORDS
+from hcs_discovery.gpu import BATCH_KERNEL_PATH, KERNEL_PATH, WORDS
 from hcs_discovery.gpu.device import select_adapter
 
 _WG = 64
@@ -26,6 +26,19 @@ class GpuResult:
     total_ms: float
     adapter: str
     backend: str
+
+
+@dataclass(frozen=True)
+class GpuBatchResult:
+    """Counts for many queries at once; ``inter``/``union`` are (queries, library)."""
+
+    inter: np.ndarray
+    union: np.ndarray
+    total_ms: float
+    adapter: str
+    backend: str
+    queries: int
+    library: int
 
 
 class GpuEngine:
@@ -47,7 +60,12 @@ class GpuEngine:
         self.pipeline = self.device.create_compute_pipeline(
             layout="auto", compute={"module": shader, "entry_point": "main"}
         )
-        self.max_chunk = int(adapter.limits["max-storage-buffer-binding-size"]) // (WORDS * 4)
+        batch_shader = self.device.create_shader_module(code=BATCH_KERNEL_PATH.read_text(encoding="utf-8"))
+        self.batch_pipeline = self.device.create_compute_pipeline(
+            layout="auto", compute={"module": batch_shader, "entry_point": "main"}
+        )
+        self.max_binding = int(adapter.limits["max-storage-buffer-binding-size"])
+        self.max_chunk = self.max_binding // (WORDS * 4)
 
     def counts(self, query: np.ndarray, library: np.ndarray, *, chunk: int | None = None) -> GpuResult:
         lib = np.ascontiguousarray(library, dtype=np.uint32)
@@ -64,6 +82,78 @@ class GpuEngine:
             union[start : start + part.shape[0]] = u
         total = (time.perf_counter() - started) * 1000.0
         return GpuResult(inter, union, total, self.adapter_name, self.backend)
+
+    def counts_many(
+        self,
+        queries: np.ndarray,
+        library: np.ndarray,
+        *,
+        query_chunk: int = 32,
+    ) -> GpuBatchResult:
+        """Score many queries against one library in stacked dispatches.
+
+        The library is uploaded once per chunk instead of once per query, which is the
+        cost the single-query path pays on every call. Chunk sizes are derived from the
+        adapter's real storage-buffer limit; nothing is silently truncated.
+        """
+        lib = np.ascontiguousarray(library, dtype=np.uint32)
+        qs = np.ascontiguousarray(queries, dtype=np.uint32)
+        if qs.ndim == 1:
+            qs = qs.reshape(1, -1)
+        if qs.shape[1] != WORDS or lib.shape[1] != WORDS:
+            raise ValueError(f"queries and library must have {WORDS} uint32 words per row")
+        n = lib.shape[0]
+        total_queries = qs.shape[0]
+        inter = np.empty((total_queries, n), dtype=np.uint32)
+        union = np.empty((total_queries, n), dtype=np.uint32)
+        started = time.perf_counter()
+        chunk = max(1, min(query_chunk, total_queries))
+        for q_start in range(0, total_queries, chunk):
+            q_part = qs[q_start : q_start + chunk]
+            # Output is queries * library * 4 bytes; keep it inside one binding.
+            n_step = max(1, min(n or 1, self.max_chunk, self.max_binding // (4 * max(1, q_part.shape[0]))))
+            for start in range(0, n, n_step):
+                part = lib[start : start + n_step]
+                i, u = self._dispatch_batch(q_part, part)
+                inter[q_start : q_start + q_part.shape[0], start : start + part.shape[0]] = i
+                union[q_start : q_start + q_part.shape[0], start : start + part.shape[0]] = u
+        total = (time.perf_counter() - started) * 1000.0
+        return GpuBatchResult(inter, union, total, self.adapter_name, self.backend, total_queries, n)
+
+    def _dispatch_batch(self, queries: np.ndarray, part: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        usage = self._wgpu.BufferUsage
+        dev = self.device
+        q_count = queries.shape[0]
+        count = part.shape[0]
+        qbuf = dev.create_buffer_with_data(data=np.ascontiguousarray(queries), usage=usage.STORAGE)
+        lbuf = dev.create_buffer_with_data(data=np.ascontiguousarray(part.T), usage=usage.STORAGE)
+        size = q_count * count * 4
+        obuf_i = dev.create_buffer(size=size, usage=usage.STORAGE | usage.COPY_SRC)
+        obuf_u = dev.create_buffer(size=size, usage=usage.STORAGE | usage.COPY_SRC)
+        pbuf = dev.create_buffer_with_data(
+            data=np.array([count, 0, count, q_count], dtype=np.uint32), usage=usage.UNIFORM
+        )
+        buffers = (qbuf, lbuf, obuf_i, obuf_u, pbuf)
+        group = dev.create_bind_group(
+            layout=self.batch_pipeline.get_bind_group_layout(0),
+            entries=[
+                {"binding": b, "resource": {"buffer": buf, "offset": 0, "size": buf.size}}
+                for b, buf in enumerate(buffers)
+            ],
+        )
+        gx = min(-(-count // _WG), _MAX_X)
+        enc = dev.create_command_encoder()
+        compute = enc.begin_compute_pass()
+        compute.set_pipeline(self.batch_pipeline)
+        compute.set_bind_group(0, group)
+        compute.dispatch_workgroups(gx, q_count, 1)
+        compute.end()
+        dev.queue.submit([enc.finish()])
+        i = np.frombuffer(dev.queue.read_buffer(obuf_i), dtype=np.uint32).reshape(q_count, count).copy()
+        u = np.frombuffer(dev.queue.read_buffer(obuf_u), dtype=np.uint32).reshape(q_count, count).copy()
+        for buf in buffers:
+            buf.destroy()
+        return i, u
 
     def load_library(self, library: np.ndarray) -> None:
         """Keep a library resident on the GPU (single binding; must fit one storage buffer)."""

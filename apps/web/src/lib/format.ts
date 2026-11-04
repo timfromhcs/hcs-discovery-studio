@@ -49,7 +49,7 @@ export function formatRelative(value: string | null | undefined): string {
 }
 
 export function formatDuration(seconds: number | null | undefined): string {
-  if (seconds === null || seconds === undefined || !Number.isFinite(seconds)) return "—";
+  if (seconds === null || seconds === undefined || !Number.isFinite(seconds)) return "-";
   if (seconds > 0 && seconds < 1) return `${seconds.toFixed(2)}s`;
   const total = Math.max(0, Math.round(seconds));
   if (total < 60) return `${total}s`;
@@ -58,6 +58,17 @@ export function formatDuration(seconds: number | null | undefined): string {
   if (minutes < 60) return `${minutes}m ${rest}s`;
   const hours = Math.floor(minutes / 60);
   return `${hours}h ${minutes % 60}m`;
+}
+
+/**
+ * Durations below a second are shown in milliseconds; above that the seconds
+ * formatter is used. A run that took 72 ms should not read "0.07s" next to another
+ * that took 6 ms and also reads "0.01s".
+ */
+export function formatDurationMs(milliseconds: number | null | undefined): string {
+  if (milliseconds === null || milliseconds === undefined || !Number.isFinite(milliseconds)) return "-";
+  if (milliseconds < 1000) return `${Math.max(0, Math.round(milliseconds))}ms`;
+  return formatDuration(milliseconds / 1000);
 }
 
 export function elapsed(startedAt: string | null | undefined, finishedAt?: string | null): number | null {

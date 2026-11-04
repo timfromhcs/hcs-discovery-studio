@@ -123,6 +123,13 @@ def _render_markdown(report: dict[str, Any]) -> str:
         "that does not beat it has no demonstrated ranking or absolute accuracy on "
         "this set.",
         "",
+        "> **This is the stress set, not the primary benchmark.** The published",
+        "> equation's reproduction on the 1,128-molecule Delaney set is in",
+        "> [`esol-delaney.md`](esol-delaney.md) (RMSE 1.10, R² 0.72; held-out",
+        "> scaffold split RMSE 1.20). The 45 molecules here are a narrow,",
+        "> drug-like challenge where the equation explains little of the variance;",
+        "> that weak result is published deliberately rather than hidden.",
+        "",
         "## Per-molecule predictions",
         "",
         "| ID | Name | Measured logS | Predicted logS | Error |",
@@ -139,7 +146,7 @@ def _render_markdown(report: dict[str, Any]) -> str:
         "## Interpretation and limitations",
         "",
         f"- This is a measured-value check of the Delaney (2004) four-descriptor "
-        f"reduced ESOL equation, not a re-fit. On this {metrics['n']:.0f}-molecule "
+        f"ESOL equation, not a re-fit. On this {metrics['n']:.0f}-molecule "
         f"drug-like challenge set it achieves RMSE {metrics['rmse']:.3f} log10 units "
         f"and R² {metrics['r2']:.3f}. The near-zero R² means the model explains "
         "little of the variance in this set; absolute solubility predictions "

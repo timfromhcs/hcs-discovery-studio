@@ -431,6 +431,14 @@ export function RunMonitorPage() {
                 <a className="btn btn-quiet btn-sm" href={api.runs.reportUrl(detail.id, "markdown")}>Markdown</a>
                 <a className="btn btn-quiet btn-sm" href={api.runs.reportUrl(detail.id, "json")}>JSON</a>
                 <a className="btn btn-quiet btn-sm" href={api.runs.reportUrl(detail.id, "csv")}>CSV</a>
+                <a
+                  className="btn btn-quiet btn-sm"
+                  href={api.runs.exportUrl(detail.id, "ro-crate")}
+                  download
+                  title="RO-Crate 1.1 bundle: JSON-LD metadata, PROV mapping and every artifact"
+                >
+                  RO-Crate
+                </a>
               </>
             ) : null
           }

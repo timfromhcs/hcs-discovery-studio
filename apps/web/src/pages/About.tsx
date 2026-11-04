@@ -14,7 +14,7 @@ import {
   Skeleton,
   Stat,
 } from "../components/ui";
-import { CREDIT } from "../lib/constants";
+import { CREDIT, VERSION } from "../lib/constants";
 
 const LIMITS: Array<{ title: string; body: string }> = [
   {
@@ -82,11 +82,12 @@ export function AboutPage() {
   const runnable = models.data?.items.filter((model) => model.status === "available" || model.status === "available_with_limits").length;
 
   const citation = `@software{hcs_discovery_studio,
-  title  = {HCS Discovery Studio},
-  author = {hcsmedia},
-  year   = {2026},
-  url    = {https://github.com/timfromhcs/hcs-discovery-studio},
-  note   = {Local-first, reproducible drug-discovery research workbench}
+  title   = {HCS Discovery Studio},
+  author  = {hcsmedia},
+  year    = {2026},
+  version = {${VERSION}},
+  url     = {https://github.com/timfromhcs/hcs-discovery-studio},
+  note    = {Local-first, reproducible drug-discovery research workbench}
 }`;
 
   return (

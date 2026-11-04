@@ -4003,6 +4003,11 @@ small a,
   gap: 8px;
 }
 
+.timeline-hint {
+  margin: -2px 0 2px;
+  max-width: 78ch;
+}
+
 .timeline-rows {
   display: flex;
   flex-direction: column;

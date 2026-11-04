@@ -29,6 +29,13 @@ Generated from the checked-in measured dataset by `scripts/science/validate_esol
 
 The mean baseline predicts the dataset mean for every molecule; a model that does not beat it has no demonstrated ranking or absolute accuracy on this set.
 
+> **This is the stress set, not the primary benchmark.** The published
+> equation's reproduction on the 1,128-molecule Delaney set is in
+> [`esol-delaney.md`](esol-delaney.md) (RMSE 1.10, R² 0.72; held-out
+> scaffold split RMSE 1.20). The 45 molecules here are a narrow,
+> drug-like challenge where the equation explains little of the variance;
+> that weak result is published deliberately rather than hidden.
+
 ## Per-molecule predictions
 
 | ID | Name | Measured logS | Predicted logS | Error |
@@ -81,7 +88,7 @@ The mean baseline predicts the dataset mean for every molecule; a model that doe
 
 ## Interpretation and limitations
 
-- This is a measured-value check of the Delaney (2004) four-descriptor reduced ESOL equation, not a re-fit. On this 45-molecule drug-like challenge set it achieves RMSE 0.968 log10 units and R² 0.072. The near-zero R² means the model explains little of the variance in this set; absolute solubility predictions should not be treated as reliable for these compounds.
+- This is a measured-value check of the Delaney (2004) four-descriptor ESOL equation, not a re-fit. On this 45-molecule drug-like challenge set it achieves RMSE 0.968 log10 units and R² 0.072. The near-zero R² means the model explains little of the variance in this set; absolute solubility predictions should not be treated as reliable for these compounds.
 - The set postdates Delaney (2004), but AqSolDB curation may still share source measurements with that training data; this report does not claim a fully leakage-audited benchmark.
 - ESOL estimates intrinsic solubility of the neutral form. It does not model ionization, salt form, pH, polymorphs, or kinetic dissolution, all of which matter for the ionizable and zwitterionic molecules here.
 - Applicability-domain flags only state that descriptors fall inside the fitted range. They do not certify accuracy, as the errors above show.

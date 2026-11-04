@@ -346,6 +346,10 @@ GATES: tuple[Gate, ...] = (
         steps=(
             Step("check_links.py", ("uv", "run", "--no-project", _python(), "scripts/ci/check_links.py")),
             Step("check_doc_claims.py", ("uv", "run", "--no-project", _python(), "scripts/ci/check_doc_claims.py")),
+            Step(
+                "check_text_encoding.py",
+                ("uv", "run", "--no-project", _python(), "scripts/ci/check_text_encoding.py"),
+            ),
         ),
         levels=("full", "science", "release"),
         requires="uv",

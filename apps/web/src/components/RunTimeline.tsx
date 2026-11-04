@@ -1,5 +1,5 @@
 import type { RunDetail } from "../api/types";
-import { formatDuration } from "../lib/format";
+import { formatDurationMs } from "../lib/format";
 
 /**
  * Run timeline built from the persisted timestamps only.
@@ -70,36 +70,47 @@ export function RunTimeline({ run }: { run: RunDetail }) {
     <section className="run-timeline" aria-label="Run timeline" data-testid="run-timeline">
       <div className="timeline-head">
         <span className="eyebrow">Timeline</span>
-        <span className="muted tiny">
-          {formatDuration(queueMs)} queued · {formatDuration(workMs)} in nodes · {formatDuration(end - created)} total
+        <span className="muted tiny" data-testid="run-timeline-total">
+          {formatDurationMs(queueMs)} queued · {formatDurationMs(workMs)} in nodes ·{" "}
+          {formatDurationMs(end - created)} total
         </span>
       </div>
       {segments.length === 0 ? (
         <p className="muted small">No node timing was recorded for this run.</p>
       ) : (
-        <ol className="timeline-rows">
-          {segments.map((segment) => {
-            const left = ((segment.start - created) / total) * 100;
-            const width = Math.max(((segment.end - segment.start) / total) * 100, 1.5);
-            return (
-              <li key={segment.id} className={`timeline-row status-${segment.status}`}>
-                <span className="timeline-label mono tiny" title={segment.label}>
-                  {segment.label}
-                </span>
-                <span className="timeline-track" aria-hidden="true">
-                  <span
-                    className="timeline-bar"
-                    style={{ left: `${Math.min(Math.max(left, 0), 100)}%`, width: `${width}%` }}
-                  />
-                </span>
-                <span className="timeline-meta tiny muted">
-                  {formatDuration(segment.end - segment.start)}
-                  {segment.cached ? " · cache" : ""}
-                </span>
-              </li>
-            );
-          })}
-        </ol>
+        <>
+          <p className="muted tiny timeline-hint">
+            Queue is the wait before the first node; gaps between bars are idle time. Dimmed bars were served from
+            the node cache.
+          </p>
+          <ol className="timeline-rows">
+            {segments.map((segment) => {
+              const left = ((segment.start - created) / total) * 100;
+              const width = Math.max(((segment.end - segment.start) / total) * 100, 1.5);
+              return (
+                <li
+                  key={segment.id}
+                  className={`timeline-row status-${segment.status}`}
+                  data-duration-ms={segment.end - segment.start}
+                >
+                  <span className="timeline-label mono tiny" title={segment.label}>
+                    {segment.label}
+                  </span>
+                  <span className="timeline-track" aria-hidden="true">
+                    <span
+                      className="timeline-bar"
+                      style={{ left: `${Math.min(Math.max(left, 0), 100)}%`, width: `${width}%` }}
+                    />
+                  </span>
+                  <span className="timeline-meta tiny muted">
+                    {formatDurationMs(segment.end - segment.start)}
+                    {segment.cached ? " · cache" : ""}
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
+        </>
       )}
     </section>
   );

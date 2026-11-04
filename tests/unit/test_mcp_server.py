@@ -155,3 +155,68 @@ def test_parse_errors_and_invalid_requests(capsys):
     assert json.loads(lines[1])["error"]["code"] == -32600  # array instead of object
     assert handle_message({"jsonrpc": "2.0", "id": 2})["error"]["code"] == -32600
     assert handle_message({"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": []})["error"]["code"] == -32602
+
+
+# ------------------------------------------------------------------- 2026-07-28
+MODERN_META = {"io.modelcontextprotocol/protocolVersion": "2026-07-28"}
+
+
+def _modern(method: str, request_id: int, params: dict | None = None) -> dict:
+    merged = {"_meta": MODERN_META, **(params or {})}
+    return call({"jsonrpc": "2.0", "id": request_id, "method": method, "params": merged})
+
+
+def test_server_discover_reports_the_modern_versions_and_identity():
+    response = call({"jsonrpc": "2.0", "id": 20, "method": "server/discover", "params": {"_meta": MODERN_META}})
+    result = response["result"]
+    assert result["resultType"] == "complete"
+    assert result["supportedVersions"][0] == "2026-07-28"
+    assert "2024-11-05" in result["supportedVersions"]
+    assert result["_meta"]["io.modelcontextprotocol/serverInfo"]["name"] == "hcs-discovery"
+    assert result["capabilities"]["tools"] == {}
+    assert result["ttlMs"] > 0 and result["cacheScope"] == "public"
+
+
+def test_modern_tools_list_is_cacheable_and_deterministic():
+    first = _modern("tools/list", 21)["result"]
+    second = _modern("tools/list", 22)["result"]
+    assert first["resultType"] == "complete"
+    assert first["ttlMs"] == 60_000 and first["cacheScope"] == "public"
+    names = [tool["name"] for tool in first["tools"]]
+    assert names == sorted(names)
+    assert names == [tool["name"] for tool in second["tools"]]
+    assert all(tool["annotations"]["openWorldHint"] is False for tool in first["tools"])
+
+
+def test_modern_tool_call_carries_structured_content(settings):
+    response = _modern(
+        "tools/call",
+        23,
+        {"name": "hcs_similarity_search", "arguments": {"query": "CCO", "smiles": ["CCO", "CCC"], "engine": "cpu"}},
+    )
+    result = response["result"]
+    assert result["resultType"] == "complete"
+    assert result["structuredContent"]["schema"] == "hcs.similarity-search.v1"
+    assert result["isError"] is False
+
+
+def test_unsupported_version_is_a_modern_error_with_the_supported_list():
+    response = call(
+        {
+            "jsonrpc": "2.0",
+            "id": 24,
+            "method": "tools/list",
+            "params": {"_meta": {"io.modelcontextprotocol/protocolVersion": "1900-01-01"}},
+        }
+    )
+    assert response["error"]["code"] == -32022
+    assert "2026-07-28" in response["error"]["data"]["supported"]
+    assert response["error"]["data"]["requested"] == "1900-01-01"
+
+
+def test_legacy_initialize_still_negotiates_an_old_revision():
+    response = call({"jsonrpc": "2.0", "id": 25, "method": "initialize", "params": {"protocolVersion": "2024-11-05"}})
+    assert response["result"]["protocolVersion"] == "2024-11-05"
+    assert "resultType" not in response["result"]
+    legacy_list = call({"jsonrpc": "2.0", "id": 26, "method": "tools/list"})["result"]
+    assert "ttlMs" not in legacy_list and "resultType" not in legacy_list

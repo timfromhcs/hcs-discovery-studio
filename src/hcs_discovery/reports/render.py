@@ -389,6 +389,10 @@ def export_report(
     output: Path,
 ) -> Path:
     fmt = fmt.lower()
+    if fmt in {"ro-crate", "rocrate"}:
+        from .rocrate import export_ro_crate
+
+        return export_ro_crate(session, settings, run_id, output)
     data = load_report_data(session, run_id)
     output.parent.mkdir(parents=True, exist_ok=True)
     if fmt == "markdown" or fmt == "md":

@@ -64,6 +64,25 @@ def _varied_density(lib: np.ndarray) -> np.ndarray:
     return out
 
 
+def _clustered_density(lib: np.ndarray, *, share: float = 0.7, seed: int = 2) -> np.ndarray:
+    """A library where most rows cluster around row 0, as real compound sets do.
+
+    Kept synthetic on purpose: it makes the k-NN bound measurable without implying
+    anything about a real chemical library.
+    """
+    rng = np.random.default_rng(seed)
+    out = lib.copy()
+    base = lib[0]
+    chosen = np.flatnonzero(rng.random(lib.shape[0]) < share)
+    for row in chosen:
+        out[row] = base
+        flips = int(rng.integers(1, 40))
+        columns = rng.choice(lib.shape[1], size=flips, replace=False)
+        masks = (np.uint32(1) << rng.integers(0, 32, size=flips).astype(np.uint32)).astype(np.uint32)
+        out[row, columns] = out[row, columns] ^ masks
+    return out
+
+
 def _median_ms(fn, repeats: int) -> float:
     timings = []
     for _ in range(repeats):
@@ -157,6 +176,71 @@ def measure(engine: Any, n: int, *, repeats: int, seed: int = 0) -> dict[str, An
             finally:
                 index.close()
 
+    # Bound-pruned k-NN: same answer as a full scan, fewer comparisons. The full-scan
+    # baseline is measured here so the table can state a ratio instead of a claim.
+    knn: dict[str, dict[str, float | int | str]] = {}
+    if n >= 20_000:
+        from hcs_discovery.similarity import TanimotoIndex, _rank_scores
+
+        for label, library in (("varied", _varied_density(lib)), ("clustered", _clustered_density(lib))):
+            index = TanimotoIndex.from_packed(library, prefer="auto", boost="gpu", verify=False)
+            try:
+                for k in (10, 100):
+                    index.knn_hits_for(query, k)  # warm-up
+                    samples = []
+                    pruned = None
+                    for _ in range(repeats):
+                        started = time.perf_counter()
+                        pruned = index.knn_hits_for(query, k)
+                        samples.append((time.perf_counter() - started) * 1000.0)
+                    assert pruned is not None
+                    full_samples = []
+                    for _ in range(repeats):
+                        started = time.perf_counter()
+                        inter, union = index.counts_for(query)
+                        scores = np.divide(inter, union, out=np.zeros(n), where=union > 0)
+                        _rank_scores(scores, index.valid, k=k, threshold=None)
+                        full_samples.append((time.perf_counter() - started) * 1000.0)
+                    knn_ms = statistics.median(samples)
+                    full_ms = statistics.median(full_samples)
+                    knn[f"{label}:{k}"] = {
+                        "density": label,
+                        "k": k,
+                        "candidates": pruned.candidates,
+                        "fraction": round(pruned.candidates / max(1, n), 6),
+                        "ms": round(knn_ms, 3),
+                        "full_ms": round(full_ms, 3),
+                        "speedup": round(full_ms / knn_ms, 2) if knn_ms else None,
+                    }
+            finally:
+                index.close()
+
+    # Batched multi-query: the library upload is paid once per dispatch instead of once
+    # per query. This is a kernel-level comparison on the same library and queries.
+    batch: dict[str, float | int | bool | None] = {}
+    if n >= 20_000:
+        from hcs_discovery.gpu.cpu import cpu_counts as _cpu_counts
+
+        queries = lib[:16].copy()
+        single_ms = _median_ms(lambda: [engine.counts(query, lib) for query in queries], repeats)
+        engine.counts_many(queries[:1], lib)  # warm-up
+        many_ms = _median_ms(lambda: engine.counts_many(queries, lib), repeats)
+        many = engine.counts_many(queries, lib)
+        exact_batch = all(
+            bool(
+                np.array_equal(many.inter[row], _cpu_counts(queries[row], lib)[0])
+                and np.array_equal(many.union[row], _cpu_counts(queries[row], lib)[1])
+            )
+            for row in (0, len(queries) - 1)
+        )
+        batch = {
+            "queries": len(queries),
+            "single_ms": round(single_ms, 2),
+            "batch_ms": round(many_ms, 2),
+            "speedup": round(single_ms / many_ms, 2) if many_ms else None,
+            "parity_exact": exact_batch,
+        }
+
     exact = bool(np.array_equal(uploaded.inter, inter_ref) and np.array_equal(uploaded.union, union_ref))
     if resident_counts is not None:
         exact = exact and bool(
@@ -188,6 +272,8 @@ def measure(engine: Any, n: int, *, repeats: int, seed: int = 0) -> dict[str, An
         "hybrid_ms": None if hybrid_ms is None else round(hybrid_ms, 2),
         "hybrid_vs_upload": None if hybrid_ms is None else round(upload_ms / hybrid_ms, 2),
         "thresholds": thresholds,
+        "knn": knn,
+        "batch": batch,
         "throughput_million_s": {
             "numpy": throughput(numpy_ms),
             "rdkit": throughput(rdkit_ms),
@@ -238,6 +324,41 @@ def render(report: dict[str, Any]) -> str:
                 )
             )
     threshold_table = "\n".join(threshold_rows) or "No threshold measurement."
+    knn_rows = []
+    for item in measurements:
+        for data in (item.get("knn") or {}).values():
+            knn_rows.append(
+                (
+                    "| {n:,} | {density} | {k} | {candidates:,} | {fraction:.2f} % | "
+                    "{ms:.2f} | {full_ms:.2f} | {speedup} |"
+                ).format(
+                    n=item["n"],
+                    density=data["density"],
+                    k=data["k"],
+                    candidates=data["candidates"],
+                    fraction=float(data["fraction"]) * 100.0,
+                    ms=float(data["ms"]),
+                    full_ms=float(data["full_ms"]),
+                    speedup="n/a" if data["speedup"] is None else f"{data['speedup']:.2f}×",
+                )
+            )
+    knn_table = "\n".join(knn_rows) or "No k-NN measurement."
+    batch_rows = []
+    for item in measurements:
+        data = item.get("batch") or {}
+        if not data:
+            continue
+        batch_rows.append(
+            "| {n:,} | {queries} | {single:.2f} | {batch:.2f} | {speedup} | {parity} |".format(
+                n=item["n"],
+                queries=data["queries"],
+                single=float(data["single_ms"]),
+                batch=float(data["batch_ms"]),
+                speedup="n/a" if data["speedup"] is None else f"{data['speedup']:.2f}×",
+                parity="exact" if data["parity_exact"] else "**FAILED**",
+            )
+        )
+    batch_table = "\n".join(batch_rows) or "No batch measurement."
     status = report["status"]
     if status != "passed":
         table = f"No measurement: {report['detail']}"
@@ -279,6 +400,28 @@ in `tests/unit/test_similarity_search.py`).
 |---|---|---|---|---|---|---|
 {threshold_table}
 
+## k-nearest neighbours with the same bound
+
+The k-NN path uses the same popcount bound but stages the work into few, large
+dispatches: it scores the popcount ring closest to the query first, takes the k-th score
+as a lower bound, then drops every row whose bound cannot reach it. It returns exactly
+the full-scan ranking (differential tests, ties included). Full scan here means scoring
+every row and ranking it, on the same index.
+
+| Library | Density | k | Rows scored | Share | Bound-pruned ms | Full scan ms | Speed-up |
+|---|---|---|---|---|---|---|---|
+{knn_table}
+
+## Batched multi-query
+
+Sixteen queries against the same library, kernel-level: the single-query column pays the
+library upload sixteen times, the batched column once per dispatch. Counts are compared
+with the CPU reference for the first and last query of the batch.
+
+| Library | Queries | Single-query total ms | Batched ms | Speed-up | Parity |
+|---|---|---|---|---|---|
+{batch_table}
+
 ## What this does and does not establish
 
 - **Parity is exact.** The GPU computes integer intersections and unions; the table
@@ -302,9 +445,15 @@ in `tests/unit/test_similarity_search.py`).
   (random prefix of words, standing in for molecule size) it prunes 32–88 % and the
   search gets 1.5–8× faster. Both rows are synthetic and the report says so; the
   differential tests prove the hits are identical to a full scan.
+- **k-NN pruning needs a clustered library.** A k-nearest query only prunes once the
+  running k-th score is high enough that the popcount bound can drop rows. On the
+  unclustered synthetic library the k-th neighbour is dissimilar and almost nothing is
+  dropped (the table may even show a slowdown); on the clustered one — 70 % of rows
+  derived from the query — the bound skips most of the library. Both are synthetic,
+  and neither is a claim about a real screening library.
 - **Not benchmarked:** GPU fingerprint generation (RDKit computes fingerprints on the
-  CPU), popcount-bound prefilters, and multi-query batches. The kernel scans the whole
-  library per query.
+  CPU), ANN indexes (deliberately absent: exact bounds keep recall at 1.0), and the
+  end-to-end batch ranking in Python (only the kernel is timed above).
 - **No scientific claim.** Tanimoto similarity over Morgan fingerprints is a
   prioritisation signal, not evidence of binding, safety or efficacy.
 """

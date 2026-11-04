@@ -15,7 +15,7 @@ from the CLI or HTTP API — without Docker, CUDA, an account, or a cloud key.
 [![CodeQL](https://github.com/timfromhcs/hcs-discovery-studio/actions/workflows/codeql.yml/badge.svg)](https://github.com/timfromhcs/hcs-discovery-studio/actions/workflows/codeql.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Python 3.12–3.13](https://img.shields.io/badge/python-3.12%E2%80%933.13-3776ab.svg)](pyproject.toml)
-[![Status: v2.2.1](https://img.shields.io/badge/status-v2.2.1-3dd6c3.svg)](docs/engineering/IMPLEMENTATION_STATUS.md)
+[![Status: v3.0.0](https://img.shields.io/badge/status-v3.0.0-3dd6c3.svg)](docs/engineering/IMPLEMENTATION_STATUS.md)
 
 <img src="docs/screenshots/workspace-dark.png" alt="HCS Discovery Studio workspace showing projects, machine diagnostics, queue state and recent runs" width="1200">
 
@@ -36,6 +36,9 @@ reproducible**, whether it came from the UI, the CLI, or the API.
 - **Headless parity.** Every shipped UI action has a CLI and `/api/v1`
   equivalent. Long jobs expose status, logs, cancellation, failure reasons and
   artifacts.
+- **Portable provenance.** Every run can be exported as an RO-Crate 1.1 bundle:
+  JSON-LD metadata with W3C PROV terms, the workflow, the environment and every
+  artifact with its SHA-256 — readable by tools that never heard of this app.
 - **Honest scope.** RDKit chemistry, AutoDock Vina CPU docking (when the
   official binary is installed) and two literature property estimates run
   locally. MD, learned ADMET models and structure prediction are registry cards
@@ -53,25 +56,27 @@ prioritisation signals. Read
 | CSV, SDF and SMILES import with row-level errors | **Available** | 16/17 demo rows imported; failures retained |
 | RDKit standardisation, descriptors and Morgan/Tanimoto similarity | **Available** | Deterministic fixture tests |
 | AutoDock Vina CPU docking | **Host-dependent** | Needs the official Vina 1.2.x binary; flexible-ligand PDBQT matches Meeko on 48/51 fixtures ([report](docs/validation/ligand-prep-meeko.md)); one-complex redocking check (1IEP, top pose ≤ 0.94 Å over 5 seeds, [report](docs/validation/vina-redocking-1iep.md)); not a docking benchmark |
-| Literature property estimates (ESOL, CNS MPO) | **Available** | Reduced ESOL: RMSE 0.97, R² 0.07 on 45 measured compounds ([report](docs/validation/esol-solubility.md)); CNS MPO is an approximation (cLogP for ClogD, assumed pKa) |
+| Literature property estimates (ESOL, CNS MPO) | **Available** | Delaney ESOL reproduction on the full 1,128-molecule set: RMSE 1.099, R² 0.725, held-out scaffold split RMSE 1.201 / R² 0.640 ([report](docs/validation/esol-delaney.md)); the 45-molecule stress set (R² 0.07) stays published ([report](docs/validation/esol-solubility.md)); CNS MPO is an approximation (cLogP for ClogD, assumed pKa) |
 | Bemis-Murcko generic scaffold splitting | **Available** | Leakage-free split validation tests |
 | PubChem & ChEMBL public data connectors | **Available** | NCBI & EBI REST search with policy-gated access |
 | DAG branching & table joins | **Available** | Kahn topological sort, fan-out, and `table.join` |
 | Targets & structures with provenance | **Available** (API + CLI, no UI page yet) | Target CRUD, PDB import with SHA-256 and chain/ligand/missing-residue inspection; mmCIF refused explicitly |
 | Deb's Fast Non-dominated Sorting & Pareto ranking | **Available** | Multi-objective sorting invariant tests |
-| GPU similarity search (Vulkan / D3D12 / Metal, one WGSL kernel) | **Available** on a hardware adapter, exact CPU fallback | Bit-identical to RDKit on every measured library; resident-library throughput ≈100 M Tanimoto/s at 500k fingerprints on this host's integrated GPU ([benchmark](docs/validation/gpu-tanimoto.md)); threshold searches use the BitBound prefilter and skip up to 88 % of a density-varied library |
+| GPU similarity search (Vulkan / D3D12 / Metal, one WGSL kernel) | **Available** on a hardware adapter, exact CPU fallback | Bit-identical to RDKit on every measured library; resident-library throughput ≈100 M Tanimoto/s at 500k fingerprints on this host's integrated GPU ([benchmark](docs/validation/gpu-tanimoto.md)); threshold searches use the BitBound prefilter; exact k-NN prunes by popcount bound (6.0× at 100k / 3.9× at 500k on a clustered synthetic library, 0.85× when unclustered — the report states both) |
+| Batched similarity screening | **Available** | 16 queries per library upload with parity per query; kernel-level 10.9× (100k) and 9.7× (500k) over the per-query path ([report](docs/validation/gpu-tanimoto.md)); `hcs-discovery similarity screen`. The CLI verifies every count against the CPU reference, so its wall time is higher than the kernel-only measurement |
 | Browser compute (RDKit WebAssembly + WebGPU Tanimoto) | **Available**, opt-in on the Settings page | Self-test and bit-exact WebGPU parity tests run against the served app |
 | Offline lab (no backend at all) | **Available** | Import CSV/SDF/SMI, RDKit descriptors, triage, ranking, GPU/CPU similarity and IndexedDB persistence, verified against a static build at 360 px; a service worker makes it work offline after the first visit (verified with the server killed) |
 | Constraint selection (SAT) | **Available** | Dependency-free DPLL with watched literals; brute-force differential tests, pigeonhole UNSAT, `sat solve`/`sat select` and the `select.sat` workflow node |
 | Run timeline in the UI | **Available** | Queue wait, per-node duration and cache hits drawn from persisted timestamps, asserted in the end-to-end run test |
 | Dataset fingerprint cache | **Available** | Packed Morgan fingerprints stored per dataset with a compound-set checksum and a blob checksum; reuse, invalidation and corruption rebuild are tested; measured 43× faster than re-fingerprinting on a synthetic 5,000-row library ([report](docs/validation/fingerprint-cache.md)) |
-| MCP server | **Available** | `hcs-discovery mcp serve`: five read-only tools over JSON-RPC 2.0, scripted stdio session test |
+| MCP server | **Available** | `hcs-discovery mcp serve`: five read-only tools over JSON-RPC 2.0, dual-era (`2026-07-28` `server/discover` + legacy `initialize`), scripted stdio session tests |
+| RO-Crate provenance export | **Available** | CLI, API and run-monitor button; RO-Crate 1.1 JSON-LD with PROV terms, artifact hashes and a deterministic ZIP; missing artifacts abort the export |
 | Container image | **Builds and runs** | Multi-stage Dockerfile; health, SPA and a similarity search verified in the container on this host |
 | Safe local research assistant | **Available** | Ask, Plan, Run modes with strict allowlisted tools |
 | Persistent lease-based queue & restart recovery | **Available** | Queue/worker integration tests |
 | Bounded cache lifecycle & cascade deletion | **Available** | Size/age pruning and orphan cleanup tests |
 | Report export & table truncation disclosures | **Available** | Markdown/HTML truncation notices & full CSV/JSON/SDF export |
-| React UI for project → import → workflow → run → results | **Available** | 5 Playwright E2E tests |
+| React UI for project → import → workflow → run → results | **Available** | 19 Playwright E2E tests, including the run timeline and axe checks |
 | CLI and versioned HTTP API | **Available** | Shared domain services; CLI integration tests |
 | Self-contained wheel with bundled SPA | **Available** | Built and smoke-tested without Node runtime; ships the GPU kernel |
 | One-file executable (PyInstaller) | **Builds and smoke-tests** | Gate G15: `version`, `db upgrade`, `doctor`, served `/api/v1/ready` and a verified GPU similarity search inside the frozen binary |
@@ -112,13 +117,13 @@ cd apps/web && npm run dev        # http://127.0.0.1:5173, proxies /api to 8787
 
 Download the wheel from the
 [latest release](https://github.com/timfromhcs/hcs-discovery-studio/releases/latest)
-(`v2.2.1` is published there only once all release gates pass).
-It bundles the built UI:
+(`v3.0.0` is built by the release workflow for a tagged commit whose CI and CodeQL
+runs are green). It bundles the built UI:
 
 ```bash
 python -m venv .venv
 . .venv/bin/activate              # Windows: .venv\Scripts\Activate.ps1
-pip install hcs_discovery_studio-2.2.1-py3-none-any.whl
+pip install hcs_discovery_studio-3.0.0-py3-none-any.whl
 hcs-discovery doctor
 hcs-discovery serve
 ```
@@ -128,14 +133,14 @@ attestation (commands are in the release notes).
 
 ### Option C — one-file executable (build it yourself)
 The repository ships a PyInstaller spec that bundles the CLI, the API, RDKit, the
-built SPA, the Alembic migrations and the GPU kernel into a single binary. It is
-built and smoke-tested by the release gate (`G15`), and it is not published as a
-download until `v2.2.1` ships:
+built SPA, the Alembic migrations and the GPU kernel into a single binary. The release
+workflow builds and smoke-tests it on **Windows x64, Linux x64, macOS arm64 and macOS
+x64**, and the local gate `G15` does the same on the host:
 
 ```bash
 uv pip install "pyinstaller==6.22.3"        # build-only, deliberately not in the lockfile
 uv run python scripts/release/build_executable.py
-build/exe-dist/hcs-discovery.exe doctor     # Windows; the Linux build drops the .exe
+build/exe-dist/hcs-discovery.exe doctor     # Windows; other hosts drop the .exe
 build/exe-dist/hcs-discovery.exe serve
 ```
 
@@ -171,6 +176,8 @@ uv run hcs-discovery dataset import examples/datasets/demo_library.csv --project
 uv run hcs-discovery workflow run examples/workflows/triage.yaml --project <project-id> --dataset <dataset-id>
 uv run hcs-discovery run status <run-id>
 uv run hcs-discovery report export <run-id> --format html --output report.html
+uv run hcs-discovery report export <run-id> --format ro-crate --output run.crate.zip
+uv run hcs-discovery similarity screen --queries queries.smi --file examples/datasets/demo_library.csv --k 5
 ```
 
 The CLI uses the same service layer as the API. Add `--json` before or after a
@@ -208,12 +215,13 @@ flowchart LR
     API --> UI
 ```
 
-A workflow is a typed table flowing through single-input nodes. Multi-input
-merges are explicitly rejected rather than silently mis-executed. The queue is
-persistent and lease-based with **at-least-once** execution; node results are
-cached by node type, implementation version, configuration, input hash and
-engine versions. See [Workflow engine](docs/architecture/WORKFLOW_ENGINE.md) and
-[Data model](docs/architecture/DATA_MODEL.md).
+A workflow is a typed table flowing through a DAG. Nodes may fan out to several
+children, and multi-input merges are explicit `table.join` nodes with strict key
+checks — a duplicate or colliding key is a validation error, not a silent cartesian
+product. The queue is persistent and lease-based with **at-least-once** execution;
+node results are cached by node type, implementation version, configuration, input
+hash and engine versions. See [Workflow engine](docs/architecture/WORKFLOW_ENGINE.md)
+and [Data model](docs/architecture/DATA_MODEL.md).
 
 ## Reproducibility and provenance
 
@@ -238,11 +246,11 @@ RDKit or dependency versions. See
 |---|---|---|
 | CPU x86-64, Windows 11 | **Verified locally** | Ryzen 7 7735HS, 19.8 GB RAM, Python 3.12 |
 | CPU x86-64, Linux | **Verified in CI** | Ubuntu runner, Python 3.12 |
-| Vulkan (similarity search) | **Verified locally** | AMD Radeon 680M integrated GPU, Vulkan via `wgpu-py`; GPU counts are bit-exact against the CPU reference. 500k fingerprints in ≈5 ms with the library resident (≈100 M Tanimoto/s), ≈19× RDKit's bulk call ([benchmark](docs/validation/gpu-tanimoto.md)); threshold searches use the BitBound prefilter and skip up to 88 % of a density-varied library |
+| Vulkan (similarity search) | **Verified locally** | AMD Radeon 680M integrated GPU, Vulkan via `wgpu-py`; GPU counts are bit-exact against the CPU reference. 500k fingerprints in ≈7 ms with the library resident (≈71 M Tanimoto/s in the current report), ≈21× RDKit's bulk call ([benchmark](docs/validation/gpu-tanimoto.md)); threshold searches use the BitBound prefilter, exact k-NN prunes by popcount bound, and batched screening uploads the library once per dispatch |
 | WebGPU (browser) | **Verified locally in Chrome** | Same WGSL kernel, parity checked against JavaScript before any timing; opt-in on the Settings page |
 | CUDA | **Not required, not used** | No CUDA dependency in the base install; CUDA-only libraries such as nvMolKit are not a comparison point here |
 | GPU acceleration | **Available for similarity search only** | Docking, descriptors, property estimates and docking stay on the CPU; no other engine claims GPU execution |
-| macOS / ARM64 | **Untested** | No release claim |
+| macOS (arm64/x64) | **Built by the release workflow; not yet run on real hardware** | The binary is smoke-tested on the CI runner, which is not a substitute for a user's machine; no performance claim |
 
 `hcs-discovery doctor` reports what the current machine can actually do. It
 never labels an engine GPU-compatible unless that adapter has a real probe, and
@@ -253,7 +261,7 @@ are using. Hardware presence alone is never reported as a speed claim.
 
 | Gate | Command | Result |
 |---|---|---|
-| Backend tests | `uv run pytest -q` | <!-- gen:tests -->591 passed, 0 skipped<!-- /gen:tests --> on the development host; the two live docking tests are deselected there because no Vina binary is installed, and CI runs them on Linux |
+| Backend tests | `uv run pytest -q` | <!-- gen:tests -->633 passed, 0 skipped<!-- /gen:tests --> on the development host (the live docking tests ran with the local Vina binary; CI installs it on Linux) |
 | Coverage | `uv run pytest --cov=hcs_discovery --cov-branch` | <!-- gen:coverage -->83 % branch coverage<!-- /gen:coverage --> locally; CI floor 70%, HAEL modules ≥94% |
 | Python format/lint/type | `uv run ruff format --check .`, `uv run ruff check .`, `uv run mypy` | Clean locally and in CI |
 | Frontend typecheck/build | `npm run typecheck`, `npm run build` in `apps/web` | Clean locally and in CI |
@@ -303,10 +311,11 @@ threat model and residual risks are in
   check, not evidence of accuracy on other targets, cross-docking or affinity
   ranking. Receptors must be prepared PDBQT files under
   `<HCS_DATA_DIR>/receptors`.
-- **Property estimates are weak.** Reduced ESOL barely beats a constant
-  baseline on independent data; CNS MPO approximates ClogD and pKa. Neither
-  reports a calibrated uncertainty. MD, learned ADMET and structure prediction
-  are not implemented.
+- **Property estimates need their benchmark read with them.** The ESOL reproduction
+  reaches RMSE 1.10 / R² 0.72 on the full Delaney set but R² 0.07 on a narrow,
+  drug-like stress set; both reports are published. CNS MPO approximates ClogD and
+  pKa. Neither reports a calibrated uncertainty. MD, learned ADMET and structure
+  prediction are not implemented.
 - **DAGs without loops.** Fan-out and key-based `table.join` are supported; no
   loops, conditionals, sub-workflows or parameter sweeps.
 - **Single machine.** SQLite and a local queue; no PostgreSQL deployment,
@@ -314,15 +323,15 @@ threat model and residual risks are in
 - **Research agent is rule-based by default.** Ask/Plan/Run use allowlisted
   tools; Ask uses a configured local LLM when available and says so when it
   falls back to built-in rules.
-- **SQLite on one machine.** Writers are serialised; no distributed workers.
-- **GPU similarity is a scanner, not a search index.** The kernel scores every
-  fingerprint in the library for one query; there is no popcount-bound prefilter,
-  no ANN index and no GPU fingerprint generation (RDKit computes fingerprints on
-  the CPU). It only supports radius-2/2048-bit Morgan fingerprints; other widths
-  use the CPU reference. The published speed-up is one integrated GPU against one
-  CPU thread pool on the host named in
+- **GPU similarity is exact search, not an ANN index.** The kernel supports
+  radius-2/2048-bit Morgan fingerprints; exact k-NN and threshold searches prune
+  with the popcount bound, but a full score vector still scans the library. There
+  is no ANN index (deliberate: exact bounds keep recall at 1.0) and no GPU
+  fingerprint generation (RDKit computes fingerprints on the CPU). The published
+  speed-ups are one integrated GPU against one CPU thread pool on the host named in
   [the benchmark](docs/validation/gpu-tanimoto.md), not a comparison with CUDA
-  implementations such as nvMolKit.
+  implementations such as nvMolKit. On an unclustered library the k-NN bookkeeping
+  costs about 15 %, and the report says so.
 - **No TLS or reverse proxy.** Put a hardened proxy in front of any non-local
   deployment.
 - **Node cache entries outlive projects.** They are content-addressed and
@@ -357,13 +366,15 @@ More help: [Windows install](docs/user-guide/INSTALL_WINDOWS.md),
 - **Zero to hero:** [English](docs/guides/ZERO_TO_HERO.en.md) ·
   [Deutsch](docs/guides/ZERO_TO_HERO.de.md) ·
   [Français](docs/guides/ZERO_TO_HERO.fr.md)
-- **Automation:** [API](docs/user-guide/CLI.md) · MCP (`hcs-discovery mcp serve`) ·
-  `hcs-discovery similarity search` · `hcs-discovery sat solve|select`
+- **Automation:** [API](docs/user-guide/CLI.md) · MCP (`hcs-discovery mcp serve`,
+  protocol `2026-07-28`) · `hcs-discovery similarity search|screen` ·
+  `hcs-discovery sat solve|select` · `report export --format ro-crate`
 - **Architecture:** [Overview](docs/architecture/OVERVIEW.md) ·
   [Workflow engine](docs/architecture/WORKFLOW_ENGINE.md) ·
   [Data model](docs/architecture/DATA_MODEL.md) ·
   [Plugin API](docs/architecture/PLUGIN_API.md)
 - **Engineering:** [Implementation status](docs/engineering/IMPLEMENTATION_STATUS.md) ·
+  [v3.0.0 plan](docs/engineering/PLAN_2026-11-04_SOTA_V3.md) ·
   [Long-term roadmap](docs/engineering/ROADMAP_LONG_TERM.md) ·
   [Release plan v2.1](docs/engineering/RELEASE_PLAN_v2.1.md) ·
   [Releasing runbook](docs/engineering/RELEASING.md) ·
@@ -374,6 +385,7 @@ More help: [Windows install](docs/user-guide/INSTALL_WINDOWS.md),
   [Validation protocol](docs/scientific-validation/VALIDATION_PROTOCOL.md) ·
   [SOTA gap analysis](docs/research/SOTA_GAP_ANALYSIS.md) ·
   [GPU Tanimoto benchmark](docs/validation/gpu-tanimoto.md) ·
+  [ESOL on the Delaney set](docs/validation/esol-delaney.md) ·
   [HAEL (experimental)](docs/research/HAEL.md) ·
   [Research register](docs/research/RESEARCH_REGISTER.md)
 - **Security:** [Threat model](docs/security/THREAT_MODEL.md) · [SECURITY.md](SECURITY.md)
@@ -390,7 +402,7 @@ If you use this work, cite the repository using [CITATION.cff](CITATION.cff):
   author  = {hcsmedia},
   title   = {HCS Discovery Studio},
   year    = {2026},
-  version = {2.2.1},
+  version = {3.0.0},
   url     = {https://github.com/timfromhcs/hcs-discovery-studio},
   license = {Apache-2.0}
 }
@@ -406,10 +418,10 @@ No third-party model weights or proprietary datasets are bundled.
 
 ---
 
-**Status:** `2.2.1` — the hosted deployment runs the full workbench (SPA and
-`/api/v1`). It is published only after the local gates and cloud CI pass for the
-tagged commit. Release notes:
-[`docs/releases/v2.2.1.md`](docs/releases/v2.2.1.md); the human steps are in
+**Status:** `3.0.0` — exact pruned similarity search, batched screening, RO-Crate
+provenance, MCP `2026-07-28` and one-file binaries for Windows, Linux and macOS.
+Release notes:
+[`docs/releases/v3.0.0.md`](docs/releases/v3.0.0.md); the human steps are in
 [`docs/engineering/RELEASING.md`](docs/engineering/RELEASING.md). See
 `IMPLEMENTATION_STATUS.md` for the full feature ledger and `CHANGELOG.md` for the
 change list.

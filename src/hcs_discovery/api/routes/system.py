@@ -13,7 +13,7 @@ from ... import CREDIT, PRODUCT_NAME, TAGLINE, __version__
 from ...core.config import Settings
 from ...core.doctor import run_diagnostics
 from ...core.errors import ValidationError
-from ...database.models import Compound, Dataset, Project, Run
+from ...database.models import Compound, Dataset, Project, Run, RunNode
 from ...workflow.cache import NodeCache
 from ..deps import db, settings_dep
 
@@ -177,4 +177,56 @@ def metrics(request: Request, session: Session = Depends(db), settings: Settings
         "# TYPE hcs_fingerprint_cache_compounds gauge",
         f"hcs_fingerprint_cache_compounds {fingerprints['compounds']}",
     ]
+
+    # Latency comes from persisted timestamps, not from an in-process collector: a scrape
+    # after a restart still describes what actually ran. Buckets are coarse on purpose —
+    # the runs are seconds to minutes, not web requests.
+    finished_runs = session.execute(
+        select(Run.started_at, Run.finished_at).where(Run.started_at.is_not(None), Run.finished_at.is_not(None))
+    ).all()
+    run_seconds: list[float] = []
+    for started, finished in finished_runs:
+        if started is None or finished is None or finished < started:
+            continue
+        run_seconds.append((finished - started).total_seconds())
+    node_rows = session.execute(
+        select(RunNode.started_at, RunNode.finished_at, RunNode.cached).where(
+            RunNode.started_at.is_not(None), RunNode.finished_at.is_not(None)
+        )
+    ).all()
+    node_seconds: list[float] = []
+    cache_hits = 0
+    for started, finished, cached in node_rows:
+        if cached:
+            cache_hits += 1
+        if started is None or finished is None or finished < started:
+            continue
+        node_seconds.append((finished - started).total_seconds())
+    lines += _histogram(
+        "hcs_run_duration_seconds",
+        "Finished run wall time, from the persisted start and finish timestamps.",
+        run_seconds,
+        buckets=(1, 5, 15, 60, 300, 900, 3600),
+    )
+    lines += _histogram(
+        "hcs_node_duration_seconds",
+        "Finished node wall time, from the persisted start and finish timestamps.",
+        node_seconds,
+        buckets=(0.1, 0.5, 1, 5, 30, 120, 600),
+    )
+    lines += [
+        "# HELP hcs_node_cache_hits_total Node executions served from the content-addressed cache.",
+        "# TYPE hcs_node_cache_hits_total counter",
+        f"hcs_node_cache_hits_total {cache_hits}",
+    ]
     return "\n".join(lines) + "\n"
+
+
+def _histogram(name: str, help_text: str, values: list[float], *, buckets: tuple[float, ...]) -> list[str]:
+    lines = [f"# HELP {name} {help_text}", f"# TYPE {name} histogram"]
+    for bound in buckets:
+        lines.append(f'{name}_bucket{{le="{bound}"}} {sum(1 for value in values if value <= bound)}')
+    lines.append(f'{name}_bucket{{le="+Inf"}} {len(values)}')
+    lines.append(f"{name}_sum {sum(values):.3f}")
+    lines.append(f"{name}_count {len(values)}")
+    return lines

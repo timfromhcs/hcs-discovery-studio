@@ -210,6 +210,7 @@ export const api = {
       `${BASE}/runs/${encodeURIComponent(runId)}/artifacts/${artifactId}`,
     reportUrl: (runId: string, format: "html" | "markdown" | "json" | "csv", download = true) =>
       `${BASE}/runs/${encodeURIComponent(runId)}/report${query({ format, download })}`,
+    exportUrl: (runId: string, format: "ro-crate") => `${BASE}/runs/${encodeURIComponent(runId)}/export/${format}`,
   },
 
   models: {

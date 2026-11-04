@@ -126,12 +126,22 @@ This does not write to the database. It exits `1` if any row fails.
 hcs-discovery similarity search --query "CC(=O)Oc1ccccc1C(=O)O" --file library.smi --k 10
 hcs-discovery similarity search --query "c1ccccc1" --file library.csv \
   --threshold 0.7 --engine gpu --output scores.csv --json
+hcs-discovery similarity screen --queries queries.smi --file library.csv --k 10 --json
 ```
 
-Structures are standardised exactly as `dataset import` does, then scored against
-one query with Morgan/ECFP fingerprints and Tanimoto similarity. `--engine` is
-`auto` (a hardware GPU when present, otherwise the CPU), `cpu`, or `gpu`; `gpu`
-fails with exit code `3` when no hardware adapter exists instead of falling back.
+`similarity search` standardises the library exactly as `dataset import` does, then
+ranks it against one query with Morgan/ECFP fingerprints and Tanimoto similarity.
+Without `--output` it uses exact bound-pruned k-NN: rows whose popcount bound cannot
+reach the running k-th score are not compared, and the ranking equals a full scan.
+`--output` asks for every score, so it scans. `--engine` is `auto` (a hardware GPU
+when present, otherwise the CPU), `cpu`, or `gpu`; `gpu` fails with exit code `3`
+when no hardware adapter exists instead of falling back.
+
+`similarity screen` scores several queries against one library in batched dispatches.
+The library is uploaded once per dispatch instead of once per query; every count is
+still verified against the CPU reference. The payload is
+`hcs.similarity-screen.v1` and reports `mode: batched_full_scan`, because screening
+does not prune.
 `--max-rows` (default 50,000) refuses larger files because standardisation holds
 every structure in memory — raise it deliberately for a bigger screen.
 
@@ -194,7 +204,14 @@ hcs-discovery report export <run-id> --format html --output reports/run.html
 hcs-discovery report export <run-id> --format markdown --output reports/run.md
 hcs-discovery report export <run-id> --format json --output reports/run.json
 hcs-discovery report export <run-id> --format csv --output reports/results.csv
+hcs-discovery report export <run-id> --format ro-crate --output reports/run.crate.zip
 ```
+
+`ro-crate` writes a ZIP with `ro-crate-metadata.json` (RO-Crate 1.1 context, W3C PROV
+terms, software/environment records) and every artifact with its SHA-256. The export
+refuses to run when an artifact is missing instead of writing a crate that points at
+nothing. The run monitor exposes the same bundle as a button. It is **not** labelled
+as Workflow Run RO-Crate conformant: per-step actions are not emitted yet.
 
 ## Models and configuration
 

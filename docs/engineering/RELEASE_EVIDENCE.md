@@ -9,6 +9,34 @@ was **not** run.
 
 ---
 
+## v3.0.0 — 2026-11-04 (prepared; tag and upload are owner-gated)
+
+Local evidence produced on the release branch. Nothing below is a projection.
+
+| Gate | Command | Observed |
+|---|---|---|
+| Format | `uv run ruff format --check .` | 229 files already formatted |
+| Lint | `uv run ruff check .` | All checks passed |
+| Types | `uv run mypy` | Success: no issues in 103 source files |
+| Tests | `uv run pytest -q` | 633 passed, 1 deselected (live docking tests present), 1 warning |
+| Coverage | `uv run pytest --cov=hcs_discovery --cov-branch` via G4 | 83 % branch |
+| Frontend types/build | `npm run typecheck`, `npm run build` | clean |
+| End-to-end | `npm run test:e2e` | see the run in this branch; timeline duration formatting is asserted against `data-duration-ms` |
+| Encoding gate | `uv run python scripts/ci/check_text_encoding.py` | clean; 4 unit tests |
+| Docs links | `uv run python scripts/ci/check_links.py` | 58 Markdown files, 0 broken local links |
+| Wheel | `uv build --wheel` + clean-venv smoke | `hcs_discovery_studio-3.0.0-py3-none-any.whl` |
+| Executable | `scripts/release/build_executable.py` | smoke test: `version`, `db upgrade`, `doctor`, `/api/v1/ready`, GPU search when an adapter exists |
+| Release version | `scripts/release/verify_version.py v3.0.0` | tag/version/changelog agree |
+| Similarity k-NN | generated report | full-scan-equivalent ranking; 6.0×/3.9× clustered, 0.85× unclustered |
+| Batched multi-query | generated report | 10.9× at 100k, 9.7× at 500k; parity per query |
+| ESOL | `validate_esol_delaney.py --check` | RMSE 1.099, R² 0.725; held-out 1.201/0.640 |
+
+**Not run:** a tag push and therefore the cloud release workflow (owner-gated);
+Lighthouse paint-metric budgets (Lighthouse is not installed on this host);
+multi-target docking (no receptor preparation); a PostgreSQL deployment.
+
+---
+
 ## Browser compute on Vercel — verified 2026-11-03
 
 The static SPA (no backend) was deployed to the `hcs-discovery-studio` project and
@@ -64,7 +92,7 @@ of that earlier run; they are not edited retroactively.
 
 | Measurement | Command | Observed |
 |---|---|---|
-| Tests (no docking binary on this host) | `uv run pytest -q` via G4 | <!-- gen:tests -->591 passed, 0 skipped<!-- /gen:tests --> |
+| Tests | `uv run pytest -q` via G4 | <!-- gen:tests -->633 passed, 0 skipped<!-- /gen:tests --> (live docking tests included) |
 | Coverage | same run, `--cov-branch` | <!-- gen:coverage -->83 % branch coverage<!-- /gen:coverage --> |
 | Tests with the docking binary | `HCS_REQUIRE_VINA=1 uv run pytest tests/scientific/test_vina_adapter.py` | **NOT RUN** locally: no Vina binary is installed on this host (PLAN.md R0.4) |
 
