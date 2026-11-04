@@ -9,34 +9,36 @@ was **not** run.
 
 ---
 
-## v3.0.0 — 2026-11-04 (prepared; tag and upload are owner-gated)
+## v3.0.1 — 2026-11-04 (published)
 
-Local evidence produced on the release branch. Nothing below is a projection.
+The feature evidence below was produced on the 3.0.0/3.0.1 tree. `v3.0.0` was tagged
+but not published (the macOS x64 binary job could not install RDKit — no x86_64
+wheel); `v3.0.1` is the first published 3.0 release with Windows x64, Linux x64 and
+macOS arm64.
 
 | Gate | Command | Observed |
 |---|---|---|
-| Format | `uv run ruff format --check .` | 229 files already formatted |
+| Format | `uv run ruff format --check .` | 236 files already formatted |
 | Lint | `uv run ruff check .` | All checks passed |
 | Types | `uv run mypy` | Success: no issues in 103 source files |
-| Tests | `uv run pytest -q` | 633 passed, 1 deselected (live docking tests present), 1 warning |
+| Tests | `uv run pytest -q` | 635 passed, 4 skipped (PostgreSQL tests skip without `HCS_TEST_POSTGRES_URL`), 1 deselected |
 | Coverage | `uv run pytest --cov=hcs_discovery --cov-branch` via G4 | 83 % branch |
 | Frontend types/build | `npm run typecheck`, `npm run build` | clean |
 | Visual/a11y QA | `node apps/web/scripts/visual_qa.mjs` against a demo instance | 180 captures (every route × 6 widths × 2 themes), 0 automatic findings |
-| End-to-end | `npm run test:e2e` | see the run in this branch; timeline duration formatting is asserted against `data-duration-ms` |
+| End-to-end | `npm run test:e2e` | 19 passed; timeline duration formatting is asserted against `data-duration-ms` |
 | Encoding gate | `uv run python scripts/ci/check_text_encoding.py` | clean; 4 unit tests |
-| Docs links | `uv run python scripts/ci/check_links.py` | 58 Markdown files, 0 broken local links |
-| Wheel | `uv build --wheel` + clean-venv smoke | `hcs_discovery_studio-3.0.0-py3-none-any.whl` |
+| Docs links | `uv run python scripts/ci/check_links.py` | 60 Markdown files, 0 broken local links |
+| Wheel | `uv build --wheel` + clean-venv smoke | `hcs_discovery_studio-3.0.1-py3-none-any.whl` |
 | PostgreSQL | `scripts/ci/run_postgres_tests.py` | migrations, full run, 4-worker claim race, `/ready`, stale-lease recovery on `postgres:16-alpine` |
 | Lighthouse | `scripts/ci/run_lighthouse.py` | workspace 96 / lab 98 perf, 100 a11y, LCP 2.4/1.8 s, CLS 0.007/0, TBT 104/36 ms |
 | Executable | `scripts/release/build_executable.py` | smoke test: `version`, `db upgrade`, `doctor`, `/api/v1/ready`, GPU search when an adapter exists |
-| Release version | `scripts/release/verify_version.py v3.0.0` | tag/version/changelog agree |
+| Release version | `scripts/release/verify_version.py v3.0.1` | tag/version/changelog agree |
 | Similarity k-NN | generated report | full-scan-equivalent ranking; 6.0×/3.9× clustered, 0.85× unclustered |
 | Batched multi-query | generated report | 10.9× at 100k, 9.7× at 500k; parity per query |
 | ESOL | `validate_esol_delaney.py --check` | RMSE 1.099, R² 0.725; held-out 1.201/0.640 |
 
-**Not run:** a tag push and therefore the cloud release workflow (owner-gated);
-multi-target docking (no receptor preparation); a managed PostgreSQL deployment (the
-container is exercised, not a hosted database).
+**Not run:** a managed PostgreSQL deployment (the container is exercised, not a hosted
+database); multi-target docking (no receptor preparation).
 
 ---
 

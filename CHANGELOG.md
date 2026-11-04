@@ -4,6 +4,20 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.1] - 2026-11-04
+
+`v3.0.0` was tagged after its gates passed, but the release workflow failed before
+publishing anything: the macOS x64 binary job could not install `rdkit==2026.9.1`,
+which ships no macOS x86_64 wheel. No release, draft or asset was created for
+`v3.0.0`, and the tag stays in place — this repository never moves a tag. `3.0.1` is
+the first published 3.0 release.
+
+### Fixed
+
+- The release matrix no longer claims macOS x64. Supported release targets are
+  Windows x64, Linux x64 and macOS arm64; the workflow states the RDKit wheel
+  constraint instead of failing at install time.
+
 ## [3.0.0] - 2026-11-04
 
 The first major release since `2.0`: exact similarity search that prunes, provenance

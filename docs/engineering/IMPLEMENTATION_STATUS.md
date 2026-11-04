@@ -1,9 +1,11 @@
 ﻿# Implementation status
 
-Last updated: 2026-11-04. Version: `3.0.0`. `3.0.0` adds exact bound-pruned k-NN,
-the batched multi-query kernel, RO-Crate provenance export, the MCP `2026-07-28`
-protocol, the full Delaney ESOL benchmark and a four-platform release matrix; see
-[the release notes](../releases/v3.0.0.md) and
+Last updated: 2026-11-04. Version: `3.0.1`. The 3.0 line adds exact bound-pruned
+k-NN, the batched multi-query kernel, RO-Crate provenance export, the MCP `2026-07-28`
+protocol, the full Delaney ESOL benchmark, PostgreSQL and Lighthouse gates, and a
+three-platform release matrix. `v3.0.0` remains an unpublished tag because the macOS
+x64 binary job could not install RDKit (no x86_64 wheel); see
+[the 3.0.1 notes](../releases/v3.0.1.md) and
 [the plan](PLAN_2026-11-04_SOTA_V3.md).
 
 This document is the honest feature ledger. It distinguishes what has been exercised
@@ -39,7 +41,7 @@ check; it does not mean validated science.
 | PostgreSQL | Done (real server) | Disposable `postgres:16-alpine` container: migrations, a full run, four workers racing one claim (exactly one wins), `/ready` and stale-lease recovery; `HCS_DATABASE_URL` now actually reaches the setting (regression test) |
 | Performance budgets | Done | Lighthouse on the static build: workspace 96 / lab 98 performance, 100 accessibility, LCP 2.4 s / 1.8 s, CLS 0.007 / 0, TBT 104 / 36 ms; budgets and caveats in [lighthouse.md](../validation/lighthouse.md) |
 | GitHub CI | Green on `main` @ `da8e079` | CI 41803154577 (Windows + Linux, Vina, E2E, wheel, EXE, docs, licenses, secrets) and CodeQL 41803154693 |
-| Public release | `2.2.1` is published; `3.0.0` is prepared on `main` | Tag/upload are owner-gated; the release workflow builds four binaries and the container |
+| Public release | `3.0.1` is the published 3.0 release; `v3.0.0` is an unpublished tag (macOS x64 wheel) | Assets: Windows/Linux/macOS-arm64 binaries, wheel, SBOM, checksums, attestation; tag/upload executed for 3.0.1 |
 
 ## Working now
 
@@ -124,7 +126,7 @@ check; it does not mean validated science.
 - i18n of the UI (the guides are EN/DE/FR).
 - Signed artifacts with GPG/cosign (GitHub build provenance attestations exist).
 
-## Release-gate assessment for 3.0.0
+## Release-gate assessment for 3.0.1
 
 | Gate | Status | Evidence |
 |---|---|---|
@@ -141,7 +143,7 @@ check; it does not mean validated science.
 | MCP | Pass | Modern and legacy sessions in one stdio subprocess test |
 | ESOL benchmark | Pass | `validate_esol_delaney.py --check` matches the committed report |
 | Platform binaries | Prepared | Release workflow builds Windows x64, Linux x64, macOS arm64/x64 and GHCR |
-| Release published | **Owner-gated** | Tag `v3.0.0` and PyPI/DOI require the owner |
+| Release published | Yes for 3.0.1 | Tag `v3.0.1` → release workflow; PyPI/DOI remain owner-gated |
 
 ## Known defects and risks
 

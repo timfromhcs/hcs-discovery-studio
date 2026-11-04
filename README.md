@@ -15,7 +15,7 @@ from the CLI or HTTP API — without Docker, CUDA, an account, or a cloud key.
 [![CodeQL](https://github.com/timfromhcs/hcs-discovery-studio/actions/workflows/codeql.yml/badge.svg)](https://github.com/timfromhcs/hcs-discovery-studio/actions/workflows/codeql.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Python 3.12–3.13](https://img.shields.io/badge/python-3.12%E2%80%933.13-3776ab.svg)](pyproject.toml)
-[![Status: v3.0.0](https://img.shields.io/badge/status-v3.0.0-3dd6c3.svg)](docs/engineering/IMPLEMENTATION_STATUS.md)
+[![Status: v3.0.1](https://img.shields.io/badge/status-v3.0.1-3dd6c3.svg)](docs/engineering/IMPLEMENTATION_STATUS.md)
 
 <img src="docs/screenshots/workspace-dark.png" alt="HCS Discovery Studio workspace showing projects, machine diagnostics, queue state and recent runs" width="1200">
 
@@ -117,13 +117,13 @@ cd apps/web && npm run dev        # http://127.0.0.1:5173, proxies /api to 8787
 
 Download the wheel from the
 [latest release](https://github.com/timfromhcs/hcs-discovery-studio/releases/latest)
-(`v3.0.0` is built by the release workflow for a tagged commit whose CI and CodeQL
+(`v3.0.1` is built by the release workflow for a tagged commit whose CI and CodeQL
 runs are green). It bundles the built UI:
 
 ```bash
 python -m venv .venv
 . .venv/bin/activate              # Windows: .venv\Scripts\Activate.ps1
-pip install hcs_discovery_studio-3.0.0-py3-none-any.whl
+pip install hcs_discovery_studio-3.0.1-py3-none-any.whl
 hcs-discovery doctor
 hcs-discovery serve
 ```
@@ -134,8 +134,8 @@ attestation (commands are in the release notes).
 ### Option C — one-file executable (build it yourself)
 The repository ships a PyInstaller spec that bundles the CLI, the API, RDKit, the
 built SPA, the Alembic migrations and the GPU kernel into a single binary. The release
-workflow builds and smoke-tests it on **Windows x64, Linux x64, macOS arm64 and macOS
-x64**, and the local gate `G15` does the same on the host:
+workflow builds and smoke-tests it on **Windows x64, Linux x64 and macOS arm64**, and
+the local gate `G15` does the same on the host:
 
 ```bash
 uv pip install "pyinstaller==6.22.3"        # build-only, deliberately not in the lockfile
@@ -251,7 +251,8 @@ RDKit or dependency versions. See
 | WebGPU (browser) | **Verified locally in Chrome** | Same WGSL kernel, parity checked against JavaScript before any timing; opt-in on the Settings page |
 | CUDA | **Not required, not used** | No CUDA dependency in the base install; CUDA-only libraries such as nvMolKit are not a comparison point here |
 | GPU acceleration | **Available for similarity search only** | Docking, descriptors, property estimates and docking stay on the CPU; no other engine claims GPU execution |
-| macOS (arm64/x64) | **Built by the release workflow; not yet run on real hardware** | The binary is smoke-tested on the CI runner, which is not a substitute for a user's machine; no performance claim |
+| macOS arm64 | **Built and smoke-tested by the release workflow; not run on real hardware** | The binary is smoke-tested on the CI runner, which is not a substitute for a user's machine; no performance claim |
+| macOS x64 | **Not supported** | RDKit 2026.9.1 publishes no macOS x86_64 wheel, so the locked dependency set cannot be installed on an Intel Mac |
 
 `hcs-discovery doctor` reports what the current machine can actually do. It
 never labels an engine GPU-compatible unless that adapter has a real probe, and
@@ -408,7 +409,7 @@ If you use this work, cite the repository using [CITATION.cff](CITATION.cff):
   author  = {hcsmedia},
   title   = {HCS Discovery Studio},
   year    = {2026},
-  version = {3.0.0},
+  version = {3.0.1},
   url     = {https://github.com/timfromhcs/hcs-discovery-studio},
   license = {Apache-2.0}
 }
@@ -424,10 +425,10 @@ No third-party model weights or proprietary datasets are bundled.
 
 ---
 
-**Status:** `3.0.0` — exact pruned similarity search, batched screening, RO-Crate
-provenance, MCP `2026-07-28` and one-file binaries for Windows, Linux and macOS.
-Release notes:
-[`docs/releases/v3.0.0.md`](docs/releases/v3.0.0.md); the human steps are in
+**Status:** `3.0.1` — exact pruned similarity search, batched screening, RO-Crate
+provenance, MCP `2026-07-28`, PostgreSQL and one-file binaries for Windows, Linux and
+macOS arm64. Release notes:
+[`docs/releases/v3.0.1.md`](docs/releases/v3.0.1.md); the human steps are in
 [`docs/engineering/RELEASING.md`](docs/engineering/RELEASING.md). See
 `IMPLEMENTATION_STATUS.md` for the full feature ledger and `CHANGELOG.md` for the
 change list.

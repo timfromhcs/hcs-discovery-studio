@@ -96,10 +96,10 @@ jobs:
             label: windows-x64
           - os: ubuntu-latest
             label: linux-x64
+          # RDKit 2026.9.1 ships no macOS x86_64 wheel, so an Intel-Mac binary
+          # cannot be built from the locked dependencies. macOS arm64 is supported.
           - os: macos-latest
             label: macos-arm64
-          - os: macos-15-intel
-            label: macos-x64
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     permissions:

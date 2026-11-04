@@ -36,8 +36,8 @@ not installed; CI runs it.
 ## 3. Tag and approve (owner)
 
 ```bash
-git tag -a v3.0.0 -m "HCS Discovery Studio 3.0.0"
-git push origin v3.0.0
+git tag -a v3.0.1 -m "HCS Discovery Studio 3.0.1"
+git push origin v3.0.1
 ```
 
 The tag starts `.github/workflows/release.yml`, which:
@@ -72,7 +72,7 @@ separate, gated job.
    short-lived credential, and PEP 740 attestations are attached automatically.
 4. Verify afterwards:
    ```bash
-   pip install hcs-discovery-studio==3.0.0
+   pip install hcs-discovery-studio==3.0.1
    hcs-discovery version
    ```
 

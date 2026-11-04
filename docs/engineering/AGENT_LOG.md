@@ -1016,6 +1016,23 @@ Worked through GEMINI.md again from the merged `main`.
 - **Weiter offen:** Multi-Target-Docking (Rezeptorvorbereitung), Managed-PostgreSQL-
   Deployment, Objekt-Storage/Worker auf Vercel, UI-i18n, Tag/PyPI/DOI (owner-gated).
 
+## 2026-11-04 (11:15) — Release v3.0.0 gescheitert, v3.0.1 veröffentlicht
+
+- Tag `v3.0.0` auf `6cd5566` (CI 41810541863 und CodeQL 41810541778 grün). Der
+  Release-Workflow `41816103615` scheiterte **vor** jedem Release: der Job
+  `macos-x64` konnte `rdkit==2026.9.1` nicht installieren — RDKit liefert kein
+  macOS-x86_64-Wheel (nur manylinux aarch64/x86_64, macosx_11_0_arm64, win_amd64).
+  Windows x64, Linux x64 und macOS arm64 bauten und smokten erfolgreich; Publish,
+  Container und PyPI wurden übersprungen. Kein Release, kein Draft, kein Asset.
+- Entscheidung nach der Repo-Regel „Tags werden nie verschoben": `v3.0.0` bleibt
+  unveröffentlicht; die Matrix fällt auf Windows x64, Linux x64 und macOS arm64,
+  Version auf `3.0.1`, neuer Tag. Die macOS-x64-Grenze ist eine externe
+  Wheel-Tatsache und steht so in README/Status/Release Notes.
+- `3.0.1`-Änderungen: Matrix ohne Intel-Mac, Version in pyproject/`__init__`/
+  package.json/Lock/constants/CITATION, `uv lock`, CHANGELOG-Abschnitt,
+  `docs/releases/v3.0.1.md`, Doku-Verweise.
+- Nächster Schritt: Gates, CI/CodeQL, Tag `v3.0.1`, Release-Workflow beobachten.
+
 ## Blockers
 
 - None technical at the time of writing. The `v0.1.0` preview is published and
