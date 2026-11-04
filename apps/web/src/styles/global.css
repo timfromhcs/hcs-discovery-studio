@@ -931,7 +931,9 @@ small a,
 .badge-muted {
   background: transparent;
   border-color: var(--border);
-  color: var(--text-faint);
+  /* `--text-faint` measured 4.98:1 on the light card here, which is too close to the
+     4.5:1 floor across Chrome/font stacks; --text-muted is unambiguously AA. */
+  color: var(--text-muted);
 }
 
 .badge-accent {
