@@ -880,6 +880,23 @@ Worked through GEMINI.md again from the merged `main`.
   Registry-Katalog sichtbar (`select.sat`), Workflow-Validator akzeptiert ihn
   (Gruppenspalte muss von einer Vorgänger-Node stammen). Voller Lauf unten.
 
+## 2026-11-04 (08:40) — Run-Timeline (Observability in der UI)
+
+- Branch `main` @ `6bf9ffb`, Baum clean, kein paralleler Agent aktiv.
+- Neu: `apps/web/src/components/RunTimeline.tsx`, eingebunden im Run-Monitor unter dem
+  Ausführungsgraphen. Ausschließlich aus persistierten Zeitstempeln:
+  - Queue-Segment (`created_at` → `started_at`), nur wenn es eine Wartezeit gab;
+  - je Knoten ein Balken (`started_at` → `finished_at`, laufende Knoten bis jetzt);
+  - Cache-Markierung aus `node.cached`, Statusfarbe aus `node.status`;
+  - Kopfzeile mit „X queued · Y in nodes · Z total".
+  Knoten ohne aufgezeichneten Start werden **ausgelassen**, nicht geschätzt.
+- Barrierefreiheit: `<section aria-label>`, `<ol>` als Zeilenliste, die Grafik ist
+  `aria-hidden`, die Information steht als Text (Label + Dauer) daneben; axe-Gate
+  deckt die Seite ab.
+- Test: `e2e/studio.spec.ts` prüft nach dem Run mindestens 4 Timeline-Segmente und
+  die Kopfzeile. Lokal: `studio.spec.ts` 3 passed (inkl. Timeline), Build grün.
+- Gates/Doku: CHANGELOG, Roadmap (Next-Zeile erledigt), voller Gate-Lauf unten.
+
 ## Blockers
 
 - None technical at the time of writing. The `v0.1.0` preview is published and

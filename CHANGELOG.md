@@ -15,6 +15,11 @@ All notable changes to this project are documented here. The format follows
   writing a plausible subset; `mark` writes all-false rows with that reason. The
   output is `sat_selected` plus `sat_reason`, and rows are never dropped. Covered by
   eight node tests (coverage, budget conflicts, ungrouped rows, determinism).
+- **Run timeline in the UI.** The run monitor shows where the time went, built only
+  from persisted timestamps: a queue segment, one row per executed node with its
+  measured duration, and a `cache` marker for node-cache hits. A segment without a
+  recorded start is left out instead of estimated. The end-to-end run test asserts at
+  least four segments, and the component is covered by the axe gate.
 
 ## [2.2.1] - 2026-11-03
 

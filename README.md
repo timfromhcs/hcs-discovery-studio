@@ -63,6 +63,7 @@ prioritisation signals. Read
 | Browser compute (RDKit WebAssembly + WebGPU Tanimoto) | **Available**, opt-in on the Settings page | Self-test and bit-exact WebGPU parity tests run against the served app |
 | Offline lab (no backend at all) | **Available** | Import CSV/SDF/SMI, RDKit descriptors, triage, ranking, GPU/CPU similarity and IndexedDB persistence, verified against a static build at 360 px; a service worker makes it work offline after the first visit (verified with the server killed) |
 | Constraint selection (SAT) | **Available** | Dependency-free DPLL with watched literals; brute-force differential tests, pigeonhole UNSAT, `sat solve`/`sat select` and the `select.sat` workflow node |
+| Run timeline in the UI | **Available** | Queue wait, per-node duration and cache hits drawn from persisted timestamps, asserted in the end-to-end run test |
 | Dataset fingerprint cache | **Available** | Packed Morgan fingerprints stored per dataset with a compound-set checksum and a blob checksum; reuse, invalidation and corruption rebuild are tested; measured 43× faster than re-fingerprinting on a synthetic 5,000-row library ([report](docs/validation/fingerprint-cache.md)) |
 | MCP server | **Available** | `hcs-discovery mcp serve`: five read-only tools over JSON-RPC 2.0, scripted stdio session test |
 | Container image | **Builds and runs** | Multi-stage Dockerfile; health, SPA and a similarity search verified in the container on this host |

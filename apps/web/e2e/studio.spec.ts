@@ -55,6 +55,14 @@ test("workspace to import, workflow, run and results", async ({ page }) => {
   await expect(page.getByText("Succeeded", { exact: true }).first()).toBeVisible({ timeout: 90_000 });
   await expect(page.getByText("4 / 4")).toBeVisible();
 
+  // The timeline is drawn from persisted timestamps: a queue segment and one row per
+  // executed node, each with a measured duration.
+  const timeline = page.getByTestId("run-timeline");
+  await expect(timeline).toBeVisible();
+  expect(await timeline.getByRole("listitem").count()).toBeGreaterThanOrEqual(4);
+  await expect(timeline).toContainText("queued");
+  await expect(timeline).toContainText("total");
+
   await page.getByRole("link", { name: "Results" }).click();
   await expect(page.getByRole("heading", { name: /Basic triage/ })).toBeVisible();
   await expect(page.locator(".scatter-svg")).toBeVisible();

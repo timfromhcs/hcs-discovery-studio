@@ -4,6 +4,7 @@ import { api } from "../api/client";
 import { useCancelRun, useRun, useRunEvents, useRetryRun } from "../api/queries";
 import { Icon } from "../components/Icon";
 import { WorkflowGraph } from "../components/WorkflowGraph";
+import { RunTimeline } from "../components/RunTimeline";
 import {
   Badge,
   Button,
@@ -253,6 +254,7 @@ export function RunMonitorPage() {
             actions={<Badge tone={active ? "info" : "neutral"}>{active ? "live" : "final"}</Badge>}
           />
           <WorkflowGraph definition={detail.workflow_snapshot} statuses={statuses} ariaLabel="Run execution graph with node statuses" />
+          <RunTimeline run={detail} />
           <div className="node-progress-list">
             {detail.nodes.map((node) => (
               <div key={node.node_id} className={`node-progress status-${node.status}`}>

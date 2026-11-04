@@ -73,3 +73,6 @@ tmp/
 
 # autonomous wake-up logs
 logs/
+
+# Tool working directories (Serena code-index caches)
+.serena/

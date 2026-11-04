@@ -46,7 +46,7 @@ degradation, local first, no invented SOTA.
 | **v2.1.0 release with PyPI + DOI** | Sustainability: citable, installable artifacts | Trusted-publishing release workflow, `pip install hcs-discovery-studio` verified in a clean environment, Zenodo DOI in `CITATION.cff` |
 | **Batched multi-query kernel** | Screening asks hundreds of queries; one dispatch per query wastes the GPU | WGSL kernel with a query tile, parity per query, measured throughput vs the single-query path |
 | **SAT selection as a workflow node** | The solver exists but is not reachable from the pipeline | **Done 2026-11-03** — `select.sat` with coverage, budget, `on_infeasible` fail/mark and eight tests |
-| **Observability in the UI** | Run health is only visible as raw events | A run timeline with queue wait, node duration and cache hits from real data |
+| **Observability in the UI** | Run health is only visible as raw events | **Done 2026-11-04** — run timeline from persisted timestamps (queue, node durations, cache marker) |
 
 ### Later (3–12 months) — scientific breadth, only with evidence
 
