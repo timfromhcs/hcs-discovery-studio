@@ -21,6 +21,7 @@ Local evidence produced on the release branch. Nothing below is a projection.
 | Tests | `uv run pytest -q` | 633 passed, 1 deselected (live docking tests present), 1 warning |
 | Coverage | `uv run pytest --cov=hcs_discovery --cov-branch` via G4 | 83 % branch |
 | Frontend types/build | `npm run typecheck`, `npm run build` | clean |
+| Visual/a11y QA | `node apps/web/scripts/visual_qa.mjs` against a demo instance | 180 captures (every route × 6 widths × 2 themes), 0 automatic findings |
 | End-to-end | `npm run test:e2e` | see the run in this branch; timeline duration formatting is asserted against `data-duration-ms` |
 | Encoding gate | `uv run python scripts/ci/check_text_encoding.py` | clean; 4 unit tests |
 | Docs links | `uv run python scripts/ci/check_links.py` | 58 Markdown files, 0 broken local links |

@@ -970,7 +970,8 @@ Worked through GEMINI.md again from the merged `main`.
      `scripts/ci/check_text_encoding.py` (UTF-8 strikt, U+FFFD, Mojibake-Muster)
      plus vier Tests und CI-/Gate-Runner-Einbindung.
   Timeline-Hinweis (Queue/Idle/Cache) ergänzt; RO-Crate-Button mit Tooltip;
-  Screenshots neu erzeugt.
+  Screenshots neu erzeugt. Visueller QA-Lauf: **180 Captures, 0 automatische
+  Findings**; E2E 19 passed; Bundle-Budget grün.
 - **Doku:** README (3.0.0, neue Fähigkeiten, ehrliche Grenzen, korrigierte
   DAG-Beschreibung), IMPLEMENTATION_STATUS neu geschrieben, Roadmap/Release-
   Notes/CLI-Guide aktualisiert.
