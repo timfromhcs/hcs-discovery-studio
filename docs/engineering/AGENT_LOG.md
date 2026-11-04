@@ -984,6 +984,38 @@ Worked through GEMINI.md again from the merged `main`.
 - **Offen:** Lighthouse-LCP/CLS, Tag/PyPI/DOI (owner-gated), Multi-Target-Docking,
   PostgreSQL gegen echten Server, Objekt-Storage.
 
+## 2026-11-04 (10:30) — PostgreSQL gegen echten Server + Lighthouse-Budgets
+
+- Ausgangspunkt `main` @ `da8e079` (CI und CodeQL grün). Zwei der im Ledger offenen
+  Punkte waren auf dieser Maschine doch prüfbar: Docker 29.6.1 und Lighthouse 13.6.0.
+- **PostgreSQL:** `scripts/ci/run_postgres_tests.py` startet
+  `postgres:16-alpine` (Digest gepinnt) auf einem freien Loopback-Port und führt
+  `tests/integration/test_postgres.py` aus:
+  - Migrationen auf leerer DB, voller Triage-Lauf (16 Ergebnisse, ≥ 4 Artefakte),
+  - vier Threads racen einen Claim → genau einer gewinnt,
+  - `/api/v1/ready` und `/health` über den echten Server,
+  - Stale-Lease-Recovery (requeue).
+  4 passed lokal; Gate `G16`, CI-Job `postgres`, im Summary als Pflichtjob.
+- **Dabei ein echter Bug:** `HCS_DATABASE_URL` wurde ignoriert. Das Feld hieß
+  `database_url_override`, also las pydantic-settings nur
+  `HCS_DATABASE_URL_OVERRIDE`; jedes Dokument nannte die kurze Variable. Die
+  Vercel-Anleitung hätte also weiter SQLite benutzt. Fix: `validation_alias` mit
+  beiden Schreibweisen + `populate_by_name`, zwei Regressionstests. `db current`
+  zeigt jetzt „PostgreSQL database (configured by HCS_DATABASE_URL)“ statt eines
+  SQLite-Pfads.
+- **Lighthouse:** `apps/web/scripts/check_lighthouse.mjs` (programmatische API,
+  `lighthouse` 13.6.0 als Dev-Dependency) misst Workspace und Offline-Lab gegen den
+  statischen Build; `scripts/ci/run_lighthouse.py` baut/serviert und räumt auf.
+  Messung: **Workspace 96 Performance, 100 Accessibility, FCP 1,8 s, LCP 2,4 s,
+  CLS 0,007, TBT 104 ms; Lab 98 / 100, LCP 1,8 s, TBT 36 ms.** Budgets (0,85 /
+  LCP 3000 ms / CLS 0,1 / TBT 600 ms) sind Regressionsbänder, dokumentiert in
+  `docs/validation/lighthouse.md`. Gate `G17`, CI-Job `lighthouse`.
+- **Gates:** voller Lauf lokal `635 passed, 4 skipped` (die 4 PostgreSQL-Tests
+  skippen ohne `HCS_TEST_POSTGRES_URL`), ruff/mypy folgen; der neue CI-Lauf muss
+  beide Jobs grün zeigen.
+- **Weiter offen:** Multi-Target-Docking (Rezeptorvorbereitung), Managed-PostgreSQL-
+  Deployment, Objekt-Storage/Worker auf Vercel, UI-i18n, Tag/PyPI/DOI (owner-gated).
+
 ## Blockers
 
 - None technical at the time of writing. The `v0.1.0` preview is published and

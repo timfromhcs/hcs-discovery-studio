@@ -1109,8 +1109,8 @@ def db_init(ctx: typer.Context) -> None:
     init_db(settings)
     _print(
         ctx,
-        {"database": str(settings.db_path), "status": "initialised", "revision": current_revision(settings)},
-        f"Database ready at {settings.db_path}",
+        {"database": settings.database_label, "status": "initialised", "revision": current_revision(settings)},
+        f"Database ready at {settings.database_label}",
     )
 
 
@@ -1121,8 +1121,8 @@ def db_upgrade(ctx: typer.Context) -> None:
     init_db(settings)
     _print(
         ctx,
-        {"database": str(settings.db_path), "revision": current_revision(settings), "status": "up-to-date"},
-        f"Database at {settings.db_path} is up to date ({current_revision(settings)}).",
+        {"database": settings.database_label, "revision": current_revision(settings), "status": "up-to-date"},
+        f"Database at {settings.database_label} is up to date ({current_revision(settings)}).",
     )
 
 
@@ -1133,7 +1133,7 @@ def db_current(ctx: typer.Context) -> None:
     revision = current_revision(settings)
     _print(
         ctx,
-        {"database": str(settings.db_path), "revision": revision},
+        {"database": settings.database_label, "revision": revision},
         f"Revision: {revision or 'not initialised'}",
     )
 

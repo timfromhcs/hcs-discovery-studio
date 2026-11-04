@@ -5,8 +5,8 @@
   "schema": "hcs.evidence.v1",
   "tests": {
     "failed": 0,
-    "passed": 633,
-    "skipped": 0
+    "passed": 635,
+    "skipped": 4
   },
   "version": "3.0.0"
 }

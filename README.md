@@ -247,6 +247,7 @@ RDKit or dependency versions. See
 | CPU x86-64, Windows 11 | **Verified locally** | Ryzen 7 7735HS, 19.8 GB RAM, Python 3.12 |
 | CPU x86-64, Linux | **Verified in CI** | Ubuntu runner, Python 3.12 |
 | Vulkan (similarity search) | **Verified locally** | AMD Radeon 680M integrated GPU, Vulkan via `wgpu-py`; GPU counts are bit-exact against the CPU reference. 500k fingerprints in ≈7 ms with the library resident (≈71 M Tanimoto/s in the current report), ≈21× RDKit's bulk call ([benchmark](docs/validation/gpu-tanimoto.md)); threshold searches use the BitBound prefilter, exact k-NN prunes by popcount bound, and batched screening uploads the library once per dispatch |
+| PostgreSQL 16 | **Verified locally and in CI** | Disposable container: migrations, a full run, four workers racing one claim (exactly one wins), API readiness and stale-lease recovery; `HCS_DATABASE_URL` now really overrides the database (the documented variable was previously ignored) |
 | WebGPU (browser) | **Verified locally in Chrome** | Same WGSL kernel, parity checked against JavaScript before any timing; opt-in on the Settings page |
 | CUDA | **Not required, not used** | No CUDA dependency in the base install; CUDA-only libraries such as nvMolKit are not a comparison point here |
 | GPU acceleration | **Available for similarity search only** | Docking, descriptors, property estimates and docking stay on the CPU; no other engine claims GPU execution |
@@ -261,13 +262,15 @@ are using. Hardware presence alone is never reported as a speed claim.
 
 | Gate | Command | Result |
 |---|---|---|
-| Backend tests | `uv run pytest -q` | <!-- gen:tests -->633 passed, 0 skipped<!-- /gen:tests --> on the development host (the live docking tests ran with the local Vina binary; CI installs it on Linux) |
+| Backend tests | `uv run pytest -q` | <!-- gen:tests -->635 passed, 4 skipped<!-- /gen:tests --> on the development host (the live docking tests ran with the local Vina binary; the four PostgreSQL tests skip unless `HCS_TEST_POSTGRES_URL` is set, and CI runs them) |
 | Coverage | `uv run pytest --cov=hcs_discovery --cov-branch` | <!-- gen:coverage -->83 % branch coverage<!-- /gen:coverage --> locally; CI floor 70%, HAEL modules ≥94% |
 | Python format/lint/type | `uv run ruff format --check .`, `uv run ruff check .`, `uv run mypy` | Clean locally and in CI |
 | Frontend typecheck/build | `npm run typecheck`, `npm run build` in `apps/web` | Clean locally and in CI |
 | End-to-end | `npm run test:e2e` in `apps/web` | 19 passed locally (studio journey, planned engines, unknown runs, browser WebAssembly self-test, WebGPU parity, offline lab x3, offline cache with the server killed, SEO/404 x3, axe accessibility x7) |
 | Accessibility | `npx playwright test e2e/a11y.spec.ts` | axe-core WCAG 2.0/2.1/2.2 A+AA over 7 routes; serious and critical violations fail the build |
 | Bundle budget | `node scripts/ci/check_bundle_budget.mjs` | JS 167 kB gzip (budget 210), CSS 10 kB (budget 16); checked in the gate runner and CI |
+| Lighthouse budgets | `npm run lighthouse` (static preview) | Workspace 96 / lab 98 performance, 100 accessibility, LCP 2.4 s / 1.8 s, CLS 0.007 / 0, TBT 104 / 36 ms; [report](docs/validation/lighthouse.md) |
+| PostgreSQL | `uv run python scripts/ci/run_postgres_tests.py` | Disposable PostgreSQL 16 container; migrations, full run, claim exclusivity, lease recovery and `/ready` |
 | Visual and a11y QA | `node apps/web/scripts/visual_qa.mjs` against a running app | 180 captures (every route × 6 widths × 2 themes), 0 automatic findings on 2026-11-04 |
 | License policy | `uv run python scripts/ci/check_licenses.py`, `node scripts/ci/check_licenses.mjs` | Pass locally and in CI |
 | Dependency audit | `pip-audit`, `npm audit --omit=dev` | No known vulnerabilities at release time |
@@ -275,9 +278,9 @@ are using. Hardware presence alone is never reported as a speed claim.
 | Static analysis | CodeQL (Python, TypeScript) | Pass in CI |
 
 CI runs backend gates on **Ubuntu and Windows**, frontend typecheck/build,
-Playwright E2E on Linux, a clean SQLite migration, a wheel install/health smoke
-test, license and dependency audits, secret scanning, dependency review and
-CodeQL. The release-candidate runs are
+Playwright E2E on Linux, a clean SQLite migration, a PostgreSQL 16 integration job, a
+Lighthouse budget job, a wheel install/health smoke test, license and dependency
+audits, secret scanning, dependency review and CodeQL. The release-candidate runs are
 [CI 40676916640](https://github.com/timfromhcs/hcs-discovery-studio/actions/runs/40676916640)
 and
 [CodeQL 40676916587](https://github.com/timfromhcs/hcs-discovery-studio/actions/runs/40676916587).
@@ -318,8 +321,10 @@ threat model and residual risks are in
   prediction are not implemented.
 - **DAGs without loops.** Fan-out and key-based `table.join` are supported; no
   loops, conditionals, sub-workflows or parameter sweeps.
-- **Single machine.** SQLite and a local queue; no PostgreSQL deployment,
-  distributed workers or multi-tenant isolation.
+- **Single machine by default.** SQLite and a local queue. PostgreSQL is tested
+  against a real server for migrations, runs, claim exclusivity and lease recovery,
+  but there is no distributed worker service, Redis/Celery and no multi-tenant
+  isolation.
 - **Research agent is rule-based by default.** Ask/Plan/Run use allowlisted
   tools; Ask uses a configured local LLM when available and says so when it
   falls back to built-in rules.
@@ -386,6 +391,7 @@ More help: [Windows install](docs/user-guide/INSTALL_WINDOWS.md),
   [SOTA gap analysis](docs/research/SOTA_GAP_ANALYSIS.md) ·
   [GPU Tanimoto benchmark](docs/validation/gpu-tanimoto.md) ·
   [ESOL on the Delaney set](docs/validation/esol-delaney.md) ·
+  [Lighthouse budgets](docs/validation/lighthouse.md) ·
   [HAEL (experimental)](docs/research/HAEL.md) ·
   [Research register](docs/research/RESEARCH_REGISTER.md)
 - **Security:** [Threat model](docs/security/THREAT_MODEL.md) · [SECURITY.md](SECURITY.md)

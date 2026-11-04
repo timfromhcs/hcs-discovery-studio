@@ -48,6 +48,15 @@ or a command in the log.
 - **Latency metrics.** `hcs_run_duration_seconds` and
   `hcs_node_duration_seconds` histograms and `hcs_node_cache_hits_total`, all from
   persisted timestamps, so a scrape after a restart still reports what ran.
+- **PostgreSQL against a real server.** `scripts/ci/run_postgres_tests.py` starts a
+  pinned `postgres:16-alpine` container and runs migrations, a full workflow, four
+  workers racing one claim (exactly one wins), API readiness and stale-lease
+  recovery. New CI job `postgres` and gate `G16`.
+- **Lighthouse budgets.** `apps/web/scripts/check_lighthouse.mjs` measures the static
+  workspace and offline lab: 96/98 performance, 100 accessibility, LCP 2.4 s/1.8 s,
+  CLS 0.007/0, TBT 104/36 ms. Budgets are regression bands, documented in
+  [`docs/validation/lighthouse.md`](docs/validation/lighthouse.md); gate `G17` and
+  CI job `lighthouse`.
 - **Platform release matrix.** Release builds now produce one-file binaries for
   Windows x64, Linux x64, macOS arm64 and macOS x64, publish the container image to
   GHCR and smoke-test it, and attest every artifact. PyPI stays gated behind
@@ -63,6 +72,10 @@ or a command in the log.
 
 ### Fixed
 
+- `HCS_DATABASE_URL` did nothing: the setting was named `database_url_override`, so
+  pydantic-settings only read `HCS_DATABASE_URL_OVERRIDE` while every document told
+  operators to set the former. A hosted instance silently stayed on SQLite. Both
+  spellings are accepted now, with regression tests.
 - A stray inline `border` declaration in the timeline CSS.
 - `similarity search --k` no longer computes a full score vector it does not need.
 

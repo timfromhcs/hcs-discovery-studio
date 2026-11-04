@@ -227,6 +227,49 @@ jobs:
           test -s "$HCS_DATA_DIR/hcs.sqlite3"
           uv run hcs-discovery doctor
 
+  postgres:
+    name: PostgreSQL integration (real server)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+      - name: Install dependencies
+        run: uv sync --frozen
+      - name: Run the PostgreSQL integration suite
+        run: uv run python scripts/ci/run_postgres_tests.py
+
+  lighthouse:
+    name: Lighthouse budgets (static SPA)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Install and build the SPA
+        working-directory: apps/web
+        run: |
+          npm ci
+          npm run build
+      - name: Run Lighthouse with budgets
+        run: python3 scripts/ci/run_lighthouse.py
+
   wheel:
     name: Wheel build and install smoke test (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
@@ -473,6 +516,8 @@ jobs:
       - e2e
       - science-vina
       - migrations
+      - postgres
+      - lighthouse
       - wheel
       - exe
       - licenses
@@ -490,6 +535,8 @@ jobs:
             e2e=${{ needs.e2e.result }}
             science-vina=${{ needs.science-vina.result }}
             migrations=${{ needs.migrations.result }}
+            postgres=${{ needs.postgres.result }}
+            lighthouse=${{ needs.lighthouse.result }}
             wheel=${{ needs.wheel.result }}
             exe=${{ needs.exe.result }}
             licenses=${{ needs.licenses.result }}

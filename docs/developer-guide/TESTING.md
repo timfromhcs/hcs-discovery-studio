@@ -32,6 +32,18 @@ Wheel:
 uv build --wheel
 ```
 
+PostgreSQL (disposable container, requires Docker):
+
+```bash
+uv run python scripts/ci/run_postgres_tests.py
+```
+
+Lighthouse budgets (static build; Chrome or the Playwright Chromium):
+
+```bash
+uv run python scripts/ci/run_lighthouse.py
+```
+
 ## Backend layout
 
 | File | Focus |
@@ -43,11 +55,14 @@ uv build --wheel
 | `tests/integration/test_cli.py` | Exit codes, JSON output, CLI/service parity |
 | `tests/integration/test_runs.py` | Queue, leases, cancellation, retry, manifests |
 | `tests/integration/test_migrations.py` | Fresh database and legacy stamping |
+| `tests/integration/test_postgres.py` | Migrations, a full run, claim exclusivity, readiness and lease recovery on PostgreSQL |
 | `tests/security/test_reports_and_policy.py` | HTML escaping, secret absence, policy blocks |
 
 The suite is deterministic and offline. Tests that would use the network are
 marked `network` and excluded from the default run. Scientific benchmarks are
-marked `scientific`; they are not correctness tests.
+marked `scientific`; they are not correctness tests. PostgreSQL tests are marked
+`postgres` and skip unless `HCS_TEST_POSTGRES_URL` points at a disposable server;
+`scripts/ci/run_postgres_tests.py` starts one.
 
 ## What is covered
 
@@ -66,11 +81,14 @@ marked `scientific`; they are not correctness tests.
 ## What is not covered
 
 - Numerical accuracy against experimental data. No such claim is made.
-- Docking, MD or learned models, because they are not implemented.
-- Multi-user concurrency or PostgreSQL. The product targets one local user.
-- Browser visual regression snapshots. Screenshots are reviewed manually.
-- Performance benchmarks. Timings in the UI are observed durations, not
-  benchmark results.
+- Docking accuracy across targets; one redocking complex is a regression gate, not a
+  benchmark.
+- Multi-user concurrency, a distributed worker service or multi-tenant isolation.
+  PostgreSQL is covered as a single-database backend.
+- Browser visual regression snapshots. Screenshots are reviewed manually; the axe and
+  Lighthouse checks cover accessibility and paint metrics, not layout diffs.
+- Micro-benchmarks in the regular suite. The published timings come from the
+  generated reports under `docs/validation/`.
 
 ## End-to-end suite
 

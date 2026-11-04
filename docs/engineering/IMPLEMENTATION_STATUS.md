@@ -36,8 +36,10 @@ check; it does not mean validated science.
 | RO-Crate export | Done (RO-Crate 1.1, not WRROC-profile) | CLI, API, UI; JSON-LD, PROV mapping, artifact hashes, deterministic ZIP; missing artifacts abort |
 | MCP server | Done (dual-era) | stdio; `2026-07-28` `server/discover` + legacy `initialize`; tests for both eras |
 | Observability | Metrics endpoint + run latency histograms | `/api/v1/metrics`; no traces, dashboards or alerting |
-| GitHub CI | Green on `main` before this branch | CI/CodeQL run on the merged SHA; this branch adds gates but the cloud run is per push |
-| Public release | `2.2.1` is the published release; `3.0.0` is prepared | Tag/upload are owner-gated; the release workflow builds four binaries and the container |
+| PostgreSQL | Done (real server) | Disposable `postgres:16-alpine` container: migrations, a full run, four workers racing one claim (exactly one wins), `/ready` and stale-lease recovery; `HCS_DATABASE_URL` now actually reaches the setting (regression test) |
+| Performance budgets | Done | Lighthouse on the static build: workspace 96 / lab 98 performance, 100 accessibility, LCP 2.4 s / 1.8 s, CLS 0.007 / 0, TBT 104 / 36 ms; budgets and caveats in [lighthouse.md](../validation/lighthouse.md) |
+| GitHub CI | Green on `main` @ `da8e079` | CI 41803154577 (Windows + Linux, Vina, E2E, wheel, EXE, docs, licenses, secrets) and CodeQL 41803154693 |
+| Public release | `2.2.1` is published; `3.0.0` is prepared on `main` | Tag/upload are owner-gated; the release workflow builds four binaries and the container |
 
 ## Working now
 
@@ -99,7 +101,7 @@ check; it does not mean validated science.
 | Auth | Static bearer token for non-loopback | Users, roles, ACLs, expiry, rotation |
 | Audit | Audit rows for mutations | Viewer and export |
 | Target/structure records | Service + API + CLI with provenance and inspection | UI page, binding-site definition, receptor preparation, mmCIF |
-| PostgreSQL | SQLAlchemy-compatible models | No deployment against a real server |
+| PostgreSQL | SQLAlchemy-compatible models, tested against a real 16 container | No managed/production deployment exercised; no distributed workers |
 | Observability | Metrics + histograms + structured logs | Traces, dashboards, alerting |
 | RO-Crate | RO-Crate 1.1 with PROV mapping | Workflow Run RO-Crate per-step profile |
 
@@ -127,10 +129,12 @@ check; it does not mean validated science.
 | Gate | Status | Evidence |
 |---|---|---|
 | Lint, format, types | Pass locally | Ruff (229 files), mypy (103 source files) |
-| Backend tests | Pass locally | <!-- gen:tests -->633 passed, 0 skipped<!-- /gen:tests --> backend tests; <!-- gen:coverage -->83 % branch coverage<!-- /gen:coverage -->; Hypothesis properties for ranking, joins and similarity |
+| Backend tests | Pass locally | <!-- gen:tests -->635 passed, 4 skipped<!-- /gen:tests --> backend tests; <!-- gen:coverage -->83 % branch coverage<!-- /gen:coverage -->; Hypothesis properties for ranking, joins and similarity |
 | Frontend build and E2E | Pass locally | typecheck, build, Playwright suite |
 | Visual QA | Pass locally | routes × widths × themes; axe gate over the main routes; bundle budget |
-| Fresh migration and wheel | Pass locally | Wheel ships Alembic scripts; installed into a clean venv |
+| Fresh migration and wheel | Pass locally | Wheel ships Alembic scripts; installed into a clean venv; PostgreSQL migrations run in G16 |
+| PostgreSQL | Pass locally and in CI | G16 / `postgres` job: real server, run, claim exclusivity, lease recovery |
+| Lighthouse budgets | Pass locally | G17 / `lighthouse` job: performance, accessibility, LCP, CLS, TBT on the static build |
 | Docking reference validation | Pass (one complex) | 1IEP redocking ≤ 0.94 Å over 5 seeds; CI job `science-vina` |
 | Similarity parity | Pass | Exact counts and top-10 identity on the adapter; CLI/API/MCP share the path |
 | RO-Crate | Pass | Structure, hashes, determinism and missing-artifact refusal tests |

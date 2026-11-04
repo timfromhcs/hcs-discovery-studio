@@ -256,6 +256,7 @@ hcs-discovery --json run status "$RUN" | jq '.status'
 | Variable | Default | Meaning |
 |---|---|---|
 | `HCS_DATA_DIR` | `./data` | Database, runs, cache and logs |
+| `HCS_DATABASE_URL` | unset | SQLAlchemy URL; e.g. `postgresql+pg8000://…` switches off SQLite (install the `postgres` extra) |
 | `HCS_NETWORK_POLICY` | `local` | `local` blocks non-loopback providers |
 | `HCS_HOST` | `127.0.0.1` | Bind address |
 | `HCS_PORT` | `8787` | Bind port |

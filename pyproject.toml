@@ -113,6 +113,7 @@ markers = [
   "scientific: scientific validation/benchmark, not a correctness proof",
   "e2e: browser end-to-end test",
   "gpu: needs a hardware GPU adapter (auto-skipped without one)",
+  "postgres: talks to a real PostgreSQL server (auto-skipped without HCS_TEST_POSTGRES_URL)",
 ]
 filterwarnings = ["error::DeprecationWarning:hcs_discovery.*"]
 

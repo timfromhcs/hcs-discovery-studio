@@ -127,7 +127,9 @@ pip resolve them.
 ## Where data lives
 
 By default: `.\data\hcs.sqlite3`, with run artifacts under `.\data\runs`. Set
-`HCS_DATA_DIR` to an absolute path to keep data outside the repository.
+`HCS_DATA_DIR` to an absolute path to keep data outside the repository. To use a
+PostgreSQL database instead, set `HCS_DATABASE_URL` (install the `postgres` extra for
+the `pg8000` driver) and run `hcs-discovery db upgrade`.
 
 ## Uninstall
 

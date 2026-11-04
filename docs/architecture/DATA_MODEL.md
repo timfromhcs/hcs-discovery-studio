@@ -1,9 +1,12 @@
 # Data model
 
 The database is SQLite by default, accessed through SQLAlchemy 2 and migrated
-with Alembic. The schema is intentionally small and inspectable. This document
-describes the shipped schema; tables marked **reserved** exist for forward
-compatibility and are not yet exercised by a user-facing feature.
+with Alembic. `HCS_DATABASE_URL` switches to any SQLAlchemy URL — PostgreSQL 16 via
+the BSD-3-Clause `pg8000` driver is tested against a real container, including
+migrations, a full run, claim exclusivity and lease recovery. The schema is
+intentionally small and inspectable. This document describes the shipped schema;
+tables marked **reserved** exist for forward compatibility and are not yet exercised
+by a user-facing feature.
 
 ## Identifiers
 

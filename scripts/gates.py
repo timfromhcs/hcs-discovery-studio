@@ -56,6 +56,8 @@ CI_GATE_JOBS = (
     "docs",
     "science-vina",
     "secret-scan",
+    "postgres",
+    "lighthouse",
 )
 
 
@@ -396,6 +398,23 @@ GATES: tuple[Gate, ...] = (
         steps=(Step("build_executable", ("uv", "run", _python(), "scripts/release/build_executable.py")),),
         levels=("release",),
         requires="uv",
+    ),
+    Gate(
+        id="G16",
+        name="PostgreSQL integration on a disposable container",
+        ci_jobs=("postgres",),
+        steps=(Step("run_postgres_tests", ("uv", "run", _python(), "scripts/ci/run_postgres_tests.py")),),
+        levels=("full", "science", "release"),
+        requires="docker",
+        optional=True,
+    ),
+    Gate(
+        id="G17",
+        name="Lighthouse budgets on the static SPA",
+        ci_jobs=("lighthouse",),
+        steps=(Step("run_lighthouse", ("uv", "run", _python(), "scripts/ci/run_lighthouse.py")),),
+        levels=("full", "science", "release"),
+        requires="npm",
     ),
 )
 

@@ -11,7 +11,7 @@ import os
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, field_validator
+from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 NetworkPolicy = Literal["local", "remote"]
@@ -23,12 +23,18 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",
+        populate_by_name=True,
     )
 
     data_dir: Path = Path("./data")
     # Override the SQLite default with any SQLAlchemy URL (for a hosted instance,
-    # e.g. a PostgreSQL URL). Unset keeps the local single-file database.
-    database_url_override: str | None = None
+    # e.g. a PostgreSQL URL). Unset keeps the local single-file database. The
+    # documented variable is HCS_DATABASE_URL; the longer field-name spelling is
+    # accepted too so an existing deployment does not break.
+    database_url_override: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("HCS_DATABASE_URL", "HCS_DATABASE_URL_OVERRIDE"),
+    )
     network_policy: NetworkPolicy = "local"
     host: str = "127.0.0.1"
     port: int = Field(default=8787, ge=1, le=65535)
@@ -108,6 +114,14 @@ class Settings(BaseSettings):
     @property
     def uses_sqlite(self) -> bool:
         return self.database_url.startswith("sqlite")
+
+    @property
+    def database_label(self) -> str:
+        """Human-facing database location; never the URL, which may hold a password."""
+        if self.uses_sqlite:
+            return str(self.db_path)
+        scheme = self.database_url.split("://", 1)[0].split("+", 1)[0]
+        return f"{scheme or 'external'} database (configured by HCS_DATABASE_URL)"
 
     @property
     def is_loopback(self) -> bool:

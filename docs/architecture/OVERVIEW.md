@@ -82,8 +82,10 @@ docs/             architecture, user, developer, research, security, status
 The target is a scientist's laptop, not a cluster. SQLite keeps installation
 trivial and the database inspectable. A lease-based queue gives at-least-once
 execution and recovery from a crashed worker without adding Redis or a broker.
-The trade-off is documented honestly: concurrent writers are serialised, and
-multi-machine execution is not supported in this release.
+`HCS_DATABASE_URL` switches the same schema to PostgreSQL when a shared database is
+needed; that path is exercised against a real container. The trade-off is documented
+honestly: concurrent SQLite writers are serialised, and multi-machine scheduling is
+not supported in this release.
 
 ## Frontend
 

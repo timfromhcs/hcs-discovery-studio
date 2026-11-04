@@ -123,7 +123,8 @@ hcs-discovery cache clear
 
 ## Queue and leases
 
-The queue lives in SQLite. A worker claims the oldest queued run with a
+The queue lives in the database (SQLite by default, PostgreSQL via
+`HCS_DATABASE_URL`). A worker claims the oldest queued run with a
 conditional `UPDATE ... WHERE status='queued'`, so two workers cannot claim the
 same row. Claiming increments `attempt` and sets a lease expiry.
 
@@ -186,6 +187,7 @@ backend (`cpu`). It does not claim that a result is experimentally valid.
   duplicating or overwriting rows.
 - One root; the dataset is always the entry point.
 - No loops, conditionals, parameter sweeps or sub-workflow composition.
-- No distributed workers, no PostgreSQL queue, no multi-tenant isolation.
+- No distributed workers or a broker-backed queue; PostgreSQL is a tested database
+  backend, not a multi-node scheduler. No multi-tenant isolation.
 - Node handlers run in-process. There is no OS sandbox for third-party nodes.
 - A crashed process can leave a run queued for one lease period before recovery.

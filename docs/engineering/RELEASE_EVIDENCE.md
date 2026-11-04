@@ -26,6 +26,8 @@ Local evidence produced on the release branch. Nothing below is a projection.
 | Encoding gate | `uv run python scripts/ci/check_text_encoding.py` | clean; 4 unit tests |
 | Docs links | `uv run python scripts/ci/check_links.py` | 58 Markdown files, 0 broken local links |
 | Wheel | `uv build --wheel` + clean-venv smoke | `hcs_discovery_studio-3.0.0-py3-none-any.whl` |
+| PostgreSQL | `scripts/ci/run_postgres_tests.py` | migrations, full run, 4-worker claim race, `/ready`, stale-lease recovery on `postgres:16-alpine` |
+| Lighthouse | `scripts/ci/run_lighthouse.py` | workspace 96 / lab 98 perf, 100 a11y, LCP 2.4/1.8 s, CLS 0.007/0, TBT 104/36 ms |
 | Executable | `scripts/release/build_executable.py` | smoke test: `version`, `db upgrade`, `doctor`, `/api/v1/ready`, GPU search when an adapter exists |
 | Release version | `scripts/release/verify_version.py v3.0.0` | tag/version/changelog agree |
 | Similarity k-NN | generated report | full-scan-equivalent ranking; 6.0×/3.9× clustered, 0.85× unclustered |
@@ -33,8 +35,8 @@ Local evidence produced on the release branch. Nothing below is a projection.
 | ESOL | `validate_esol_delaney.py --check` | RMSE 1.099, R² 0.725; held-out 1.201/0.640 |
 
 **Not run:** a tag push and therefore the cloud release workflow (owner-gated);
-Lighthouse paint-metric budgets (Lighthouse is not installed on this host);
-multi-target docking (no receptor preparation); a PostgreSQL deployment.
+multi-target docking (no receptor preparation); a managed PostgreSQL deployment (the
+container is exercised, not a hosted database).
 
 ---
 
@@ -93,7 +95,7 @@ of that earlier run; they are not edited retroactively.
 
 | Measurement | Command | Observed |
 |---|---|---|
-| Tests | `uv run pytest -q` via G4 | <!-- gen:tests -->633 passed, 0 skipped<!-- /gen:tests --> (live docking tests included) |
+| Tests | `uv run pytest -q` via G4 | <!-- gen:tests -->635 passed, 4 skipped<!-- /gen:tests --> (live docking tests included) |
 | Coverage | same run, `--cov-branch` | <!-- gen:coverage -->83 % branch coverage<!-- /gen:coverage --> |
 | Tests with the docking binary | `HCS_REQUIRE_VINA=1 uv run pytest tests/scientific/test_vina_adapter.py` | **NOT RUN** locally: no Vina binary is installed on this host (PLAN.md R0.4) |
 

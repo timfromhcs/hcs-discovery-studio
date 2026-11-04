@@ -44,6 +44,29 @@ def test_database_url_override_is_used_verbatim(tmp_path: Path) -> None:
     assert settings.uses_sqlite is False
 
 
+def test_documented_environment_variable_is_read(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """HCS_DATABASE_URL is what every document tells an operator to set.
+
+    Regression: the field was named database_url_override, so pydantic-settings
+    looked for HCS_DATABASE_URL_OVERRIDE and the documented variable silently did
+    nothing — a hosted instance stayed on SQLite.
+    """
+    monkeypatch.setenv("HCS_DATABASE_URL", POSTGRES_URL)
+    monkeypatch.setenv("HCS_DATA_DIR", str(tmp_path))
+
+    settings = Settings()
+
+    assert settings.database_url == POSTGRES_URL
+    assert settings.uses_sqlite is False
+
+
+def test_legacy_override_spelling_still_works(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("HCS_DATABASE_URL_OVERRIDE", POSTGRES_URL)
+    monkeypatch.setenv("HCS_DATA_DIR", str(tmp_path))
+
+    assert Settings().database_url == POSTGRES_URL
+
+
 def test_public_dict_reports_the_backend_without_the_url(tmp_path: Path) -> None:
     settings = Settings(data_dir=tmp_path, database_url_override=POSTGRES_URL)
 
