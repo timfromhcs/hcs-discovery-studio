@@ -1,8 +1,9 @@
 ﻿# Implementation status
 
-Last updated: 2026-11-03. Version: `2.2.0`. `2.2.0` adds the hosted deployment of
-the full application (SPA + `/api/v1` from one Vercel project), an external
-database URL and inline run execution; see
+Last updated: 2026-11-04. Version: `2.2.1` (published 2026-11-03).
+`2.2.0` added the hosted deployment of the full application (SPA + `/api/v1` from
+one Vercel project), an external database URL and inline run execution; `2.2.1`
+fixed the release workflow's artifact pin. See
 [the plan](PLAN_2026-11-03_HOSTED_PARITY.md) and
 [the release notes](../releases/v2.2.0.md).
 
@@ -33,8 +34,8 @@ test or a recorded manual check; it does not mean validated science.
 | GPU similarity search | Done (Tanimoto only) | Shared WGSL kernel via `wgpu-py`; `hcs_discovery.similarity` with k/threshold, resident library, exact CPU reference; BitBound prefilter for threshold searches (differential-tested, 32–88 % skipped on a density-varied library); `chem.similarity` engine option; `similarity search` CLI; bit-identical to RDKit; measured in [gpu-tanimoto.md](../validation/gpu-tanimoto.md) |
 | Browser compute | Done (opt-in) | RDKit WebAssembly self-test and WebGPU Tanimoto benchmark on the Settings page, both covered by Playwright against the served app |
 | GitHub CI | Pass on `main` | CI 40947455326 and CodeQL 40947455914 passed on commit `12febcf` |
-| Public release | Pending | [`v1.0.0`](https://github.com/timfromhcs/hcs-discovery-studio/releases/tag/v1.0.0) published; `v2.0.0` not yet tagged or published |
-| v2.0.0 Stable | Awaiting release candidate run and owner approval | Local gates pass on the merged SHA; tag/publication not performed |
+| Public release | Published | `v0.1.0`, `v1.0.0`, `v2.2.0` and `v2.2.1` exist as GitHub Releases; `v2.2.1` is the current one (2026-11-03). `v2.0.0` was never tagged |
+| Current version | `2.2.1` | Tagged, released and served by the hosted deployment; PyPI and a DOI are still owner-gated |
 
 ## Working now
 

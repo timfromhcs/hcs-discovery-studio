@@ -15,7 +15,7 @@ from the CLI or HTTP API — without Docker, CUDA, an account, or a cloud key.
 [![CodeQL](https://github.com/timfromhcs/hcs-discovery-studio/actions/workflows/codeql.yml/badge.svg)](https://github.com/timfromhcs/hcs-discovery-studio/actions/workflows/codeql.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Python 3.12–3.13](https://img.shields.io/badge/python-3.12%E2%80%933.13-3776ab.svg)](pyproject.toml)
-[![Status: v2.2.0](https://img.shields.io/badge/status-v2.2.1-3dd6c3.svg)](docs/engineering/IMPLEMENTATION_STATUS.md)
+[![Status: v2.2.1](https://img.shields.io/badge/status-v2.2.1-3dd6c3.svg)](docs/engineering/IMPLEMENTATION_STATUS.md)
 
 <img src="docs/screenshots/workspace-dark.png" alt="HCS Discovery Studio workspace showing projects, machine diagnostics, queue state and recent runs" width="1200">
 
@@ -390,7 +390,7 @@ If you use this work, cite the repository using [CITATION.cff](CITATION.cff):
   author  = {hcsmedia},
   title   = {HCS Discovery Studio},
   year    = {2026},
-  version = {2.1.0},
+  version = {2.2.1},
   url     = {https://github.com/timfromhcs/hcs-discovery-studio},
   license = {Apache-2.0}
 }

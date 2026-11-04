@@ -9,7 +9,7 @@ abstract: >-
 type: software
 authors:
   - name: "hcsmedia"
-version: "2.1.0"
+version: "2.2.1"
 date-released: "2026-11-03"
 license: Apache-2.0
 repository-code: "https://github.com/timfromhcs/hcs-discovery-studio"
@@ -30,7 +30,7 @@ preferred-citation:
   title: "HCS Discovery Studio"
   authors:
     - name: "hcsmedia"
-  version: "2.1.0"
+  version: "2.2.1"
   date-released: "2026-11-03"
   license: Apache-2.0
   repository-code: "https://github.com/timfromhcs/hcs-discovery-studio"

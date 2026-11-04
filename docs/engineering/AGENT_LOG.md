@@ -913,6 +913,12 @@ Worked through GEMINI.md again from the merged `main`.
   stillschweigend gelöscht.
 - Lehre für den Plan: Behauptungen über einen Arbeitsbaum veralten, sobald ein
   zweiter Agent committet; jeder „Defekt" braucht den Befehl, der ihn zeigt.
+- Zusätzlich die im v3-Plan (§0.2, Punkt 13) benannte **Versionsdrift** behoben:
+  `apps/web/package.json`/Lockfile, `CITATION.cff` (beide Blöcke) und README
+  (Badge, Citation-Block) standen auf `2.1.0`; `IMPLEMENTATION_STATUS.md` nannte
+  `2.2.0` als aktuell. Jetzt überall `2.2.1`, passend zu Tag, GitHub-Release
+  (published 2026-11-03) und `pyproject.toml`. `verify_version.py v2.2.1` grün,
+  `test_release_version.py` 12 passed.
 
 ## Blockers
 
