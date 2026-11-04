@@ -59,8 +59,13 @@ SKIP_PARTS = {
     "screenshots",
     "__pycache__",
 }
-#: Files that quote bad encoding on purpose (the log that documents the repair).
-SKIP_FILES = {"docs/engineering/AGENT_LOG.md"}
+#: Files that quote bad encoding on purpose (the log that documents the repair and
+#: the checker/test that must contain the patterns they look for).
+SKIP_FILES = {
+    "docs/engineering/AGENT_LOG.md",
+    "scripts/ci/check_text_encoding.py",
+    "tests/unit/test_text_encoding.py",
+}
 #: Sequences that appear when UTF-8 is decoded as Latin-1/cp1252 and re-encoded.
 MOJIBAKE = ("â€", "Ã¤", "Ã¶", "Ã¼", "ÃŸ", "Ã©", "Ã¨", "â¤ï¸", "Â ", "ï»¿")
 #: Generic double-encoding shape: "â" or "Ã" followed by a C1 control byte. This is
