@@ -98,7 +98,7 @@ jobs:
             label: linux-x64
           - os: macos-latest
             label: macos-arm64
-          - os: macos-13
+          - os: macos-15-intel
             label: macos-x64
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
@@ -339,14 +339,15 @@ jobs:
         run: |
           set -euo pipefail
           image="ghcr.io/${{ github.repository }}:${RELEASE_TAG}"
-          docker run -d --name hcs-release -p 8796:8787 "$image"
+          token="release-smoke-token"
+          docker run -d --name hcs-release -p 8796:8787 -e HCS_API_TOKEN="$token" "$image"
           trap 'docker rm -f hcs-release >/dev/null 2>&1 || true' EXIT
           for _ in $(seq 1 60); do
-            curl -fsS http://127.0.0.1:8796/api/v1/health >/dev/null 2>&1 && break
+            curl -fsS -H "Authorization: Bearer $token" http://127.0.0.1:8796/api/v1/health >/dev/null 2>&1 && break
             sleep 1
           done
-          curl -fsS http://127.0.0.1:8796/api/v1/health
-          curl -fsS http://127.0.0.1:8796/api/v1/ready
+          curl -fsS -H "Authorization: Bearer $token" http://127.0.0.1:8796/api/v1/health
+          curl -fsS -H "Authorization: Bearer $token" http://127.0.0.1:8796/api/v1/ready
           docker rm -f hcs-release >/dev/null
 
   # Optional PyPI publication. It is skipped unless the repository variable  # PYPI_PUBLISH is "true" and a trusted publisher for this repository + workflow
