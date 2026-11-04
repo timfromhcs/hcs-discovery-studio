@@ -33,12 +33,33 @@ macOS arm64.
 | Lighthouse | `scripts/ci/run_lighthouse.py` | workspace 97 / lab 98 perf, 100 a11y, LCP 2.3/1.8 s, CLS 0/0, TBT 91/52 ms (hard: a11y/CLS + catastrophic floor) |
 | Executable | `scripts/release/build_executable.py` | smoke test: `version`, `db upgrade`, `doctor`, `/api/v1/ready`, GPU search when an adapter exists |
 | Release version | `scripts/release/verify_version.py v3.0.1` | tag/version/changelog agree |
+| Release workflow | [run 41821840434](https://github.com/timfromhcs/hcs-discovery-studio/actions/runs/41821840434) | Verify, three binaries, publish, attest and GHCR all succeeded; PyPI skipped by policy |
+| Release | [v3.0.1](https://github.com/timfromhcs/hcs-discovery-studio/releases/tag/v3.0.1) | Published 2026-11-04T11:37:06Z, stable, six assets |
 | Similarity k-NN | generated report | full-scan-equivalent ranking; 6.0×/3.9× clustered, 0.85× unclustered |
 | Batched multi-query | generated report | 10.9× at 100k, 9.7× at 500k; parity per query |
 | ESOL | `validate_esol_delaney.py --check` | RMSE 1.099, R² 0.725; held-out 1.201/0.640 |
 
 **Not run:** a managed PostgreSQL deployment (the container is exercised, not a hosted
-database); multi-target docking (no receptor preparation).
+database); multi-target docking (no receptor preparation); PyPI and a DOI (gated).
+
+## Published assets (verified after download)
+
+| Asset | SHA-256 |
+|---|---|
+| `hcs_discovery_studio-3.0.1-py3-none-any.whl` | `299b199d21ebabbb152a4edb5bf8f0aa07a6fa89d87c7d9ffc2c7a3390553023` |
+| `hcs-discovery-windows-x64.exe` | `1441be405fe9016d6f9fc978ae67d960ef54d8fd704729f4cbf47d3a2ca13a4a` |
+| `hcs-discovery-linux-x64` | `6ba8fa50fe9c247ffc0837d7c8b3bc388ce2af5af8191fc1e633389c3feace7e` |
+| `hcs-discovery-macos-arm64` | `35986c8f994fb64cc6622228c0b41403660003e080665df76ca9d37cfc530b88` |
+| `sbom.cdx.json` | `587485d9525b036e749d8fff8209d0890d56d2e89733b91d76de153700700a4b` |
+
+- `SHA256SUMS.txt` matches every downloaded file.
+- `gh attestation verify` exits 0 for the wheel.
+- The wheel installs into a clean venv, prints `3.0.1`, migrates to `b7d21c4f9a03`,
+  serves `/api/v1/health` and the SPA.
+- `ghcr.io/timfromhcs/hcs-discovery-studio:v3.0.1` pulls without credentials
+  (digest `sha256:3497b9deabcdbd9091551fb626d74b76698127a3712ae405d41fc3b968e796b4`)
+  and serves health/ready with a bearer token.
+- `v3.0.0` remains an unpublished tag (macOS x64 RDKit wheel); no release exists for it.
 
 ---
 

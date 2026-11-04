@@ -1035,6 +1035,26 @@ Worked through GEMINI.md again from the merged `main`.
   `docs/releases/v3.0.1.md`, Doku-Verweise.
 - Nächster Schritt: Gates, CI/CodeQL, Tag `v3.0.1`, Release-Workflow beobachten.
 
+## 2026-11-04 (12:40) — v3.0.1 veröffentlicht und verifiziert
+
+- Tag `v3.0.1` auf `29c0aa8` (CI 41820280909 und CodeQL grün). Release-Workflow
+  [41821840434](https://github.com/timfromhcs/hcs-discovery-studio/actions/runs/41821840434):
+  Verify, Windows-x64-, Linux-x64- und macOS-arm64-Binary, Wheel/SBOM/Checksums,
+  Attestierung, Draft-Verifikation, Publish und GHCR-Container — **alle grün**;
+  PyPI wie konfiguriert übersprungen.
+- Veröffentlicht: <https://github.com/timfromhcs/hcs-discovery-studio/releases/tag/v3.0.1>
+  (stable, 2026-11-04T11:37:06Z), sechs Assets. Geprüft nach dem Download:
+  `SHA256SUMS.txt` stimmt für alle Dateien, `gh attestation verify` exit 0, Wheel in
+  frischem venv (Version 3.0.1, Migration `b7d21c4f9a03`, Health + SPA), GHCR-Image
+  ohne Credentials ziehbar (Digest `sha256:3497b9de…`) und mit Bearer-Token health/ready.
+- Stolperstein davor: der Lighthouse-CI-Job fiel bei Performance 0,81 (Budget 0,85)
+  und auf einem ausgelasteten Host sogar 0,74/1058 ms TBT. Konsequenz: harte Budgets
+  nur für Accessibility/CLS plus Katastrophengrenze, Paint-Ziele als Advisory; der
+  zweite CI-Lauf scheiterte an einem echten Kontrastfehler (`.badge-muted` mit
+  `--text-faint`), behoben mit `--text-muted`; sieben axe-Routen grün.
+- `v3.0.0` bleibt unveröffentlicht; die drei Plattformen und der Grund stehen in
+  README, Status und Release Notes.
+
 ## Blockers
 
 - None technical at the time of writing. The `v0.1.0` preview is published and

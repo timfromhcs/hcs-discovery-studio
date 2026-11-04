@@ -425,11 +425,12 @@ No third-party model weights or proprietary datasets are bundled.
 
 ---
 
-**Status:** `3.0.1` — exact pruned similarity search, batched screening, RO-Crate
-provenance, MCP `2026-07-28`, PostgreSQL and one-file binaries for Windows, Linux and
-macOS arm64. Release notes:
-[`docs/releases/v3.0.1.md`](docs/releases/v3.0.1.md); the human steps are in
-[`docs/engineering/RELEASING.md`](docs/engineering/RELEASING.md). See
+**Status:** `3.0.1` — published as
+[`v3.0.1`](https://github.com/timfromhcs/hcs-discovery-studio/releases/tag/v3.0.1):
+exact pruned similarity search, batched screening, RO-Crate provenance, MCP
+`2026-07-28`, PostgreSQL and one-file binaries for Windows, Linux and macOS arm64.
+Release notes: [`docs/releases/v3.0.1.md`](docs/releases/v3.0.1.md); the human steps
+are in [`docs/engineering/RELEASING.md`](docs/engineering/RELEASING.md). See
 `IMPLEMENTATION_STATUS.md` for the full feature ledger and `CHANGELOG.md` for the
 change list.
 
