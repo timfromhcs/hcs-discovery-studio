@@ -897,6 +897,23 @@ Worked through GEMINI.md again from the merged `main`.
   die Kopfzeile. Lokal: `studio.spec.ts` 3 passed (inkl. Timeline), Build grün.
 - Gates/Doku: CHANGELOG, Roadmap (Next-Zeile erledigt), voller Gate-Lauf unten.
 
+## 2026-11-04 (08:50) — v3-Plan gegengeprüft: zwei behauptete Defekte existieren nicht
+
+- `main` @ `85b3d10` (Run-Timeline committet); im Baum arbeitet ein zweiter Agent an
+  `similarity.py` (bound-pruned k-NN) — nicht angefasst.
+- `docs/engineering/PLAN_2026-11-04_SOTA_V3.md` behauptete in §0.1/§0.2 zwei Defekte.
+  Beide geprüft, beide **nicht reproduzierbar**:
+  1. „kaputter CSS-Einzeiler" in `global.css`: `.node-progress` ist ein normaler
+     Block (`padding`, `border`, `border-left`, `border-radius` je eigene Zeile),
+     `npm run build` und lightningcss laufen grün.
+  2. Mojibake in `plugins/science/adapter.py`: die Datei heißt
+     `plugins/science/properties/adapter.py`; ein Scan über alle `src/**/*.py` nach
+     U+FFFD/„â€"/„Ã" liefert 0 Treffer.
+  Der Plan ist an beiden Stellen korrigiert (durchgestrichen + Prüfdatum), nicht
+  stillschweigend gelöscht.
+- Lehre für den Plan: Behauptungen über einen Arbeitsbaum veralten, sobald ein
+  zweiter Agent committet; jeder „Defekt" braucht den Befehl, der ihn zeigt.
+
 ## Blockers
 
 - None technical at the time of writing. The `v0.1.0` preview is published and
