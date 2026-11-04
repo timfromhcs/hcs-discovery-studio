@@ -39,7 +39,7 @@ check; it does not mean validated science.
 | MCP server | Done (dual-era) | stdio; `2026-07-28` `server/discover` + legacy `initialize`; tests for both eras |
 | Observability | Metrics endpoint + run latency histograms | `/api/v1/metrics`; no traces, dashboards or alerting |
 | PostgreSQL | Done (real server) | Disposable `postgres:16-alpine` container: migrations, a full run, four workers racing one claim (exactly one wins), `/ready` and stale-lease recovery; `HCS_DATABASE_URL` now actually reaches the setting (regression test) |
-| Performance budgets | Done | Lighthouse on the static build: workspace 96 / lab 98 performance, 100 accessibility, LCP 2.4 s / 1.8 s, CLS 0.007 / 0, TBT 104 / 36 ms; budgets and caveats in [lighthouse.md](../validation/lighthouse.md) |
+| Performance budgets | Done | Lighthouse on the static build: workspace 97 / lab 98 performance, 100 accessibility, LCP 2.3 s / 1.8 s, CLS 0 / 0, TBT 91 / 52 ms; hard budgets on accessibility/CLS plus a catastrophic floor, advisory targets documented in [lighthouse.md](../validation/lighthouse.md) |
 | GitHub CI | Green on `main` @ `da8e079` | CI 41803154577 (Windows + Linux, Vina, E2E, wheel, EXE, docs, licenses, secrets) and CodeQL 41803154693 |
 | Public release | `3.0.1` is the published 3.0 release; `v3.0.0` is an unpublished tag (macOS x64 wheel) | Assets: Windows/Linux/macOS-arm64 binaries, wheel, SBOM, checksums, attestation; tag/upload executed for 3.0.1 |
 

@@ -30,7 +30,7 @@ macOS arm64.
 | Docs links | `uv run python scripts/ci/check_links.py` | 60 Markdown files, 0 broken local links |
 | Wheel | `uv build --wheel` + clean-venv smoke | `hcs_discovery_studio-3.0.1-py3-none-any.whl` |
 | PostgreSQL | `scripts/ci/run_postgres_tests.py` | migrations, full run, 4-worker claim race, `/ready`, stale-lease recovery on `postgres:16-alpine` |
-| Lighthouse | `scripts/ci/run_lighthouse.py` | workspace 96 / lab 98 perf, 100 a11y, LCP 2.4/1.8 s, CLS 0.007/0, TBT 104/36 ms |
+| Lighthouse | `scripts/ci/run_lighthouse.py` | workspace 97 / lab 98 perf, 100 a11y, LCP 2.3/1.8 s, CLS 0/0, TBT 91/52 ms (hard: a11y/CLS + catastrophic floor) |
 | Executable | `scripts/release/build_executable.py` | smoke test: `version`, `db upgrade`, `doctor`, `/api/v1/ready`, GPU search when an adapter exists |
 | Release version | `scripts/release/verify_version.py v3.0.1` | tag/version/changelog agree |
 | Similarity k-NN | generated report | full-scan-equivalent ranking; 6.0×/3.9× clustered, 0.85× unclustered |

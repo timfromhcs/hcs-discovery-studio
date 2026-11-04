@@ -270,7 +270,7 @@ are using. Hardware presence alone is never reported as a speed claim.
 | End-to-end | `npm run test:e2e` in `apps/web` | 19 passed locally (studio journey, planned engines, unknown runs, browser WebAssembly self-test, WebGPU parity, offline lab x3, offline cache with the server killed, SEO/404 x3, axe accessibility x7) |
 | Accessibility | `npx playwright test e2e/a11y.spec.ts` | axe-core WCAG 2.0/2.1/2.2 A+AA over 7 routes; serious and critical violations fail the build |
 | Bundle budget | `node scripts/ci/check_bundle_budget.mjs` | JS 167 kB gzip (budget 210), CSS 10 kB (budget 16); checked in the gate runner and CI |
-| Lighthouse budgets | `npm run lighthouse` (static preview) | Workspace 96 / lab 98 performance, 100 accessibility, LCP 2.4 s / 1.8 s, CLS 0.007 / 0, TBT 104 / 36 ms; [report](docs/validation/lighthouse.md) |
+| Lighthouse budgets | `npm run lighthouse` (static preview) | Workspace 97 / lab 98 performance, 100 accessibility, LCP 2.3 s / 1.8 s, CLS 0 / 0, TBT 91 / 52 ms; [report](docs/validation/lighthouse.md) |
 | PostgreSQL | `uv run python scripts/ci/run_postgres_tests.py` | Disposable PostgreSQL 16 container; migrations, full run, claim exclusivity, lease recovery and `/ready` |
 | Visual and a11y QA | `node apps/web/scripts/visual_qa.mjs` against a running app | 180 captures (every route × 6 widths × 2 themes), 0 automatic findings on 2026-11-04 |
 | License policy | `uv run python scripts/ci/check_licenses.py`, `node scripts/ci/check_licenses.mjs` | Pass locally and in CI |

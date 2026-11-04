@@ -67,10 +67,10 @@ or a command in the log.
   workers racing one claim (exactly one wins), API readiness and stale-lease
   recovery. New CI job `postgres` and gate `G16`.
 - **Lighthouse budgets.** `apps/web/scripts/check_lighthouse.mjs` measures the static
-  workspace and offline lab: 96/98 performance, 100 accessibility, LCP 2.4 s/1.8 s,
-  CLS 0.007/0, TBT 104/36 ms. Budgets are regression bands, documented in
-  [`docs/validation/lighthouse.md`](docs/validation/lighthouse.md); gate `G17` and
-  CI job `lighthouse`.
+  workspace and offline lab: 97/98 performance, 100 accessibility, LCP 2.3 s/1.8 s,
+  CLS 0/0, TBT 91/52 ms. Accessibility and CLS are hard budgets; paint timings also
+  have a catastrophic floor and an advisory target because host load moves them by
+  more than 3×. Gate `G17` and CI job `lighthouse`.
 - **Platform release matrix.** Release builds now produce one-file binaries for
   Windows x64, Linux x64, macOS arm64 and macOS x64, publish the container image to
   GHCR and smoke-test it, and attest every artifact. PyPI stays gated behind
