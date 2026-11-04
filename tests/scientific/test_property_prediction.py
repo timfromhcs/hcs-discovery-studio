@@ -347,8 +347,28 @@ def test_esol_independent_challenge_metrics_are_measured_and_published() -> None
     errors = [record["error"] for record in report_records]
     assert bootstrap_rmse_interval(errors) == pytest.approx(tuple(report["rmse_95pct_bootstrap_ci"]), abs=1e-12)
 
-    assert model.metadata.validation["status"] == "measured"
-    assert model.metadata.validation["report_json"] == "docs/validation/esol-solubility.json"
+    assert model.metadata.validation["status"] == "reproduced"
+    assert model.metadata.validation["report_json"] == "docs/validation/esol-delaney.json"
+
+
+@pytest.mark.scientific
+def test_esol_delaney_report_matches_the_shipped_metadata() -> None:
+    """The published Delaney numbers must come from the generated report, not be typed."""
+    report_path = ROOT / "docs" / "validation" / "esol-delaney.json"
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    model = ESOLSolubilityModel()
+    published = model.metadata.benchmark_metrics
+    full = report["full_set"]
+    held = report["held_out_scaffold_split"]
+    assert published["delaney_n"] == full["n"]
+    assert published["delaney_rmse"] == pytest.approx(round(full["rmse"], 4), abs=1e-9)
+    assert published["delaney_mae"] == pytest.approx(round(full["mae"], 4), abs=1e-9)
+    assert published["delaney_r2"] == pytest.approx(round(full["r2"], 4), abs=1e-9)
+    assert published["delaney_heldout_n"] == held["n"]
+    assert published["delaney_heldout_rmse"] == pytest.approx(round(held["rmse"], 3), abs=1e-9)
+    assert published["delaney_heldout_r2"] == pytest.approx(round(held["r2"], 3), abs=1e-9)
+    assert report["dataset"]["sha256"] == "8c06a76f0c6487d29ab0f903e6a7a7139f189ab3c1178f159c8be8964602f189"
+    assert report["model"]["weights_sha256"] == model.metadata.weights_sha256
 
 
 @pytest.mark.parametrize(

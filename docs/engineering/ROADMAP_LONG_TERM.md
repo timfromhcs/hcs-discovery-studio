@@ -34,6 +34,8 @@ degradation, local first, no invented SOTA.
 | Item | Why | Acceptance |
 |---|---|---|
 | **BitBound prefilter** (done 2026-11-03) | The kernel scans everything; the bound is proven and cheap | `threshold_hits` returns exactly the full-search hits (differential test), candidate fraction and time reported in `docs/validation/gpu-tanimoto.md` |
+| **Exact bound-pruned k-NN** (done 2026-11-04) | A threshold-only bound leaves plain k-NN scanning the library | `knn_hits` equals the full scan (ties included); staged dispatches; 6.0×/3.9× on a clustered synthetic library, 0.85× when unclustered — both published |
+| **Batched multi-query kernel** (done 2026-11-04) | Screening asks hundreds of queries; one dispatch per query wastes the uploading | `tanimoto_batch.wgsl`, `search_many`, `similarity screen`; 10.9×/9.7×, parity per query |
 | **Dataset fingerprint cache** (done 2026-11-03, measured 43× on a 5k synthetic library) | Similarity re-fingerprints on every call; the dominant cost at library scale | Packed fingerprints stored once per dataset (content-hashed), reused across runs; cache hit measured |
 | **Metric and audit endpoints** (metrics done 2026-11-03) | Operators cannot see queue depth, cache hit rate or run latency today | `/api/v1/metrics` (Prometheus text) + a test for each series; no external dependency |
 | **Lighthouse/CLI budgets** | The SPA bundle is ~550 kB and unmonitored | **axe + bundle budget done 2026-11-03**; Lighthouse/LCP/CLS thresholds still open |
@@ -43,16 +45,17 @@ degradation, local first, no invented SOTA.
 
 | Item | Why | Acceptance |
 |---|---|---|
-| **v2.1.0 release with PyPI + DOI** | Sustainability: citable, installable artifacts | Trusted-publishing release workflow, `pip install hcs-discovery-studio` verified in a clean environment, Zenodo DOI in `CITATION.cff` |
-| **Batched multi-query kernel** | Screening asks hundreds of queries; one dispatch per query wastes the GPU | WGSL kernel with a query tile, parity per query, measured throughput vs the single-query path |
-| **SAT selection as a workflow node** | The solver exists but is not reachable from the pipeline | **Done 2026-11-03** — `select.sat` with coverage, budget, `on_infeasible` fail/mark and eight tests |
-| **Observability in the UI** | Run health is only visible as raw events | A run timeline with queue wait, node duration and cache hits from real data |
+| **v3.0.0 release on every platform** (prepared 2026-11-04) | Sustainability: one artifact per platform, citable release | Release matrix builds Windows/Linux/macOS binaries, GHCR image and wheel; PyPI + DOI are owner-gated |
+| **RO-Crate provenance** (done 2026-11-04) | A run manifest only this app reads is not provenance | RO-Crate 1.1 + PROV JSON-LD with artifact hashes; CLI/API/UI; not WRROC-profile conformant |
+| **MCP `2026-07-28`** (done 2026-11-04) | Legacy handshake clients and modern stateless clients both exist | `server/discover`, `_meta` versioning, `ttlMs`/`cacheScope`, legacy fallback, tests for both |
+| **PyPI + DOI** | Sustainability: installable, citable artifacts | Trusted-publishing job and runbook exist; the upload and a Zenodo DOI stay owner-gated |
+| **Observability in the UI** | Run health is only visible as raw events | **Done 2026-11-04** — run timeline from persisted timestamps (queue, node durations, cache marker) |
 
 ### Later (3–12 months) — scientific breadth, only with evidence
 
 | Item | Why / condition | Acceptance |
 |---|---|---|
-| **Property model on a public benchmark** | The ESOL estimate is weak (R² ≈ 0.07). A model without a measured baseline would repeat that mistake | A pinned TDC endpoint, scaffold split, RMSE/MAE with bootstrap CI, and a report that names the baseline it beats |
+| **Property model on a public benchmark** | The Delaney reproduction is measured (RMSE 1.099, R² 0.725) but is a 2004 linear baseline. A learned model without a measured baseline would repeat the ESOL mistake | A pinned TDC endpoint, scaffold split, RMSE/MAE with bootstrap CI, and a report that names the baseline it beats |
 | **Multi-target docking benchmark** | One redocking complex is a regression test, not accuracy | Pose recovery over a fixed, licensed complex set; per-target results, failures included |
 | **Conformer generation (ETKDG) + shape similarity** | 3D is a real gap; RDKit already provides ETKDG | Deterministic seed, runtime fingerprint, a measured comparison against the 2D fingerprint ranking |
 | **PostgreSQL backend (optional)** | Multi-user is explicitly out of scope today | A tested adapter and queue semantics, or an explicit "not planned" decision recorded |

@@ -3984,3 +3984,104 @@ small a,
     align-items: start;
   }
 }
+
+/* ------------------------------------------------------------------ run timeline */
+.run-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 14px 0 6px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.timeline-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.timeline-hint {
+  margin: -2px 0 2px;
+  max-width: 78ch;
+}
+
+.timeline-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.timeline-row {
+  display: grid;
+  grid-template-columns: minmax(90px, 150px) 1fr minmax(90px, 150px);
+  align-items: center;
+  gap: 10px;
+}
+
+.timeline-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.timeline-track {
+  position: relative;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--border);
+  overflow: hidden;
+}
+
+.timeline-bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 999px;
+  background: var(--accent);
+}
+
+/* Status colours reuse the palette; a cancelled/queued segment must not look finished. */
+.status-succeeded .timeline-bar,
+.status-cached .timeline-bar {
+  background: var(--ok, var(--accent));
+}
+
+.status-running .timeline-bar {
+  background: var(--accent-strong, var(--accent));
+}
+
+.status-failed .timeline-bar {
+  background: var(--danger);
+}
+
+.status-cancelled .timeline-bar,
+.status-queued .timeline-bar {
+  background: var(--border-strong);
+}
+
+.status-cached .timeline-bar {
+  opacity: 0.55;
+}
+
+.timeline-meta {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 640px) {
+  .timeline-row {
+    grid-template-columns: 1fr;
+    gap: 3px;
+  }
+
+  .timeline-meta {
+    text-align: left;
+  }
+}

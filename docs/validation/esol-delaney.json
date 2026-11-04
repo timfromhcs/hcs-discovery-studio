@@ -1,0 +1,63 @@
+{
+  "schema": "hcs.esol-delaney.v1",
+  "generated_at": "2026-11-04 08:11:15Z",
+  "dataset": {
+    "path": "tests/fixtures/esol/delaney-processed.csv",
+    "sha256": "8c06a76f0c6487d29ab0f903e6a7a7139f189ab3c1178f159c8be8964602f189",
+    "rows": 1128,
+    "used": 1128,
+    "rejected": [],
+    "citation": "Delaney, J. S. (2004). ESOL: estimating aqueous solubility directly from molecular structure. J. Chem. Inf. Comput. Sci. 44(3), 1000-1005. Distribution: MoleculeNet (deepchem) delaney-processed.csv."
+  },
+  "model": {
+    "id": "esol_solubility",
+    "version": "2.0.0",
+    "coefficients": {
+      "intercept": 0.16,
+      "clogp": -0.63,
+      "mw": -0.0062,
+      "rotatable_bonds": 0.066,
+      "aromatic_proportion": -0.74
+    },
+    "weights_sha256": "09fcfc4a4a1ea22756d2328267cbeec4566900f3c2f427f689162f395a60053c"
+  },
+  "full_set": {
+    "n": 1128.0,
+    "rmse": 1.0993699190771191,
+    "mae": 0.843892730496454,
+    "r2": 0.7247625619869982,
+    "mean_error": 0.2784441489361702,
+    "baseline_rmse": 2.0955117304559443,
+    "within_0_5": 0.3953900709219858,
+    "within_1_0": 0.6799645390070922,
+    "within_10x": 0.6799645390070922,
+    "max_abs_error": 4.02,
+    "rmse_ci95": [
+      1.0465899231306317,
+      1.153947880535732
+    ]
+  },
+  "held_out_scaffold_split": {
+    "n": 226.0,
+    "rmse": 1.2012936297823908,
+    "mae": 0.9240929203539823,
+    "r2": 0.6399471325139146,
+    "mean_error": 0.4845,
+    "baseline_rmse": 2.0020090533869648,
+    "within_0_5": 0.3495575221238938,
+    "within_1_0": 0.6283185840707964,
+    "within_10x": 0.6283185840707964,
+    "max_abs_error": 3.6060000000000003,
+    "rmse_ci95": [
+      1.07603655109482,
+      1.3254292625743915
+    ],
+    "n_train": 902.0
+  },
+  "split": {
+    "train_ratio": 0.8,
+    "seed": 42,
+    "strategy": "Bemis-Murcko scaffolds"
+  },
+  "status": "reproduced"
+}

@@ -1,6 +1,6 @@
 """HCS Discovery Studio - local-first AI drug-discovery research workbench."""
 
-__version__ = "2.2.1"
+__version__ = "3.0.0"
 
 PRODUCT_NAME = "HCS Discovery Studio"
 TAGLINE = "Open science. Reproducible discovery."

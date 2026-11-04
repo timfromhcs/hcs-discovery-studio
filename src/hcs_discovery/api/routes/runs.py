@@ -246,8 +246,10 @@ def export(
     session: Session = Depends(db),
     settings: Settings = Depends(settings_dep),
 ) -> Response:
-    if fmt not in {"markdown", "html", "json", "csv"}:
+    if fmt not in {"markdown", "html", "json", "csv", "ro-crate"}:
         raise ValidationError("Unsupported export format.")
-    target = settings.data_dir / "exports" / f"{run_id}.{fmt}"
+    suffix = "crate.zip" if fmt == "ro-crate" else fmt
+    target = settings.data_dir / "exports" / f"{run_id}.{suffix}"
     export_report(session, settings, run_id, fmt, target)
-    return FileResponse(target, filename=target.name)
+    media = "application/zip" if fmt == "ro-crate" else None
+    return FileResponse(target, filename=target.name, media_type=media)

@@ -5,8 +5,8 @@ Do not edit by hand: re-run the script on the host you want to describe.
 
 | Item | Value |
 |---|---|
-| Date | 2026-11-03 06:35:32Z |
-| Commit | `064a7f4` |
+| Date | 2026-11-04 07:57:58Z |
+| Commit | `c8909e2` |
 | Host | AMD64 Family 25 Model 68 Stepping 1, AuthenticAMD · Windows 11 AMD64 |
 | Adapter | AMD Radeon(TM) Graphics |
 | Backend | Vulkan |
@@ -15,14 +15,14 @@ Do not edit by hand: re-run the script on the host you want to describe.
 
 ## Measurements
 
-Median of 5 repetitions, milliseconds, end-to-end (upload, dispatch,
+Median of 3 repetitions, milliseconds, end-to-end (upload, dispatch,
 readback). "GPU resident" keeps the library in a storage buffer and moves only the
 256-byte query.
 
 | Library | numpy CPU | RDKit ms | GPU upload | GPU resident | GPU+CPU hybrid | vs upload | speed-up | Parity | err |
 |---|---|---|---|---|---|---|---|---|---|
-| 100,000 | 191.8 | 21.8 | 49.2 | 2.1 | 39.8 | 1.24x | 10.4x | exact | 0.0e+00 |
-| 500,000 | 1,220.8 | 131.4 | 232.8 | 5.6 | 223.2 | 1.04x | 23.4x | exact | 0.0e+00 |
+| 100,000 | 203.1 | 23.3 | 44.6 | 1.5 | 41.7 | 1.07x | 15.4x | exact | 0.0e+00 |
+| 500,000 | 1,090.8 | 110.3 | 259.2 | 6.8 | 252.2 | 1.03x | 16.3x | exact | 0.0e+00 |
 
 ## Threshold search with the BitBound prefilter
 
@@ -34,18 +34,48 @@ in `tests/unit/test_similarity_search.py`).
 
 | Library | Density | Threshold | Candidates scored | Share | Hits | ms |
 |---|---|---|---|---|---|---|
-| 100,000 | uniform | 0.4 | 100,000 | 100.00 % | 1 | 82.22 |
-| 100,000 | uniform | 0.7 | 100,000 | 100.00 % | 1 | 81.44 |
-| 100,000 | uniform | 0.9 | 99,755 | 99.76 % | 1 | 76.09 |
-| 100,000 | varied | 0.4 | 67,996 | 68.00 % | 1 | 54.92 |
-| 100,000 | varied | 0.7 | 34,618 | 34.62 % | 0 | 22.31 |
-| 100,000 | varied | 0.9 | 12,345 | 12.35 % | 0 | 9.58 |
-| 500,000 | uniform | 0.4 | 500,000 | 100.00 % | 1 | 476.93 |
-| 500,000 | uniform | 0.7 | 500,000 | 100.00 % | 1 | 478.26 |
-| 500,000 | uniform | 0.9 | 490,639 | 98.13 % | 1 | 465.78 |
-| 500,000 | varied | 0.4 | 332,689 | 66.54 % | 1 | 311.27 |
-| 500,000 | varied | 0.7 | 159,465 | 31.89 % | 0 | 160.19 |
-| 500,000 | varied | 0.9 | 44,139 | 8.83 % | 0 | 34.57 |
+| 100,000 | uniform | 0.4 | 100,000 | 100.00 % | 1 | 74.34 |
+| 100,000 | uniform | 0.7 | 100,000 | 100.00 % | 1 | 76.99 |
+| 100,000 | uniform | 0.9 | 99,755 | 99.76 % | 1 | 91.71 |
+| 100,000 | varied | 0.4 | 67,996 | 68.00 % | 1 | 59.15 |
+| 100,000 | varied | 0.7 | 34,618 | 34.62 % | 0 | 25.05 |
+| 100,000 | varied | 0.9 | 12,345 | 12.35 % | 0 | 9.68 |
+| 500,000 | uniform | 0.4 | 500,000 | 100.00 % | 1 | 537.28 |
+| 500,000 | uniform | 0.7 | 500,000 | 100.00 % | 1 | 505.98 |
+| 500,000 | uniform | 0.9 | 490,639 | 98.13 % | 1 | 444.52 |
+| 500,000 | varied | 0.4 | 332,689 | 66.54 % | 1 | 275.59 |
+| 500,000 | varied | 0.7 | 159,465 | 31.89 % | 0 | 134.12 |
+| 500,000 | varied | 0.9 | 44,139 | 8.83 % | 0 | 34.35 |
+
+## k-nearest neighbours with the same bound
+
+The k-NN path uses the same popcount bound but stages the work into few, large
+dispatches: it scores the popcount ring closest to the query first, takes the k-th score
+as a lower bound, then drops every row whose bound cannot reach it. It returns exactly
+the full-scan ranking (differential tests, ties included). Full scan here means scoring
+every row and ranking it, on the same index.
+
+| Library | Density | k | Rows scored | Share | Bound-pruned ms | Full scan ms | Speed-up |
+|---|---|---|---|---|---|---|---|
+| 100,000 | varied | 10 | 90,083 | 90.08 % | 75.16 | 60.70 | 0.81× |
+| 100,000 | varied | 100 | 90,845 | 90.84 % | 84.30 | 58.31 | 0.69× |
+| 100,000 | clustered | 10 | 10,326 | 10.33 % | 9.78 | 57.72 | 5.90× |
+| 100,000 | clustered | 100 | 10,326 | 10.33 % | 9.46 | 61.63 | 6.52× |
+| 500,000 | varied | 10 | 440,530 | 88.11 % | 362.86 | 301.51 | 0.83× |
+| 500,000 | varied | 100 | 445,263 | 89.05 % | 357.17 | 296.33 | 0.83× |
+| 500,000 | clustered | 10 | 75,614 | 15.12 % | 64.44 | 320.58 | 4.97× |
+| 500,000 | clustered | 100 | 75,614 | 15.12 % | 79.99 | 280.61 | 3.51× |
+
+## Batched multi-query
+
+Sixteen queries against the same library, kernel-level: the single-query column pays the
+library upload sixteen times, the batched column once per dispatch. Counts are compared
+with the CPU reference for the first and last query of the batch.
+
+| Library | Queries | Single-query total ms | Batched ms | Speed-up | Parity |
+|---|---|---|---|---|---|
+| 100,000 | 16 | 749.77 | 68.98 | 10.87× | exact |
+| 500,000 | 16 | 3758.69 | 387.27 | 9.71× | exact |
 
 ## What this does and does not establish
 
@@ -70,8 +100,14 @@ in `tests/unit/test_similarity_search.py`).
   (random prefix of words, standing in for molecule size) it prunes 32–88 % and the
   search gets 1.5–8× faster. Both rows are synthetic and the report says so; the
   differential tests prove the hits are identical to a full scan.
+- **k-NN pruning needs a clustered library.** A k-nearest query only prunes once the
+  running k-th score is high enough that the popcount bound can drop rows. On the
+  unclustered synthetic library the k-th neighbour is dissimilar and almost nothing is
+  dropped (the table may even show a slowdown); on the clustered one — 70 % of rows
+  derived from the query — the bound skips most of the library. Both are synthetic,
+  and neither is a claim about a real screening library.
 - **Not benchmarked:** GPU fingerprint generation (RDKit computes fingerprints on the
-  CPU), popcount-bound prefilters, and multi-query batches. The kernel scans the whole
-  library per query.
+  CPU), ANN indexes (deliberately absent: exact bounds keep recall at 1.0), and the
+  end-to-end batch ranking in Python (only the kernel is timed above).
 - **No scientific claim.** Tanimoto similarity over Morgan fingerprints is a
   prioritisation signal, not evidence of binding, safety or efficacy.

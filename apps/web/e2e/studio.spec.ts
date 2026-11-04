@@ -55,6 +55,37 @@ test("workspace to import, workflow, run and results", async ({ page }) => {
   await expect(page.getByText("Succeeded", { exact: true }).first()).toBeVisible({ timeout: 90_000 });
   await expect(page.getByText("4 / 4")).toBeVisible();
 
+  // The timeline is drawn from persisted timestamps: a queue segment and one row per
+  // executed node, each with a measured duration.
+  const timeline = page.getByTestId("run-timeline");
+  await expect(timeline).toBeVisible();
+  expect(await timeline.getByRole("listitem").count()).toBeGreaterThanOrEqual(4);
+  const total = page.getByTestId("run-timeline-total");
+  await expect(total).toContainText("queued");
+  await expect(total).toContainText("total");
+  // Regression: the component once passed milliseconds to a formatter that takes
+  // seconds, so a 250 ms demo run read "4m 23s". The rendered duration must be the
+  // same value the row records, formatted at the right scale.
+  const rows = await timeline.locator("li").evaluateAll((elements) =>
+    elements.map((element) => {
+      const ms = Number((element as HTMLElement).dataset.durationMs);
+      const text = element.querySelector(".timeline-meta")?.textContent?.trim() ?? "";
+      return { ms, text };
+    }),
+  );
+  const expectedDuration = (ms: number) => {
+    if (!Number.isFinite(ms)) return "";
+    if (ms < 1000) return `${Math.max(0, Math.round(ms))}ms`;
+    const seconds = Math.round(ms / 1000);
+    if (seconds < 60) return `${seconds}s`;
+    return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+  };
+  for (const row of rows) {
+    expect(Number.isFinite(row.ms)).toBe(true);
+    expect(row.ms).toBeGreaterThan(0);
+    expect(row.text.startsWith(expectedDuration(row.ms))).toBe(true);
+  }
+
   await page.getByRole("link", { name: "Results" }).click();
   await expect(page.getByRole("heading", { name: /Basic triage/ })).toBeVisible();
   await expect(page.locator(".scatter-svg")).toBeVisible();

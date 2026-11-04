@@ -7,7 +7,8 @@ executed by an agent.
 ## 1. Prepare the release commit
 
 1. Version in `pyproject.toml`, `src/hcs_discovery/__init__.py`,
-   `apps/web/package.json` (+ lockfile) and `CITATION.cff` agree.
+   `apps/web/package.json` (+ lockfile), `apps/web/src/lib/constants.ts` and
+   `CITATION.cff` agree.
 2. `CHANGELOG.md` has a `## [X.Y.Z] - YYYY-MM-DD` section (the release workflow
    refuses a tag whose version has no changelog heading).
 3. `docs/releases/vX.Y.Z.md` exists; the workflow uses it as the release body and
@@ -18,6 +19,7 @@ executed by an agent.
      --junitxml=build/junit.xml --cov-report=json:build/coverage.json
    uv run python scripts/ci/check_doc_claims.py --write
    uv run python scripts/science/benchmark_gpu_similarity.py
+   uv run python scripts/science/validate_esol_delaney.py
    ```
 
 ## 2. Local gates (machine)
@@ -34,20 +36,23 @@ not installed; CI runs it.
 ## 3. Tag and approve (owner)
 
 ```bash
-git tag -a v2.1.0 -m "HCS Discovery Studio 2.1.0"
-git push origin v2.1.0
+git tag -a v3.0.0 -m "HCS Discovery Studio 3.0.0"
+git push origin v3.0.0
 ```
 
 The tag starts `.github/workflows/release.yml`, which:
 
 1. verifies that CI and CodeQL succeeded for the exact commit;
-2. builds the SPA, the wheel and downloads the executable artifact;
+2. builds the SPA and the wheel, and builds + smoke-tests one-file binaries for
+   Windows x64, Linux x64, macOS arm64 and macOS x64;
 3. smoke-tests the wheel in a clean environment (version, `db upgrade`, `doctor`,
    served `/api/v1/health`, SPA);
-4. writes the SBOM and `SHA256SUMS.txt`, attests build provenance;
+4. writes the SBOM and `SHA256SUMS.txt`, attests build provenance for the wheel and
+   every binary;
 5. creates a **draft** release, downloads its own assets and verifies the
    checksums, then publishes it;
-6. skips the PyPI job unless `PYPI_PUBLISH` is `true` (see below).
+6. builds the container image, pushes it to GHCR and runs a health check against it;
+7. skips the PyPI job unless `PYPI_PUBLISH` is `true` (see below).
 
 A tag whose version has no changelog section, or whose CI for that SHA is missing,
 fails before anything is published.
@@ -67,7 +72,7 @@ separate, gated job.
    short-lived credential, and PEP 740 attestations are attached automatically.
 4. Verify afterwards:
    ```bash
-   pip install hcs-discovery-studio==2.1.0
+   pip install hcs-discovery-studio==3.0.0
    hcs-discovery version
    ```
 

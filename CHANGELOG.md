@@ -4,6 +4,68 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.0] - 2026-11-04
+
+The first major release since `2.0`: exact similarity search that prunes, provenance
+that other tools can read, an MCP server on the current specification, a property
+benchmark that is measured instead of asserted, and release artifacts for every
+desktop platform. Nothing in this list is claimed without a test, a generated report
+or a command in the log.
+
+### Added
+
+- **Bound-pruned exact k-NN.** `TanimotoIndex.knn_hits` walks the library by
+  popcount proximity, takes the running k-th score as a lower bound and only scores
+  rows that can still reach it. It is staged into few large dispatches because a
+  ring-per-dispatch version measured 14× slower than a full scan. Differential
+  tests (including ties) prove the ranking equals the full scan. Measured on the
+  synthetic clustered library: 6.0× faster at 100k, 3.9× at 500k; on an unclustered
+  library it is 0.85×, which the report states. CLI/API/MCP use it whenever a full
+  score vector is not requested.
+- **Batched multi-query kernel.** `gpu/kernels/tanimoto_batch.wgsl` scores 16
+  queries per library upload; `TanimotoIndex.search_many` returns one ranked result
+  per query and verifies every count against the CPU reference. Kernel-level measured
+  10.9× (100k) and 9.7× (500k) over the per-query path; the CLI's verification pass is
+  extra. New `hcs-discovery similarity screen --queries … --file …`.
+- **RO-Crate export.** `report export --format ro-crate` (CLI), `GET
+  /api/v1/runs/{id}/export/ro-crate` (API) and a button in the run monitor write a
+  ZIP with `ro-crate-metadata.json` (RO-Crate 1.1 context), W3C PROV terms, the
+  software/environment record and every artifact with its SHA-256. A missing
+  artifact aborts the export instead of producing a crate that points at nothing.
+  It does not claim the Workflow Run RO-Crate profile, because the per-step
+  `CreateAction` fields are not emitted yet.
+- **MCP `2026-07-28` (dual-era).** `server/discover`, per-request version checks
+  with `UnsupportedProtocolVersionError` (`-32022`), `resultType: "complete"`,
+  `ttlMs`/`cacheScope` on list results, deterministic tool order, annotations and
+  `structuredContent`. The legacy `initialize` handshake and `ping` are still
+  answered for older clients, and the tests cover both eras.
+- **Delaney ESOL report.** The shipped four-descriptor equation is now measured on
+  the full 1,128-molecule Delaney set: RMSE 1.099, MAE 0.844, R² 0.725, held-out
+  scaffold split RMSE 1.201 / R² 0.640, with a constant baseline and bootstrap CI.
+  The 45-molecule stress set (R² 0.07) stays published next to it; the model
+  metadata carries both. `scripts/science/validate_esol_delaney.py --check` fails
+  if a dependency upgrade changes the numbers.
+- **Latency metrics.** `hcs_run_duration_seconds` and
+  `hcs_node_duration_seconds` histograms and `hcs_node_cache_hits_total`, all from
+  persisted timestamps, so a scrape after a restart still reports what ran.
+- **Platform release matrix.** Release builds now produce one-file binaries for
+  Windows x64, Linux x64, macOS arm64 and macOS x64, publish the container image to
+  GHCR and smoke-test it, and attest every artifact. PyPI stays gated behind
+  `PYPI_PUBLISH`.
+
+### Changed
+
+- The run monitor's report row gains the RO-Crate export; the timeline is committed.
+- `IMPLEMENTATION_STATUS.md`, `README.md` and the roadmap are reconciled with the
+  actual `3.0.0` tree (the status page had been three releases behind).
+- Version strings in `pyproject.toml`, `__init__.py`, `package.json`,
+  `package-lock.json`, `constants.ts` and `CITATION.cff` now agree.
+
+### Fixed
+
+- A stray inline `border` declaration in the timeline CSS.
+- `similarity search --k` no longer computes a full score vector it does not need.
+
 ## [Unreleased]
 
 ### Added
@@ -15,6 +77,11 @@ All notable changes to this project are documented here. The format follows
   writing a plausible subset; `mark` writes all-false rows with that reason. The
   output is `sat_selected` plus `sat_reason`, and rows are never dropped. Covered by
   eight node tests (coverage, budget conflicts, ungrouped rows, determinism).
+- **Run timeline in the UI.** The run monitor shows where the time went, built only
+  from persisted timestamps: a queue segment, one row per executed node with its
+  measured duration, and a `cache` marker for node-cache hits. A segment without a
+  recorded start is left out instead of estimated. The end-to-end run test asserts at
+  least four segments, and the component is covered by the axe gate.
 
 ## [2.2.1] - 2026-11-03
 

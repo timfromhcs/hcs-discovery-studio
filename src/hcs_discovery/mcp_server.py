@@ -1,10 +1,20 @@
-"""A dependency-free MCP server (stdio, JSON-RPC 2.0) for local automation.
+"""A dependency-free dual-era MCP server (stdio, JSON-RPC 2.0) for local automation.
 
 Why hand-rolled: an MCP server that pulls a new runtime dependency into a package
 whose selling point is "installs and runs offline with no account" would be a poor
-trade. The protocol surface this needs is small and stable — ``initialize``,
-``tools/list``, ``tools/call``, ``ping`` — and JSON-RPC over stdin/stdout is
-easy to test without a transport library.
+trade. The protocol surface this needs is small — discovery, tools/list, tools/call —
+and JSON-RPC over stdin/stdout is easy to test without a transport library.
+
+Protocol eras:
+
+- **Modern (`2026-07-28`)**: stateless. No ``initialize`` handshake, no session id.
+  Every request may carry ``_meta`` with ``io.modelcontextprotocol/protocolVersion``;
+  ``server/discover`` is implemented as required, ``tools/list`` carries ``ttlMs`` and
+  ``cacheScope``, every result carries ``resultType: "complete"`` and the server
+  identity in ``_meta``.
+- **Legacy (`2024-11-05` … `2025-11-25`)**: the original ``initialize`` handshake is
+  still answered so existing clients keep working. Legacy results do not carry
+  ``resultType``.
 
 Contract:
 
@@ -34,11 +44,30 @@ from hcs_discovery.core.errors import AppError
 from hcs_discovery.similarity import GpuUnavailableError, ParityError, TanimotoIndex
 from hcs_discovery.workflow.schema import validate_workflow
 
-PROTOCOL_VERSION = "2024-11-05"
+PROTOCOL_VERSION = "2026-07-28"
+LEGACY_PROTOCOL_VERSIONS = ("2025-11-25", "2025-06-18", "2024-11-05")
+SUPPORTED_PROTOCOL_VERSIONS = (PROTOCOL_VERSION, *LEGACY_PROTOCOL_VERSIONS)
 SERVER_NAME = "hcs-discovery"
 MAX_INLINE_SMILES = 50_000
 MAX_BENCH_LIBRARY = 200_000
 MAX_FILE_BYTES = 64 * 1024 * 1024
+UNSUPPORTED_PROTOCOL_VERSION = -32022
+
+
+def _server_info() -> dict[str, str]:
+    return {"name": SERVER_NAME, "version": __version__}
+
+
+def _meta() -> dict[str, Any]:
+    return {"io.modelcontextprotocol/serverInfo": _server_info()}
+
+
+def _requested_version(params: dict[str, Any]) -> str | None:
+    meta = params.get("_meta")
+    if not isinstance(meta, dict):
+        return None
+    version = meta.get("io.modelcontextprotocol/protocolVersion")
+    return version if isinstance(version, str) else None
 
 
 class ToolError(Exception):
@@ -120,18 +149,11 @@ def tool_similarity_search(arguments: dict[str, Any]) -> dict[str, Any]:
     try:
         with TanimotoIndex(structures, prefer=engine, boost=boost) as index:  # type: ignore[arg-type]
             resolved = index.engine
-            if threshold is not None:
-                pruned = index.threshold_hits(query, float(threshold))
-                raw_hits = pruned.hits[:k]
-                parity = pruned.parity_checked
-                candidates = pruned.candidates
-                prefiltered = pruned.prefiltered
-            else:
-                result = index.search(query, k=k, threshold=None)
-                raw_hits = result.hits
-                parity = result.parity_checked
-                candidates = len(structures)
-                prefiltered = False
+            pruned = index.knn_hits(query, k, threshold=None if threshold is None else float(threshold))
+            raw_hits = pruned.hits
+            parity = pruned.parity_checked
+            candidates = pruned.candidates
+            prefiltered = pruned.prefiltered
     except GpuUnavailableError as exc:
         raise ToolError(f"No hardware GPU adapter: {exc}") from exc
     except ParityError as exc:
@@ -194,13 +216,16 @@ def tool_models_list(_: dict[str, Any]) -> dict[str, Any]:
 TOOLS: dict[str, tuple[dict[str, Any], Callable[[dict[str, Any]], dict[str, Any]]]] = {
     "hcs_doctor": (
         {
+            "title": "Environment doctor",
             "description": "Report what this machine can actually do (data dir, database, RDKit, GPU probe).",
             "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
+            "outputSchema": {"type": "object"},
         },
         tool_doctor,
     ),
     "hcs_similarity_search": (
         {
+            "title": "Tanimoto similarity search",
             "description": (
                 "Tanimoto similarity search over an inline SMILES library or a .smi/.csv/.sdf file. "
                 "Returns the hcs.similarity-search.v1 payload; GPU results are parity-checked."
@@ -229,6 +254,7 @@ TOOLS: dict[str, tuple[dict[str, Any], Callable[[dict[str, Any]], dict[str, Any]
     ),
     "hcs_gpu_bench": (
         {
+            "title": "GPU Tanimoto benchmark",
             "description": "Parity-first Tanimoto benchmark on this host's adapter (bounded size).",
             "inputSchema": {
                 "type": "object",
@@ -243,6 +269,7 @@ TOOLS: dict[str, tuple[dict[str, Any], Callable[[dict[str, Any]], dict[str, Any]
     ),
     "hcs_workflow_validate": (
         {
+            "title": "Validate a workflow",
             "description": "Validate a workflow object without queueing it.",
             "inputSchema": {
                 "type": "object",
@@ -255,6 +282,7 @@ TOOLS: dict[str, tuple[dict[str, Any], Callable[[dict[str, Any]], dict[str, Any]
     ),
     "hcs_models_list": (
         {
+            "title": "List workflow nodes",
             "description": "List the registered workflow node types and their configuration schemas.",
             "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
         },
@@ -277,56 +305,108 @@ def handle_message(message: dict[str, Any]) -> dict[str, Any] | None:
         return _error(request_id, -32600, "Invalid Request: method is required.")
     is_notification = "id" not in message
     params = message.get("params") or {}
+    if not isinstance(params, dict):
+        return _error(request_id, -32602, "Invalid params.")
 
-    if method == "initialize":
+    version = _requested_version(params)
+    modern = version is not None
+    if version is not None and version not in SUPPORTED_PROTOCOL_VERSIONS:
         return {
             "jsonrpc": "2.0",
             "id": request_id,
-            "result": {
-                "protocolVersion": PROTOCOL_VERSION,
-                "capabilities": {"tools": {"listChanged": False}},
-                "serverInfo": {"name": SERVER_NAME, "version": __version__},
-                "instructions": (
-                    "Read-only local tools: doctor, similarity search, GPU benchmark, workflow validation, "
-                    "node catalog. Nothing is written outside a temporary directory and nothing uses the network."
-                ),
+            "error": {
+                "code": UNSUPPORTED_PROTOCOL_VERSION,
+                "message": "Unsupported protocol version",
+                "data": {"supported": list(SUPPORTED_PROTOCOL_VERSIONS), "requested": version},
             },
         }
+
+    def ok(payload: dict[str, Any]) -> dict[str, Any]:
+        result = dict(payload)
+        if modern:
+            result = {"resultType": "complete", **result, "_meta": _meta()}
+        return {"jsonrpc": "2.0", "id": request_id, "result": result}
+
+    if method == "server/discover":
+        # Mandatory in 2026-07-28, and the STDIO probe a dual-era client uses before
+        # deciding whether to fall back to `initialize`.
+        return ok(
+            {
+                "supportedVersions": list(SUPPORTED_PROTOCOL_VERSIONS),
+                "capabilities": {"tools": {}},
+                "_meta": _meta(),
+                "instructions": (
+                    "Read-only local tools: doctor, similarity search and screening, GPU benchmark, "
+                    "workflow validation, node catalog. Nothing is written outside a temporary "
+                    "directory and nothing uses the network."
+                ),
+                "ttlMs": 3_600_000,
+                "cacheScope": "public",
+            }
+        )
+    if method == "initialize":
+        requested = params.get("protocolVersion")
+        negotiated = requested if requested in LEGACY_PROTOCOL_VERSIONS else LEGACY_PROTOCOL_VERSIONS[-1]
+        return ok(
+            {
+                "protocolVersion": negotiated,
+                "capabilities": {"tools": {"listChanged": False}},
+                "serverInfo": _server_info(),
+                "instructions": (
+                    "Dual-era MCP server. Modern clients should call server/discover and send "
+                    "io.modelcontextprotocol/protocolVersion in _meta. Legacy handshakes are still "
+                    "answered. Tools are read-only and offline."
+                ),
+            }
+        )
     if method.startswith("notifications/"):
         return None
     if method == "ping":
-        return {"jsonrpc": "2.0", "id": request_id, "result": {}}
+        # Removed in 2026-07-28, still answered for legacy clients.
+        return ok({})
     if method == "tools/list":
-        return {
-            "jsonrpc": "2.0",
-            "id": request_id,
-            "result": {
-                "tools": [
-                    {"name": name, **definition, "annotations": {"readOnlyHint": True}}
-                    for name, (definition, _) in TOOLS.items()
-                ]
-            },
-        }
+        tools = []
+        for name in sorted(TOOLS):
+            definition, _handler = TOOLS[name]
+            tools.append(
+                {
+                    "name": name,
+                    **definition,
+                    "annotations": {
+                        "readOnlyHint": True,
+                        "destructiveHint": False,
+                        "idempotentHint": True,
+                        "openWorldHint": False,
+                    },
+                }
+            )
+        result: dict[str, Any] = {"tools": tools}
+        if modern:
+            # Required on list results in 2026-07-28, and deterministic order matters
+            # for client-side prompt caching.
+            result.update({"ttlMs": 60_000, "cacheScope": "public"})
+        return ok(result)
     if method == "tools/call":
-        if not isinstance(params, dict):
-            return _error(request_id, -32602, "Invalid params.")
-        name = params.get("name")
+        tool_name = params.get("name")
         arguments = params.get("arguments") or {}
-        if not isinstance(name, str) or name not in TOOLS:
-            return _error(request_id, -32602, f"Unknown tool: {name!r}.")
+        if not isinstance(tool_name, str) or tool_name not in TOOLS:
+            return _error(request_id, -32602, f"Unknown tool: {tool_name!r}.")
         if not isinstance(arguments, dict):
             return _error(request_id, -32602, "Tool arguments must be an object.")
-        _, handler = TOOLS[name]
+        _, handler = TOOLS[tool_name]
         try:
             payload = handler(arguments)
         except ToolError as exc:
-            return {"jsonrpc": "2.0", "id": request_id, "result": _text(str(exc), is_error=True)}
+            return ok(_text(str(exc), is_error=True))
         except AppError as exc:
-            return {"jsonrpc": "2.0", "id": request_id, "result": _text(exc.to_dict(), is_error=True)}
+            return ok(_text(exc.to_dict(), is_error=True))
         except Exception as exc:
             traceback.print_exc(file=sys.stderr)
-            return {"jsonrpc": "2.0", "id": request_id, "result": _text(f"Tool failed: {exc}", is_error=True)}
-        return {"jsonrpc": "2.0", "id": request_id, "result": _text(payload)}
+            return ok(_text(f"Tool failed: {exc}", is_error=True))
+        result = _text(payload)
+        if modern and not result["isError"] and isinstance(payload, dict):
+            result["structuredContent"] = payload
+        return ok(result)
     if is_notification:
         return None
     return _error(request_id, -32601, f"Method not found: {method}")

@@ -1001,7 +1001,7 @@ def run_list(
 def report_export(
     ctx: typer.Context,
     run_id: str,
-    format: str = typer.Option("html", help="html|markdown|json|csv"),
+    format: str = typer.Option("html", help="html|markdown|json|csv|ro-crate"),
     output: Path = typer.Option(..., "--output"),
 ) -> None:
     from ..reports.render import export_report
@@ -1401,11 +1401,12 @@ def similarity_search(
     try:
         with TanimotoIndex(smiles, prefer=engine, boost=boost) as index:  # type: ignore[arg-type]
             resolved = index.engine
-            if threshold is not None and output is None:
-                # BitBound: only candidates near the threshold are scored. A full
-                # per-row score list is not requested here, so nothing is invented.
-                pruned = index.threshold_hits(query, threshold)
-                raw_hits = pruned.hits[:k]
+            if output is None:
+                # Exact k-NN with the popcount bound: only rows whose best possible
+                # score can still reach the answer are compared. No full score list is
+                # requested here, so nothing is invented.
+                pruned = index.knn_hits(query, k, threshold=threshold)
+                raw_hits = pruned.hits
                 parity = pruned.parity_checked
                 timings = pruned.timings_ms
                 candidates = pruned.candidates
@@ -1482,6 +1483,125 @@ def similarity_search(
     lines += [f"{hit['similarity']:.4f}  {hit['name'][:24]:<24}  {hit['smiles']}" for hit in hits]
     if not hits:
         lines.append("No structure reached the threshold.")
+    _print(ctx, payload, "\n".join(lines))
+
+
+@similarity_app.command("screen")
+def similarity_screen(
+    ctx: typer.Context,
+    queries: Path = typer.Option(
+        ..., "--queries", exists=True, dir_okay=False, readable=True, help="Query file: .smi, .csv or .sdf."
+    ),
+    file: Path = typer.Option(
+        ..., "--file", exists=True, dir_okay=False, readable=True, help="Library file: .smi, .csv or .sdf."
+    ),
+    k: int = typer.Option(10, "--k", min=1, max=10_000, help="Nearest neighbours per query."),
+    threshold: float | None = typer.Option(None, "--threshold", min=0.0, max=1.0, help="Minimum similarity."),
+    engine: str = typer.Option("auto", "--engine", help="auto, cpu or gpu. 'gpu' fails instead of falling back."),
+    boost: str = typer.Option("auto", "--boost", help="auto, gpu, cpu or hybrid."),
+    max_rows: int = typer.Option(50_000, "--max-rows", min=1, help="Row cap per file."),
+) -> None:
+    """Score several queries against one library in one batched pass.
+
+    The library is uploaded once per dispatch instead of once per query. Every count is
+    still verified against the CPU reference before a value is reported.
+    """
+    from ..core.errors import RunFailedError
+    from ..datasets.readers import ImportOptions, parse_file
+    from ..similarity import GpuUnavailableError, ParityError, TanimotoIndex
+
+    if engine not in {"auto", "cpu", "gpu"}:
+        _fail(ValidationError("engine must be one of auto, cpu or gpu.", details={"engine": engine}))
+    if boost not in {"auto", "gpu", "cpu", "hybrid"}:
+        _fail(ValidationError("boost must be one of auto, gpu, cpu or hybrid.", details={"boost": boost}))
+
+    def _structures(path: Path) -> list[tuple[str, str]]:
+        parsed = _run_cli(parse_file, path, path.name, "auto", ImportOptions(max_rows=max_rows))
+        if parsed is None:
+            raise typer.Exit(1)
+        rows = [
+            (outcome.row.name or "", outcome.molecule.canonical_smiles)
+            for outcome in parsed.outcomes
+            if outcome.status == "imported" and outcome.molecule is not None
+        ]
+        if not rows:
+            _fail(ValidationError("No structures could be read from the file.", details={"path": str(path)}))
+        return rows
+
+    query_rows = _structures(queries)
+    library_rows = _structures(file)
+    try:
+        with TanimotoIndex(
+            [smiles for _, smiles in library_rows],
+            prefer=engine,  # type: ignore[arg-type]
+            boost=boost,  # type: ignore[arg-type]
+        ) as index:
+            resolved = index.engine
+            batch = index.search_many([smiles for _, smiles in query_rows], k=k, threshold=threshold)
+    except GpuUnavailableError as exc:
+        _fail(
+            ValidationError(
+                "A GPU engine was requested but no hardware GPU adapter is available.",
+                details={"reason": str(exc)},
+            )
+        )
+        return
+    except ParityError as exc:
+        _fail(
+            RunFailedError(
+                "The GPU result did not match the CPU reference; nothing was reported.", details={"reason": str(exc)}
+            )
+        )
+        return
+
+    queries_out: list[dict[str, Any]] = [
+        {
+            "query": name or smiles,
+            "smiles": smiles,
+            "hits": [
+                {
+                    "rank": rank,
+                    "similarity": round(hit.similarity, 6),
+                    "name": library_rows[hit.index][0],
+                    "library_index": hit.index,
+                    "library_smiles": library_rows[hit.index][1],
+                }
+                for rank, hit in enumerate(result.hits, start=1)
+            ],
+        }
+        for (name, smiles), result in zip(query_rows, batch.results, strict=True)
+    ]
+    payload = {
+        "schema": "hcs.similarity-screen.v1",
+        "queries_file": str(queries),
+        "file": str(file),
+        "n_library": len(library_rows),
+        "n_queries": len(query_rows),
+        "mode": "batched_full_scan",
+        "engine": {
+            "name": resolved.name,
+            "mode": resolved.mode,
+            "detail": resolved.detail,
+            "adapter": resolved.adapter,
+            "backend": resolved.backend,
+        },
+        "parity_checked": batch.parity_checked,
+        "k": k,
+        "threshold": threshold,
+        "timings_ms": {key: round(value, 3) for key, value in batch.timings_ms.items()},
+        "queries": queries_out,
+    }
+    lines = [
+        f"engine {resolved.label} | {len(query_rows)} queries × {len(library_rows)} structures | "
+        f"{'parity verified' if batch.parity_checked else 'CPU reference'} | "
+        f"{batch.timings_ms['total']:.1f} ms"
+    ]
+    for entry in queries_out:
+        top = entry["hits"][0] if entry["hits"] else None
+        lines.append(
+            f"{entry['query'][:28]:<28} → "
+            + ("no hit" if top is None else f"{top['similarity']:.4f} {top['name'][:24]}")
+        )
     _print(ctx, payload, "\n".join(lines))
 
 

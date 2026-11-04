@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import zipfile
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -82,6 +83,15 @@ def test_workflow_validate_and_run(settings, tmp_path: Path):
     )
     assert Path(exported["output"]).exists()
     assert "not measurements" in target.read_text(encoding="utf-8")
+
+    crate = tmp_path / "run.crate.zip"
+    exported = _json(
+        runner.invoke(app, ["--json", "report", "export", run_id, "--format", "ro-crate", "--output", str(crate)])
+    )
+    assert Path(exported["output"]).exists()
+    with zipfile.ZipFile(crate) as archive:
+        document = json.loads(archive.read("ro-crate-metadata.json"))
+    assert document["@context"] == "https://w3id.org/ro/crate/1.1/context"
 
 
 def test_workflow_run_no_follow_exits_zero_in_human_and_json_mode(settings):
@@ -331,3 +341,36 @@ def test_similarity_search_uses_the_prefilter_only_without_full_scores(settings,
     )
     assert with_scores["prefilter"]["enabled"] is False
     assert [hit["name"] for hit in with_scores["hits"]] == ["Benzene"]
+
+
+def test_similarity_screen_scores_every_query_against_one_library(settings, tmp_path: Path):
+    library = tmp_path / "library.csv"
+    library.write_text(
+        "name,smiles\nBenzene,c1ccccc1\nAspirin,CC(=O)Oc1ccccc1C(=O)O\nEthanol,CCO\n",
+        encoding="utf-8",
+    )
+    queries = tmp_path / "queries.smi"
+    queries.write_text("c1ccccc1\nCCO\n", encoding="utf-8")
+    payload = _json(
+        runner.invoke(
+            app,
+            [
+                "--json",
+                "similarity",
+                "screen",
+                "--queries",
+                str(queries),
+                "--file",
+                str(library),
+                "--k",
+                "2",
+                "--engine",
+                "cpu",
+            ],
+        )
+    )
+    assert payload["schema"] == "hcs.similarity-screen.v1"
+    assert payload["n_queries"] == 2 and payload["n_library"] == 3
+    assert payload["mode"] == "batched_full_scan"
+    assert [entry["hits"][0]["name"] for entry in payload["queries"]] == ["Benzene", "Ethanol"]
+    assert all(hit["similarity"] == 1.0 for entry in payload["queries"] for hit in entry["hits"][:1])

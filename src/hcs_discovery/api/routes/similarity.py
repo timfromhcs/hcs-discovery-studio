@@ -85,20 +85,14 @@ def similarity_search(payload: SimilaritySearchRequest, session: Session = Depen
     try:
         with TanimotoIndex.from_packed(fingerprints.packed, prefer=payload.engine, boost=payload.boost) as index:
             resolved = index.engine
-            if payload.threshold is not None:
-                # BitBound only helps a threshold search; a k-nearest query needs the
-                # full score vector to know which k are nearest.
-                pruned = index.threshold_hits(payload.query_smiles, payload.threshold)
-                raw_hits = pruned.hits[: payload.k]
-                parity = pruned.parity_checked
-                timings = pruned.timings_ms
-                candidates = pruned.candidates
-                prefiltered = pruned.prefiltered
-            else:
-                result = index.search(payload.query_smiles, k=payload.k, threshold=None)
-                raw_hits = result.hits
-                parity = result.parity_checked
-                timings = result.timings_ms
+            # The threshold (when given) is part of the bound-pruned k-NN call, so the
+            # same exact pruning applies to a plain nearest-neighbour query.
+            pruned = index.knn_hits(payload.query_smiles, payload.k, threshold=payload.threshold)
+            raw_hits = pruned.hits
+            parity = pruned.parity_checked
+            timings = pruned.timings_ms
+            candidates = pruned.candidates
+            prefiltered = pruned.prefiltered
     except GpuUnavailableError as exc:
         raise ValidationError(
             "A GPU engine was requested but no hardware GPU adapter is available.",

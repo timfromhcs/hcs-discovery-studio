@@ -23,6 +23,7 @@ CPU reference, and the engine detail says so.
 
 from __future__ import annotations
 
+import heapq
 import os
 import time
 from collections.abc import Sequence
@@ -53,6 +54,7 @@ __all__ = [
     "SUPPORTED_BITS",
     "SUPPORTED_RADIUS",
     "WORDS",
+    "BatchSearchResult",
     "BoostPreference",
     "Engine",
     "GpuUnavailableError",
@@ -135,6 +137,27 @@ class ThresholdResult:
     @property
     def n_hits(self) -> int:
         return len(self.hits)
+
+    @property
+    def comparisons_skipped(self) -> int:
+        """Library rows the bound proved unable to reach the result."""
+        return max(self.n - self.candidates, 0)
+
+
+@dataclass(frozen=True)
+class BatchSearchResult:
+    """One search result per query, scored against the same library."""
+
+    results: tuple[SearchResult, ...]
+    engine: Engine
+    queries: int
+    n: int
+    parity_checked: bool
+    timings_ms: dict[str, float]
+
+    @property
+    def labels(self) -> tuple[str, ...]:
+        return tuple(result.engine.label for result in self.results)
 
 
 def resolve_engine(prefer: EnginePreference = "auto", boost: BoostPreference = "auto") -> Engine:
@@ -545,6 +568,255 @@ class TanimotoIndex:
             timings_ms={
                 "score": (counted - started) * 1000.0,
                 "rank": (finished - counted) * 1000.0,
+                "total": (finished - started) * 1000.0,
+            },
+        )
+
+    def knn_hits(
+        self,
+        query_smiles: str,
+        k: int,
+        *,
+        threshold: float | None = None,
+    ) -> ThresholdResult:
+        """Exact k-nearest search with the popcount bound, without a full scan.
+
+        A full scan is correct but scores every row. The bound
+        ``T <= min(a, b) / max(a, b)`` orders the library by distance in popcount
+        from the query: rows whose best possible score is below the running k-th
+        score cannot enter the answer and are never compared. The walk stops at the
+        first popcount ring whose upper bound is strictly below that k-th score, so
+        the returned hits are identical to :meth:`search` — ties included, because
+        the ring where the bound equals the k-th score is still scored.
+        """
+        return self.knn_hits_for(self._query_fingerprint(query_smiles), k, threshold=threshold)
+
+    def knn_hits_for(
+        self,
+        query: np.ndarray,
+        k: int,
+        *,
+        threshold: float | None = None,
+    ) -> ThresholdResult:
+        """Same as :meth:`knn_hits`, for an already packed query fingerprint.
+
+        The work is staged so the GPU sees few, large dispatches instead of one per
+        popcount ring (a ring-per-dispatch implementation was measured 14× slower than
+        a full scan on this host, which is why it is not the implementation):
+
+        1. Score the rows whose popcount is closest to the query's — those have the
+           highest possible Tanimoto — in one dispatch.
+        2. The k-th score from step 1 is now a lower bound. Every row whose popcount
+           bound cannot reach it is dropped, and the rest is scored in a second
+           dispatch. Step 2 repeats only while the k-th score still rises, which each
+           pass makes rarer; the final pass scores all remaining rows that can still
+           reach it, so the answer is exact.
+        """
+        if k < 1:
+            raise ValidationError("k must be at least 1.")
+        if threshold is not None and not 0.0 <= threshold <= 1.0:
+            raise ValidationError("threshold must be within 0-1.")
+        started = time.perf_counter()
+        fingerprint = np.ascontiguousarray(query, dtype=np.uint32).reshape(-1)
+        if fingerprint.shape[0] != WORDS:
+            raise ValidationError("A query fingerprint must be 64 uint32 words.")
+        query_pop = int(popcount_rows(fingerprint)[0])
+        valid_rows = self._valid
+        if self._n == 0 or not bool(valid_rows.any()):
+            return ThresholdResult(
+                hits=(),
+                engine=self._engine,
+                n=self._n,
+                candidates=0,
+                parity_checked=False,
+                timings_ms={"bound": 0.0, "score": 0.0, "total": (time.perf_counter() - started) * 1000.0},
+                prefiltered=False,
+            )
+        if threshold == 0.0 or query_pop == 0:
+            # Nothing can be pruned: every bound is 0/1, so this is a full scan.
+            return self._full_knn(fingerprint, k, threshold=threshold, started=started)
+
+        floor = threshold if threshold is not None else 0.0
+        pops = self._lib_pop
+        high = np.maximum(pops, query_pop).astype(np.float64)
+        low = np.minimum(pops, query_pop).astype(np.float64)
+        upper = np.zeros(self._n, dtype=np.float64)
+        nonzero = pops > 0
+        upper[nonzero] = low[nonzero] / high[nonzero]
+        candidate_mask = valid_rows & (upper >= floor)
+        candidates = np.flatnonzero(candidate_mask)
+        if candidates.size == 0:
+            finished = time.perf_counter()
+            return ThresholdResult(
+                hits=(),
+                engine=self._engine,
+                n=self._n,
+                candidates=0,
+                parity_checked=False,
+                timings_ms={
+                    "bound": 0.0,
+                    "score": (finished - started) * 1000.0,
+                    "total": (finished - started) * 1000.0,
+                },
+                prefiltered=True,
+            )
+
+        # Seed: the ring of popcounts closest to the query, in one dispatch.
+        seed_size = min(candidates.size, max(4096, 64 * k))
+        distance = np.abs(pops.astype(np.int64) - query_pop)
+        histogram = np.bincount(distance[candidates], minlength=2049)
+        cutoff = int(np.searchsorted(np.cumsum(histogram), seed_size, side="left"))
+        seed_mask = candidate_mask & (distance <= cutoff)
+        best: list[tuple[float, int]] = []
+        scored = np.zeros(self._n, dtype=bool)
+        scored_rows = self._score_rows(fingerprint, np.flatnonzero(seed_mask), floor, k, best, scored)
+        kth = best[0][0] if len(best) >= k else floor
+
+        # Refinement passes: only rows whose bound can still reach the k-th score.
+        while True:
+            remaining = candidates[~scored[candidates]]
+            if remaining.size == 0:
+                break
+            keep = remaining[upper[remaining] >= kth]
+            if keep.size == 0:
+                break
+            scored_rows += self._score_rows(fingerprint, keep, floor, k, best, scored)
+            new_kth = best[0][0] if len(best) >= k else floor
+            if new_kth <= kth:
+                # The k-th score did not move, so nothing unscored can beat it; the
+                # pass just processed everything that could still reach it.
+                break
+            kth = new_kth
+        finished = time.perf_counter()
+        ranked = sorted(best, key=lambda entry: (-entry[0], -entry[1]))
+        hits = tuple(Hit(-negative_index, score) for score, negative_index in ranked)
+        return ThresholdResult(
+            hits=hits,
+            engine=self._engine,
+            n=self._n,
+            candidates=scored_rows,
+            parity_checked=self._gpu is not None and self._verify,
+            timings_ms={"bound": 0.0, "score": (finished - started) * 1000.0, "total": (finished - started) * 1000.0},
+            prefiltered=True,
+        )
+
+    def _score_rows(
+        self,
+        fingerprint: np.ndarray,
+        indices: np.ndarray,
+        floor: float,
+        k: int,
+        best: list[tuple[float, int]],
+        scored: np.ndarray,
+    ) -> int:
+        """Score one batch into the running top-k; returns how many rows were scored."""
+        if indices.size == 0:
+            return 0
+        inter, union = self.counts_for(fingerprint, indices)
+        scores = _scores_from_counts(inter, union)
+        scored[indices] = True
+        for score, index in zip(scores.tolist(), indices.tolist(), strict=True):
+            if score < floor:
+                continue
+            item = (score, -index)
+            if len(best) < k:
+                heapq.heappush(best, item)
+            elif item > best[0]:
+                heapq.heapreplace(best, item)
+        return int(indices.size)
+
+    def _full_knn(
+        self,
+        fingerprint: np.ndarray,
+        k: int,
+        *,
+        threshold: float | None,
+        started: float,
+    ) -> ThresholdResult:
+        inter, union = self.counts_for(fingerprint)
+        scores = _scores_from_counts(inter, union)
+        hits = _rank_scores(scores, self._valid, k=k, threshold=threshold)
+        finished = time.perf_counter()
+        return ThresholdResult(
+            hits=hits,
+            engine=self._engine,
+            n=self._n,
+            candidates=int(self._valid.sum()),
+            parity_checked=self._gpu is not None and self._verify,
+            timings_ms={"bound": 0.0, "score": (finished - started) * 1000.0, "total": (finished - started) * 1000.0},
+            prefiltered=False,
+        )
+
+    def search_many(
+        self,
+        query_smiles: Sequence[str],
+        *,
+        k: int | None = None,
+        threshold: float | None = None,
+    ) -> BatchSearchResult:
+        """Score several queries in one pass and return one result per query.
+
+        On a GPU the library is uploaded once per dispatch instead of once per query,
+        which is the dominant cost of the single-query path. Every count is compared
+        with the CPU reference when ``verify`` is on, exactly like ``search``; a
+        mismatch raises :class:`ParityError` instead of returning numbers.
+        """
+        if k is not None and k < 1:
+            raise ValidationError("k must be at least 1.")
+        if threshold is not None and not 0.0 <= threshold <= 1.0:
+            raise ValidationError("threshold must be within 0-1.")
+        queries = list(query_smiles)
+        if not queries:
+            raise ValidationError("At least one query is required.")
+        packed, valid = pack_smiles(queries)
+        if not bool(valid.all()):
+            bad = [index for index, ok in enumerate(valid.tolist()) if not ok]
+            raise ValidationError("A query SMILES is invalid.", details={"query_indexes": bad})
+        started = time.perf_counter()
+        if self._gpu is not None and self._engine.mode != "hybrid":
+            batch = self._gpu.counts_many(packed, self._packed)
+            inter, union = batch.inter, batch.union
+            gpu_ms = batch.total_ms
+            parity = self._verify
+            if self._verify:
+                for row, query in enumerate(packed):
+                    reference_inter, reference_union = cpu_counts(query, self._packed)
+                    if not (
+                        np.array_equal(inter[row], reference_inter) and np.array_equal(union[row], reference_union)
+                    ):
+                        raise ParityError(
+                            "GPU Tanimoto counts differ from the CPU reference; no result was returned.",
+                        )
+        else:
+            inter = np.empty((len(queries), self._n), dtype=np.uint32)
+            union = np.empty((len(queries), self._n), dtype=np.uint32)
+            for row, query in enumerate(packed):
+                inter[row], union[row] = cpu_counts(query, self._packed)
+            gpu_ms = 0.0
+            parity = False
+        scores = _scores_from_counts(inter, union)
+        ranked_at = time.perf_counter()
+        results = tuple(
+            SearchResult(
+                scores=scores[row],
+                hits=_rank_scores(scores[row], self._valid, k=k, threshold=threshold),
+                engine=self._engine,
+                n=self._n,
+                parity_checked=parity,
+                timings_ms={"score": 0.0, "rank": 0.0, "total": 0.0},
+            )
+            for row in range(len(queries))
+        )
+        finished = time.perf_counter()
+        return BatchSearchResult(
+            results=results,
+            engine=self._engine,
+            queries=len(queries),
+            n=self._n,
+            parity_checked=parity,
+            timings_ms={
+                "score": round(gpu_ms, 3),
+                "rank": (finished - ranked_at) * 1000.0,
                 "total": (finished - started) * 1000.0,
             },
         )

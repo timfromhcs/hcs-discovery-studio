@@ -4,6 +4,7 @@ import { api } from "../api/client";
 import { useCancelRun, useRun, useRunEvents, useRetryRun } from "../api/queries";
 import { Icon } from "../components/Icon";
 import { WorkflowGraph } from "../components/WorkflowGraph";
+import { RunTimeline } from "../components/RunTimeline";
 import {
   Badge,
   Button,
@@ -253,6 +254,7 @@ export function RunMonitorPage() {
             actions={<Badge tone={active ? "info" : "neutral"}>{active ? "live" : "final"}</Badge>}
           />
           <WorkflowGraph definition={detail.workflow_snapshot} statuses={statuses} ariaLabel="Run execution graph with node statuses" />
+          <RunTimeline run={detail} />
           <div className="node-progress-list">
             {detail.nodes.map((node) => (
               <div key={node.node_id} className={`node-progress status-${node.status}`}>
@@ -429,6 +431,14 @@ export function RunMonitorPage() {
                 <a className="btn btn-quiet btn-sm" href={api.runs.reportUrl(detail.id, "markdown")}>Markdown</a>
                 <a className="btn btn-quiet btn-sm" href={api.runs.reportUrl(detail.id, "json")}>JSON</a>
                 <a className="btn btn-quiet btn-sm" href={api.runs.reportUrl(detail.id, "csv")}>CSV</a>
+                <a
+                  className="btn btn-quiet btn-sm"
+                  href={api.runs.exportUrl(detail.id, "ro-crate")}
+                  download
+                  title="RO-Crate 1.1 bundle: JSON-LD metadata, PROV mapping and every artifact"
+                >
+                  RO-Crate
+                </a>
               </>
             ) : null
           }

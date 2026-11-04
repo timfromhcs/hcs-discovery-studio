@@ -157,6 +157,17 @@ def test_full_run_flow_over_http(client, settings, triage_definition):
     assert payload["run"]["status"] == "succeeded"
     assert "not measurements" in payload["caveat"]
 
+    crate = client.get(f"/api/v1/runs/{run['id']}/export/ro-crate")
+    assert crate.status_code == 200
+    assert crate.headers["content-type"] == "application/zip"
+    assert crate.content[:2] == b"PK"
+
+    metrics = client.get("/api/v1/metrics").text
+    assert "hcs_run_duration_seconds_count 1" in metrics
+    assert "hcs_run_duration_seconds_sum " in metrics
+    assert "hcs_node_duration_seconds_count 4" in metrics
+    assert "hcs_node_cache_hits_total 0" in metrics
+
 
 def test_cancel_queued_run_and_retry(client, triage_definition):
     project = _create_project(client)
@@ -340,6 +351,9 @@ def test_metrics_endpoint_exposes_local_counters(client):
     assert "hcs_projects 0" in body
     assert 'hcs_queue_depth{status="queued"} 0' in body
     assert "hcs_node_cache_entries 0" in body
+    assert "hcs_run_duration_seconds_count 0" in body
+    assert "hcs_node_duration_seconds_count 0" in body
+    assert "hcs_node_cache_hits_total 0" in body
     assert "hcs_gpu_available 0" in body or "hcs_gpu_available 1" in body
     # No paths, no secrets, no per-request labels.
     assert "/data" not in body and "d:\\" not in body.lower()

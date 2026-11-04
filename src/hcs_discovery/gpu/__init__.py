@@ -8,5 +8,15 @@ from hcs_discovery.gpu.cpu import cpu_counts, cpu_tanimoto, ratio
 from hcs_discovery.gpu.fingerprints import BITS, WORDS, pack_smiles
 
 KERNEL_PATH = Path(__file__).parent / "kernels" / "tanimoto.wgsl"
+BATCH_KERNEL_PATH = Path(__file__).parent / "kernels" / "tanimoto_batch.wgsl"
 
-__all__ = ["BITS", "KERNEL_PATH", "WORDS", "cpu_counts", "cpu_tanimoto", "pack_smiles", "ratio"]
+__all__ = [
+    "BATCH_KERNEL_PATH",
+    "BITS",
+    "KERNEL_PATH",
+    "WORDS",
+    "cpu_counts",
+    "cpu_tanimoto",
+    "pack_smiles",
+    "ratio",
+]

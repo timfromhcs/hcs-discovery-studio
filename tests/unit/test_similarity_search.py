@@ -302,3 +302,128 @@ def test_gpu_threshold_prefilter_matches_the_cpu_full_scan():
     with TanimotoIndex(VARIED_LIBRARY, prefer="cpu") as reference:
         full = reference.search(QUERY, threshold=0.2)
     assert [(hit.index, hit.similarity) for hit in gpu.hits] == [(hit.index, hit.similarity) for hit in full.hits]
+
+
+# --------------------------------------------------------------------------- k-NN bound
+@pytest.mark.parametrize("k", [1, 2, 5, 12, 40])
+@pytest.mark.parametrize("threshold", [None, 0.0, 0.2, 0.9])
+def test_knn_bound_returns_exactly_the_full_scan(k, threshold):
+    with TanimotoIndex(VARIED_LIBRARY, prefer="cpu") as index:
+        full = index.search(QUERY, k=k, threshold=threshold)
+        pruned = index.knn_hits(QUERY, k, threshold=threshold)
+    assert [(hit.index, hit.similarity) for hit in pruned.hits] == [(hit.index, hit.similarity) for hit in full.hits]
+
+
+def test_knn_matches_the_full_scan_on_random_libraries():
+    from hcs_discovery.similarity import _rank_scores
+
+    rng = np.random.default_rng(17)
+    for _ in range(30):
+        # Different densities produce different popcounts, which is what the bound
+        # needs to be interesting; a single density would put every row in one ring.
+        density = rng.uniform(0.02, 0.5)
+        bits = (rng.random((64, 2048)) < density).astype(np.uint8)
+        words = np.ascontiguousarray(np.packbits(bits, axis=1, bitorder="little")).view(np.uint32)
+        index = TanimotoIndex.from_packed(words, prefer="cpu", verify=False)
+        query = words[rng.integers(0, 64)]
+        k = int(rng.integers(1, 20))
+        threshold = None if rng.random() < 0.5 else float(rng.uniform(0.0, 1.0))
+        pruned = index.knn_hits_for(query, k, threshold=threshold)
+        # Compare against the same ranking function the full scan uses.
+        inter, union = index.counts_for(query)
+        scores = np.divide(inter, union, out=np.zeros(len(words)), where=union > 0)
+        expected = _rank_scores(scores, index.valid, k=k, threshold=threshold)
+        assert [(hit.index, hit.similarity) for hit in pruned.hits] == [(hit.index, hit.similarity) for hit in expected]
+        assert pruned.candidates <= len(words)
+        index.close()
+
+
+def test_knn_reports_skipped_comparisons_on_a_clustered_library():
+    rng = np.random.default_rng(3)
+    # A clustered library: 6000 rows of one scaffold with a few bit flips, so the
+    # k-th neighbour is genuinely similar and the bound can drop the rest.
+    base = (rng.random(2048) < 0.08).astype(np.uint8)
+    bits = np.tile(base, (6000, 1))
+    flips = rng.integers(1, 40, size=6000)
+    for row, count in enumerate(flips):
+        columns = rng.choice(2048, size=count, replace=False)
+        bits[row, columns] ^= 1
+    words = np.ascontiguousarray(np.packbits(bits, axis=1, bitorder="little")).view(np.uint32)
+    index = TanimotoIndex.from_packed(words, prefer="cpu", verify=False)
+    query = words[0].copy()
+    try:
+        result = index.knn_hits_for(query, 10)
+    finally:
+        index.close()
+    assert result.prefiltered is True
+    assert 0 < result.candidates < len(bits)
+    assert result.comparisons_skipped == len(bits) - result.candidates
+
+
+def test_knn_threshold_zero_is_an_honest_full_scan():
+    with TanimotoIndex(VARIED_LIBRARY, prefer="cpu") as index:
+        result = index.knn_hits(QUERY, 5, threshold=0.0)
+    assert result.prefiltered is False
+    assert result.candidates == len(VARIED_LIBRARY)
+    assert result.comparisons_skipped == 0
+
+
+def test_knn_rejects_invalid_arguments():
+    with TanimotoIndex(VARIED_LIBRARY, prefer="cpu") as index:
+        with pytest.raises(ValidationError):
+            index.knn_hits(QUERY, 0)
+        with pytest.raises(ValidationError):
+            index.knn_hits(QUERY, 3, threshold=1.2)
+
+
+@pytest.mark.gpu
+def test_gpu_knn_matches_the_cpu_full_scan():
+    if select_adapter() is None:
+        pytest.skip("no hardware GPU adapter")
+    with TanimotoIndex(VARIED_LIBRARY * 5, prefer="auto") as index:
+        gpu = index.knn_hits(QUERY, 6, threshold=0.1)
+    with TanimotoIndex(VARIED_LIBRARY * 5, prefer="cpu") as reference:
+        full = reference.search(QUERY, k=6, threshold=0.1)
+    assert [(hit.index, hit.similarity) for hit in gpu.hits] == [(hit.index, hit.similarity) for hit in full.hits]
+    assert gpu.parity_checked is True
+
+
+# --------------------------------------------------------------------------- batch
+BATCH_QUERIES = ["CC(=O)Oc1ccccc1C(=O)O", "c1ccccc1", "CN1C=NC2=C1C(=O)N(C(=O)N2C)C", "CCO"]
+
+
+def test_batch_search_returns_the_same_hits_as_single_queries_on_cpu():
+    with TanimotoIndex(VARIED_LIBRARY, prefer="cpu") as index:
+        batch = index.search_many(BATCH_QUERIES, k=4, threshold=0.1)
+        single = [index.search(query, k=4, threshold=0.1) for query in BATCH_QUERIES]
+    assert batch.queries == len(BATCH_QUERIES)
+    assert batch.n == len(VARIED_LIBRARY)
+    assert batch.parity_checked is False
+    for batched, one in zip(batch.results, single, strict=True):
+        assert [(hit.index, hit.similarity) for hit in batched.hits] == [
+            (hit.index, hit.similarity) for hit in one.hits
+        ]
+
+
+def test_batch_search_rejects_an_invalid_query_with_its_index():
+    with TanimotoIndex(VARIED_LIBRARY, prefer="cpu") as index, pytest.raises(ValidationError) as error:
+        index.search_many(["CCO", "not_a_smiles"], k=3)
+    assert error.value.details["query_indexes"] == [1]
+
+
+@pytest.mark.gpu
+def test_gpu_batch_search_is_bit_exact_and_parity_checked():
+    if select_adapter() is None:
+        pytest.skip("no hardware GPU adapter")
+    with TanimotoIndex(VARIED_LIBRARY * 4, prefer="gpu", verify=True) as index:
+        batch = index.search_many(BATCH_QUERIES, k=5)
+        assert batch.parity_checked is True
+        reference = index.search_many(BATCH_QUERIES, k=5)
+        for row, query in enumerate(BATCH_QUERIES):
+            one = index.search(query, k=5)
+            assert [(hit.index, hit.similarity) for hit in batch.results[row].hits] == [
+                (hit.index, hit.similarity) for hit in one.hits
+            ]
+        assert [(hit.index, hit.similarity) for hit in batch.results[0].hits] == [
+            (hit.index, hit.similarity) for hit in reference.results[0].hits
+        ]

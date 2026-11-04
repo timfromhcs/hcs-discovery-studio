@@ -880,6 +880,109 @@ Worked through GEMINI.md again from the merged `main`.
   Registry-Katalog sichtbar (`select.sat`), Workflow-Validator akzeptiert ihn
   (Gruppenspalte muss von einer Vorgänger-Node stammen). Voller Lauf unten.
 
+## 2026-11-04 (08:40) — Run-Timeline (Observability in der UI)
+
+- Branch `main` @ `6bf9ffb`, Baum clean, kein paralleler Agent aktiv.
+- Neu: `apps/web/src/components/RunTimeline.tsx`, eingebunden im Run-Monitor unter dem
+  Ausführungsgraphen. Ausschließlich aus persistierten Zeitstempeln:
+  - Queue-Segment (`created_at` → `started_at`), nur wenn es eine Wartezeit gab;
+  - je Knoten ein Balken (`started_at` → `finished_at`, laufende Knoten bis jetzt);
+  - Cache-Markierung aus `node.cached`, Statusfarbe aus `node.status`;
+  - Kopfzeile mit „X queued · Y in nodes · Z total".
+  Knoten ohne aufgezeichneten Start werden **ausgelassen**, nicht geschätzt.
+- Barrierefreiheit: `<section aria-label>`, `<ol>` als Zeilenliste, die Grafik ist
+  `aria-hidden`, die Information steht als Text (Label + Dauer) daneben; axe-Gate
+  deckt die Seite ab.
+- Test: `e2e/studio.spec.ts` prüft nach dem Run mindestens 4 Timeline-Segmente und
+  die Kopfzeile. Lokal: `studio.spec.ts` 3 passed (inkl. Timeline), Build grün.
+- Gates/Doku: CHANGELOG, Roadmap (Next-Zeile erledigt), voller Gate-Lauf unten.
+
+## 2026-11-04 (08:50) — v3-Plan gegengeprüft: zwei behauptete Defekte existieren nicht
+
+- `main` @ `85b3d10` (Run-Timeline committet); im Baum arbeitet ein zweiter Agent an
+  `similarity.py` (bound-pruned k-NN) — nicht angefasst.
+- `docs/engineering/PLAN_2026-11-04_SOTA_V3.md` behauptete in §0.1/§0.2 zwei Defekte.
+  Beide geprüft, beide **nicht reproduzierbar**:
+  1. „kaputter CSS-Einzeiler" in `global.css`: `.node-progress` ist ein normaler
+     Block (`padding`, `border`, `border-left`, `border-radius` je eigene Zeile),
+     `npm run build` und lightningcss laufen grün.
+  2. Mojibake in `plugins/science/adapter.py`: die Datei heißt
+     `plugins/science/properties/adapter.py`; ein Scan über alle `src/**/*.py` nach
+     U+FFFD/„â€"/„Ã" liefert 0 Treffer.
+  Der Plan ist an beiden Stellen korrigiert (durchgestrichen + Prüfdatum), nicht
+  stillschweigend gelöscht.
+- Lehre für den Plan: Behauptungen über einen Arbeitsbaum veralten, sobald ein
+  zweiter Agent committet; jeder „Defekt" braucht den Befehl, der ihn zeigt.
+- Zusätzlich die im v3-Plan (§0.2, Punkt 13) benannte **Versionsdrift** behoben:
+  `apps/web/package.json`/Lockfile, `CITATION.cff` (beide Blöcke) und README
+  (Badge, Citation-Block) standen auf `2.1.0`; `IMPLEMENTATION_STATUS.md` nannte
+  `2.2.0` als aktuell. Jetzt überall `2.2.1`, passend zu Tag, GitHub-Release
+  (published 2026-11-03) und `pyproject.toml`. `verify_version.py v2.2.1` grün,
+  `test_release_version.py` 12 passed.
+
+## 2026-11-04 (09:00–…) — v3.0.0: SOTA-Lücken schließen, Major Release
+
+- Ausgangslage: `main` @ `6bf9ffb` + uncommitted Run-Timeline; Branch
+  `release/v3.0.0`. Plan: `docs/engineering/PLAN_2026-11-04_SOTA_V3.md`
+  (Recherche zu Similarity-SOTA, ADMET, Docking, RO-Crate, MCP `2026-07-28`,
+  Packaging und UI/UX mit Quellen).
+- **W0:** CSS-Defekt (inline `border` im Timeline-Block) behoben; Timeline-Werk
+  committet; Baseline `uv run pytest` → 591 passed, 1 deselected, 110 s.
+- **W1 — Bound-pruned k-NN:** `TanimotoIndex.knn_hits(_for)`; exakt (Differential-
+  und Property-Tests inkl. Ties). Die erste Ring-pro-Dispatch-Variante war
+  **14× langsamer** als ein Full Scan und wurde verworfen; die gestagte Variante
+  (Popcount-Ring als Seed, dann Bound-Filter in einem Dispatch) ist 6,0× (100k)
+  bzw. 3,9× (500k) auf einer geclusterten synthetischen Bibliothek, 0,85× auf
+  einer ungeclusterten — beides im generierten Report.
+- **W2 — Batch-Kernel:** `gpu/kernels/tanimoto_batch.wgsl`, `GpuEngine.counts_many`,
+  `TanimotoIndex.search_many`, CLI `similarity screen`; 10,9× (100k) / 9,7× (500k)
+  gegenüber Einzelabfragen, Parität pro Query. Erster Kernel-Versuch scheiterte an
+  `target` als WGSL-Schlüsselwort; das warf den gesamten GPU-Pfad still auf CPU
+  zurück, bis der Name geändert war.
+- **W3 — ESOL:** vollständige Delaney-Gleichung auf dem 1.128-Molekül-Set
+  gemessen: RMSE 1,099 [1,047; 1,154], MAE 0,844, R² 0,725; Held-out-Scaffold-Split
+  RMSE 1,201 / R² 0,640. Der 45-Molekül-Stresstest (R² 0,07) bleibt publiziert.
+  `validate_esol_delaney.py --check` ist das Gate.
+- **W4 — RO-Crate:** `reports/rocrate.py`, CLI/API/UI; RO-Crate-1.1-Kontext,
+  `CreateAction`/`prov:Activity`, `prov:Plan`, Umgebung, Artefakt-Hashes,
+  deterministisches ZIP; fehlende Artefakte brechen ab. Drei Integrationstests.
+- **W5 — MCP:** dual-era `2026-07-28` (`server/discover`, `-32022`,
+  `resultType`, `ttlMs`/`cacheScope`, `structuredContent`) plus Legacy-
+  `initialize`; 16 Tests.
+- **W6 — Metriken:** `hcs_run_duration_seconds`, `hcs_node_duration_seconds`,
+  `hcs_node_cache_hits_total` aus persistierten Zeitstempeln; API-Tests.
+  Lighthouse bleibt offen (nicht installiert; kein erfundenes Budget).
+- **W7 — Docking:** Multi-Target bewusst **nicht** gebaut (keine
+  Rezeptorvorbereitung/keine Meeko-Abhängigkeit); 1IEP-Gate bleibt
+  Regressionscheck, die Lücke steht in README/Status.
+- **W8 — Release:** `3.0.0` in pyproject/`__init__`/package.json/Lock/constants/
+  CITATION; Release-Matrix Windows x64, Linux x64, macOS arm64/x64 plus
+  GHCR-Container mit Smoke-Test; Release Notes `docs/releases/v3.0.0.md`.
+  PowerShell-`Set-Content -Encoding utf8` schrieb BOMs in sechs Dateien
+  (TOMLDecodeError); mit Python-Byteschnitt entfernt. Lehre: Dateien nur mit
+  Edit-Tool oder Python schreiben.
+- **W9 — UI/UX:** Zwei echte Defekte gefunden:
+  1. `formatDuration` erwartet Sekunden, die Timeline übergab Millisekunden →
+     ein 0,25-s-Lauf zeigte „1m 40s in nodes“/„4m 23s total“. Behoben, E2E prüft
+     jetzt `< 60 000 ms` und dass die Summe keine Minuten enthält.
+  2. Der Footer-Credit war doppelt kodiert (`â¤ï¸`), weil `constants.ts` als
+     Latin-1-Mojibake gespeichert war. Behoben; neues Gate
+     `scripts/ci/check_text_encoding.py` (UTF-8 strikt, U+FFFD, Mojibake-Muster)
+     plus vier Tests und CI-/Gate-Runner-Einbindung.
+  Timeline-Hinweis (Queue/Idle/Cache) ergänzt; RO-Crate-Button mit Tooltip;
+  Screenshots neu erzeugt.
+- **Doku:** README (3.0.0, neue Fähigkeiten, ehrliche Grenzen, korrigierte
+  DAG-Beschreibung), IMPLEMENTATION_STATUS neu geschrieben, Roadmap/Release-
+  Notes/CLI-Guide aktualisiert.
+- **Parallelarbeit:** Die stündliche Schleife hat während dieses Turns zwei reine
+  Doku-Commits erzeugt (`c4612a5`, `c8909e2`) und dabei zwei Punkte des Plans
+  gegengeprüft, die zum Prüfzeitpunkt schon repariert waren. Beide Tasks
+  (`HCS-OpenCode-Hourly`, `HCS-OpenCode-Watchdog`) wurden für den Rest des Turns
+  deaktiviert, damit kein zweiter Agent in denselben Arbeitsbaum schreibt; nach dem
+  Merge wieder aktivieren.
+- **Offen:** Lighthouse-LCP/CLS, Tag/PyPI/DOI (owner-gated), Multi-Target-Docking,
+  PostgreSQL gegen echten Server, Objekt-Storage.
+
 ## Blockers
 
 - None technical at the time of writing. The `v0.1.0` preview is published and
